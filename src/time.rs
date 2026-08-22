@@ -5,39 +5,51 @@ use jiff::tz::TimeZone;
 
 use crate::error::Error;
 
-pub fn now_stored() -> Result<String, Error> {
-    format_stored(Timestamp::now())
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Instant(Timestamp);
+
+impl Instant {
+    pub fn now() -> Self {
+        Self(Timestamp::now())
+    }
+
+    pub fn from_timestamp(ts: Timestamp) -> Self {
+        Self(ts)
+    }
+
+    pub fn timestamp(self) -> Timestamp {
+        self.0
+    }
 }
 
-pub fn parse_instant(input: &str) -> Result<String, Error> {
+pub fn parse_instant(input: &str) -> Result<Instant, Error> {
     match parse(input)? {
-        Parsed::Instant(ts) => format_stored(ts),
+        Parsed::Instant(ts) => Ok(Instant(ts)),
         Parsed::Date(_) => Err(Error::usage("date-only is a query bound, not an instant")),
     }
 }
 
-pub fn display_local(stored: &str) -> Result<String, Error> {
-    let ts = parse_stored(stored)?;
-    let zoned = ts.to_zoned(system_tz());
+pub fn display_local(at: Instant) -> Result<String, Error> {
+    let zoned = at.0.to_zoned(system_tz());
     strtime::format("%Y-%m-%dT%H:%M:%S%:z", &zoned).map_err(|e| Error::fail(e.to_string()))
 }
 
-pub fn from_bound(input: &str) -> Result<String, Error> {
+fn from_bound(input: &str) -> Result<Instant, Error> {
     match parse(input)? {
-        Parsed::Instant(ts) => format_stored(ts),
-        Parsed::Date(date) => format_stored(date_midnight(date)?),
+        Parsed::Instant(ts) => Ok(Instant(ts)),
+        Parsed::Date(date) => Ok(Instant(date_midnight(date)?)),
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ToBound {
-    Inclusive(String),
-    Exclusive(String),
+    Inclusive(Instant),
+    Exclusive(Instant),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Range {
-    pub from: Option<String>,
+    pub from: Option<Instant>,
     pub to: Option<ToBound>,
 }
 
@@ -51,11 +63,11 @@ impl Range {
 
     pub fn today() -> Result<Self, Error> {
         let today = Timestamp::now().to_zoned(system_tz()).date();
-        let start = format_stored(date_midnight(today)?)?;
+        let start = Instant(date_midnight(today)?);
         let next = today
             .checked_add(jiff::Span::new().days(1))
             .map_err(|e| Error::fail(e.to_string()))?;
-        let end = format_stored(date_midnight(next)?)?;
+        let end = Instant(date_midnight(next)?);
         Ok(Self {
             from: Some(start),
             to: Some(ToBound::Exclusive(end)),
@@ -65,19 +77,18 @@ impl Range {
 
 fn to_bound(input: &str) -> Result<ToBound, Error> {
     match parse(input)? {
-        Parsed::Instant(ts) => Ok(ToBound::Inclusive(format_stored(ts)?)),
+        Parsed::Instant(ts) => Ok(ToBound::Inclusive(Instant(ts))),
         Parsed::Date(date) => {
             let next = date
                 .checked_add(jiff::Span::new().days(1))
                 .map_err(|e| Error::fail(e.to_string()))?;
-            Ok(ToBound::Exclusive(format_stored(date_midnight(next)?)?))
+            Ok(ToBound::Exclusive(Instant(date_midnight(next)?)))
         }
     }
 }
 
-pub fn local_civil(stored: &str) -> Result<Date, Error> {
-    let ts = parse_stored(stored)?;
-    Ok(ts.to_zoned(system_tz()).date())
+pub fn local_civil(at: Instant) -> Date {
+    at.0.to_zoned(system_tz()).date()
 }
 
 enum Parsed {
@@ -147,17 +158,6 @@ fn looks_like_hms(s: &str) -> bool {
         && s.as_bytes()[2] == b':'
         && s.as_bytes()[5] == b':'
         && s.bytes().all(|b| b == b':' || b.is_ascii_digit())
-}
-
-fn parse_stored(stored: &str) -> Result<Timestamp, Error> {
-    stored
-        .parse()
-        .map_err(|_| Error::fail(format!("corrupt stored time: {stored}")))
-}
-
-fn format_stored(ts: Timestamp) -> Result<String, Error> {
-    let zoned = ts.to_zoned(TimeZone::UTC);
-    strtime::format("%Y-%m-%dT%H:%M:%SZ", &zoned).map_err(|e| Error::fail(e.to_string()))
 }
 
 fn date_midnight(date: Date) -> Result<Timestamp, Error> {

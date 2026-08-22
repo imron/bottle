@@ -7,6 +7,23 @@
 - Rebuild from the base facts with the fewest moves that reach the outcome.
   Cut steps that add ceremony but not value.
 - Lean on the type system to make it impossible to represent invalid state
+- Parse at the boundary of the system and turn things in to strong types.
+  This way we can guarantee validity within the core.  Parse don't validate.
+
+## Architecture
+
+input → domain → store
+
+- **input** is CLI and MCP. Parse user values into domain types.
+  Domain returns structured results. Input renders TSV, YAML, or
+  help. Input never talks to store.
+- **domain** is the ledger: schemas, entries, links, instants.
+  Ledgers have entries, not rows. Domain does not import rusqlite,
+  Cmd, or TSV. It does not return rendered output.
+- **store** is sqlite. It takes domain objects and returns domain
+  objects. sqlite TEXT/INTEGER stay inside store; convert to
+  Instant, SchemaName, Link, and so on before returning. Store
+  types never leak into domain. Input types never leak into domain.
 
 ## Commits
 

@@ -44,12 +44,7 @@ impl Spec {
     fn canonicalize(&mut self) -> Result<(), Error> {
         let mut seen = std::collections::HashSet::new();
         for field in &mut self.fields {
-            if !is_ident(&field.name) {
-                return Err(Error::fail(format!("invalid field name: {}", field.name)));
-            }
-            if is_reserved(&field.name) {
-                return Err(Error::fail(format!("reserved field name: {}", field.name)));
-            }
+            FieldName::parse(&field.name)?;
             if !seen.insert(field.name.clone()) {
                 return Err(Error::fail(format!("duplicate field: {}", field.name)));
             }
@@ -71,6 +66,144 @@ impl Spec {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SchemaName(String);
+
+impl SchemaName {
+    pub fn parse(s: &str) -> Result<Self, Error> {
+        if is_schema_name(s) {
+            Ok(Self(s.to_string()))
+        } else {
+            Err(Error::fail(format!("schema name must be family.kind: {s}")))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for SchemaName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FieldName(String);
+
+impl FieldName {
+    pub fn parse(s: &str) -> Result<Self, Error> {
+        if !is_ident(s) {
+            return Err(Error::fail(format!("invalid field name: {s}")));
+        }
+        if is_reserved(s) {
+            return Err(Error::fail(format!("reserved field name: {s}")));
+        }
+        Ok(Self(s.to_string()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for FieldName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LinkName(String);
+
+impl LinkName {
+    pub fn parse(s: &str) -> Result<Self, Error> {
+        if !is_ident(s) {
+            return Err(Error::fail(format!("invalid link name: {s}")));
+        }
+        if is_reserved(s) || is_time_group(s) {
+            return Err(Error::fail(format!("reserved link name: {s}")));
+        }
+        Ok(Self(s.to_string()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for LinkName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Group {
+    Day,
+    Week,
+    Month,
+    Year,
+    Link(LinkName),
+}
+
+impl Group {
+    pub fn parse(s: &str) -> Result<Self, Error> {
+        match s {
+            "day" => Ok(Self::Day),
+            "week" => Ok(Self::Week),
+            "month" => Ok(Self::Month),
+            "year" => Ok(Self::Year),
+            other => Ok(Self::Link(LinkName::parse(other)?)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EntryRef {
+    pub schema: SchemaName,
+    pub id: i64,
+}
+
+impl EntryRef {
+    pub fn parse(s: &str) -> Result<Self, Error> {
+        let Some((schema, id)) = s.rsplit_once('/') else {
+            return Err(Error::usage(format!("invalid link target: {s}")));
+        };
+        let schema = SchemaName::parse(schema)
+            .map_err(|_| Error::usage(format!("invalid link target: {s}")))?;
+        let id: i64 = id
+            .parse()
+            .map_err(|_| Error::usage(format!("invalid link target: {s}")))?;
+        if id < 1 {
+            return Err(Error::usage(format!("invalid link target: {s}")));
+        }
+        Ok(Self { schema, id })
+    }
+}
+
+impl std::fmt::Display for EntryRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.schema, self.id)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Link {
+    pub name: LinkName,
+    pub to: EntryRef,
+}
+
+impl Link {
+    pub fn parse(name: &str, target: &str) -> Result<Self, Error> {
+        Ok(Self {
+            name: LinkName::parse(name)?,
+            to: EntryRef::parse(target)?,
+        })
     }
 }
 
@@ -99,14 +232,6 @@ pub fn is_time_group(s: &str) -> bool {
     matches!(s, "day" | "week" | "month" | "year")
 }
 
-pub fn table_name(schema: &str) -> String {
-    schema.replace('.', "_")
-}
-
-pub fn quote_ident(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
-}
-
 pub fn fold_enum(value: &str) -> String {
     value.to_ascii_lowercase()
 }
@@ -125,19 +250,6 @@ pub fn fold_enum_values(values: &mut [String]) -> Result<(), Error> {
         }
     }
     Ok(())
-}
-
-pub fn parse_target(s: &str) -> Result<(String, i64), Error> {
-    let Some((schema, id)) = s.rsplit_once('/') else {
-        return Err(Error::usage(format!("invalid link target: {s}")));
-    };
-    if !is_schema_name(schema) {
-        return Err(Error::usage(format!("invalid link target: {s}")));
-    }
-    let id: i64 = id
-        .parse()
-        .map_err(|_| Error::usage(format!("invalid link target: {s}")))?;
-    Ok((schema.to_string(), id))
 }
 
 pub fn parse_number(raw: &str) -> Result<f64, Error> {
