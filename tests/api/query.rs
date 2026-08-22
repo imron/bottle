@@ -57,6 +57,23 @@ fn ls_columns_and_number_format() {
 }
 
 #[test]
+fn ls_instant_to_is_inclusive() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let out = h.run_ok(Cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: Some("2026-08-22T08:14:00Z".into()),
+        agent: None,
+        wheres: vec![],
+        include_ignored: false,
+    });
+    let lines = tsv_lines(&out);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[1][4], "eggs");
+}
+
+#[test]
 fn ls_from_to_dates() {
     let mut h = harness();
     seed_meals(&mut h);

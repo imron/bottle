@@ -26,7 +26,7 @@ pub fn harness() -> Harness {
 
 impl Harness {
     pub fn run(&mut self, cmd: Cmd) -> Result<String, Error> {
-        self.bottle.run(cmd)
+        bottle::execute(&mut self.bottle, cmd)
     }
 
     pub fn run_ok(&mut self, cmd: Cmd) -> String {

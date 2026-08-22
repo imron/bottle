@@ -12,7 +12,7 @@ use crate::store::{Amend, load_links, load_row, load_schema, require_schema_name
 use crate::time;
 use crate::tsv;
 use crate::value::{
-    SqlVal, field_sql, format_links, format_links_pairs, insert_links, sql_type,
+    SqlVal, field_sql, field_sql_parts, format_links, format_links_pairs, insert_links, sql_type,
     validate_link_name, write_id_row,
 };
 
@@ -89,15 +89,7 @@ impl Tx<'_> {
         }
         let required = default.is_some();
         if let Some(ref def) = default {
-            field_sql(
-                &Field {
-                    name: name.to_string(),
-                    type_,
-                    required: true,
-                    values: values.clone(),
-                },
-                def,
-            )?;
+            field_sql_parts(name, type_, values.as_deref(), def)?;
         }
         let field = Field {
             name: name.to_string(),

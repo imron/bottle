@@ -29,27 +29,50 @@ pub fn from_bound(input: &str) -> Result<String, Error> {
     }
 }
 
-/// Exclusive end for a `--to` value.
-pub fn to_bound_sql(input: &str) -> Result<(String, bool), Error> {
+#[derive(Debug, Clone)]
+pub enum ToBound {
+    Inclusive(String),
+    Exclusive(String),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Range {
+    pub from: Option<String>,
+    pub to: Option<ToBound>,
+}
+
+impl Range {
+    pub fn parse(from: Option<&str>, to: Option<&str>) -> Result<Self, Error> {
+        Ok(Self {
+            from: from.map(from_bound).transpose()?,
+            to: to.map(to_bound).transpose()?,
+        })
+    }
+
+    pub fn today() -> Result<Self, Error> {
+        let today = Timestamp::now().to_zoned(system_tz()).date();
+        let start = format_stored(date_midnight(today)?)?;
+        let next = today
+            .checked_add(jiff::Span::new().days(1))
+            .map_err(|e| Error::fail(e.to_string()))?;
+        let end = format_stored(date_midnight(next)?)?;
+        Ok(Self {
+            from: Some(start),
+            to: Some(ToBound::Exclusive(end)),
+        })
+    }
+}
+
+fn to_bound(input: &str) -> Result<ToBound, Error> {
     match parse(input)? {
-        Parsed::Instant(ts) => Ok((format_stored(ts)?, true)),
+        Parsed::Instant(ts) => Ok(ToBound::Inclusive(format_stored(ts)?)),
         Parsed::Date(date) => {
             let next = date
                 .checked_add(jiff::Span::new().days(1))
                 .map_err(|e| Error::fail(e.to_string()))?;
-            Ok((format_stored(date_midnight(next)?)?, false))
+            Ok(ToBound::Exclusive(format_stored(date_midnight(next)?)?))
         }
     }
-}
-
-pub fn today_window() -> Result<(String, String), Error> {
-    let today = Timestamp::now().to_zoned(system_tz()).date();
-    let start = format_stored(date_midnight(today)?)?;
-    let next = today
-        .checked_add(jiff::Span::new().days(1))
-        .map_err(|e| Error::fail(e.to_string()))?;
-    let end = format_stored(date_midnight(next)?)?;
-    Ok((start, end))
 }
 
 pub fn local_civil(stored: &str) -> Result<Date, Error> {

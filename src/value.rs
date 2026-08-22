@@ -41,12 +41,20 @@ pub(crate) fn sql_type(t: FieldType) -> &'static str {
 }
 
 pub(crate) fn field_sql(field: &Field, value: &str) -> Result<SqlVal, Error> {
-    match field.type_ {
+    field_sql_parts(&field.name, field.type_, field.values.as_deref(), value)
+}
+
+pub(crate) fn field_sql_parts(
+    name: &str,
+    type_: FieldType,
+    values: Option<&[String]>,
+    value: &str,
+) -> Result<SqlVal, Error> {
+    match type_ {
         FieldType::Text => {
             if value.contains('\t') || value.contains('\n') {
                 return Err(Error::fail(format!(
-                    "text {} may not contain tab or newline",
-                    field.name
+                    "text {name} may not contain tab or newline"
                 )));
             }
             Ok(SqlVal::Text(value.to_string()))
@@ -54,14 +62,11 @@ pub(crate) fn field_sql(field: &Field, value: &str) -> Result<SqlVal, Error> {
         FieldType::Number => Ok(SqlVal::Real(parse_number(value)?)),
         FieldType::Enum => {
             let folded = fold_enum(value);
-            let Some(values) = &field.values else {
-                return Err(Error::fail(format!("enum {} has no values", field.name)));
+            let Some(values) = values else {
+                return Err(Error::fail(format!("enum {name} has no values")));
             };
             if !values.iter().any(|v| v == &folded) {
-                return Err(Error::fail(format!(
-                    "invalid {} value: {value}",
-                    field.name
-                )));
+                return Err(Error::fail(format!("invalid {name} value: {value}")));
             }
             Ok(SqlVal::Text(folded))
         }
