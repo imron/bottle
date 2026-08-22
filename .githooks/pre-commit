@@ -1,0 +1,9 @@
+#!/bin/sh
+# Mechanical gates only. /code-review is an agent skill; run it yourself
+# on the diff before committing.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+cargo fmt --check
+cargo check --all-targets
+cargo clippy --all-targets -- --deny warnings
+echo "fmt, check, and clippy passed. /code-review is still required before this commit." >&2

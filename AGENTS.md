@@ -18,6 +18,30 @@ Write messages as in https://cbea.ms/git-commit/ : imperative subject around
 50 characters, no trailing period, blank line, body wrapped at 72 that
 explains why.
 
-A commit does not land until `cargo fmt --check` is clean, `cargo clippy
---all-targets -- -D warnings` is clean, and `/review` (the code-review skill)
-reports no bugs.
+A commit does not land until all of these pass on that commit's tree:
+
+- `cargo fmt --check`
+- `cargo check --all-targets`
+- `cargo clippy --all-targets -- -D warnings`
+- `/code-review` on the commit's diff, with no bugs
+
+Do not skip `/code-review`. Fix bugs it finds, then review again.
+
+Do not silence clippy or rustc lints (`#[allow(...)]`, `#![allow(...)]`,
+`expect`, `--allow`, `#![allow(clippy::...)]`) without explicit human
+approval for that lint at that site. Restructure the code instead.
+
+### Pre-commit hook
+
+`.githooks/pre-commit` runs fmt, `cargo check`, and clippy so those
+cannot be forgotten.
+Point git at it once per clone:
+
+```
+git config core.hooksPath .githooks
+```
+
+`/code-review` is not in the hook. A hook can run compilers; it cannot run
+an agent skill. The committer (human or agent) still has to run
+`/code-review` on the diff and fix bugs before `git commit`. Do not use
+`--no-verify` to skip the hook.
