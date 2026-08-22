@@ -7,3 +7,17 @@
 - Rebuild from the base facts with the fewest moves that reach the outcome.
   Cut steps that add ceremony but not value.
 - Lean on the type system to make it impossible to represent invalid state
+
+## Commits
+
+One commit is one complete, revertible unit of work. Do not mix unrelated
+changes. If a commit cannot be described in one subject line, split it.
+See https://www.aleksandrhovhannisyan.com/blog/atomic-git-commits/
+
+Write messages as in https://cbea.ms/git-commit/ : imperative subject around
+50 characters, no trailing period, blank line, body wrapped at 72 that
+explains why.
+
+A commit does not land until `cargo fmt --check` is clean, `cargo clippy
+--all-targets -- -D warnings` is clean, and `/review` (the code-review skill)
+reports no bugs.
