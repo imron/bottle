@@ -15,10 +15,10 @@ Output is prose, not TSV. Unknown topic: exit 2.
 
 ## overview
 
-bottle is a store for events. A schema is a type. A row is
-one fact. Bots register a schema, log rows, and query with
-a small set of verbs. They do not invent tables or issue
-SQL.
+bottle is a store for events. A schema is a type. An entry
+is one fact. Bots register a schema, log entries, and
+query with a small set of verbs. They do not invent tables
+or issue SQL.
 
 Nothing ships pre-registered. Add a schema, then log.
 
@@ -32,15 +32,15 @@ bottle [--db PATH] <command>
 `~/.config/bottle/bottle.db`. `BOTTLE_AGENT` is the default
 `--agent` on write. Set it to the bot's name.
 
-Commands that return rows print TSV: header always, even
-for one row. Booleans print `true` or `false`. Errors go
+Commands that return entries print TSV: header always,
+even for one line. Booleans print `true` or `false`. Errors go
 to stderr, never mixed into a TSV body. `help` is prose.
 `schema show --yaml` is YAML.
 
 Exit codes: `0` ok, `2` usage, `1` anything else (unknown
 schema, bad field, not found).
 
-A link is a named pointer to an existing row:
+A link is a named pointer to an existing entry:
 `--link session=fitness.session/1`. It is not a tag. See
 `bottle help log` and `bottle help ls`.
 
@@ -96,7 +96,7 @@ The `schema` verbs declare and change types: `list`,
 
 ### Why
 
-A row is only meaningful if the fields are declared.
+An entry is only meaningful if the fields are declared.
 Unknown fields are rejected. `sum` only runs on declared
 numbers. The schema is the type system. Bots do not
 `CREATE TABLE`.
@@ -164,7 +164,7 @@ bottle schema show <name>
 bottle schema show <name> --yaml
 ```
 
-Default TSV, one row per field, spec order: `name`,
+Default TSV, one line per field, spec order: `name`,
 `type`, `required`, `values`. `required` is `true` or
 `false`. `values` is comma-separated for `enum`, empty
 otherwise.
@@ -247,8 +247,8 @@ Adds one column to an existing schema.
 
 The store is not a general migrator. You may grow a type
 by one field. You may not rename, drop, or change a type
-in place. For those, add a new schema, copy the rows you
-want, retire the old name.
+in place. For those, add a new schema, copy the entries
+you want, retire the old name.
 
 ### How
 
@@ -257,9 +257,9 @@ bottle schema add-field <name> --name <field> \
   --type text|number|enum [--values a,b] [--default N]
 ```
 
-Without `--default` the field is optional and old rows are
-empty there. With `--default` the field is required and
-old rows are backfilled. `--values` is required for
+Without `--default` the field is optional and old entries
+are empty there. With `--default` the field is required and
+old entries are backfilled. `--values` is required for
 `enum`. Values are stored lowercase. Fails if the field
 exists, the schema is retired, or two values fold to the
 same lowercase string.
@@ -276,9 +276,9 @@ Appends one value to an enum field.
 
 Enums are closed on write. A new real-world case (a new
 `channel`, a new `kind`) should not force a new schema.
-Removing a value would make old rows invalid, so that is
-not offered. To drop a value, add a new schema and copy
-rows.
+Removing a value would make old entries invalid, so that
+is not offered. To drop a value, add a new schema and copy
+entries.
 
 ### How
 
@@ -297,7 +297,7 @@ stored lowercase.
 
 ### What
 
-Blocks new `log`s on a schema. Existing rows stay
+Blocks new `log`s on a schema. Existing entries stay
 readable.
 
 ### Why
@@ -322,8 +322,8 @@ retired schema. `amend`, `ignore`, and reads do not.
 
 ### What
 
-Deletes a schema, its table, its rows, and outbound links
-from those rows.
+Deletes a schema, its table, its entries, and outbound
+links from those entries.
 
 ### Why
 
@@ -352,15 +352,15 @@ bottle schema drop fitness.session
 
 ### What
 
-Writes one row of a registered schema.
+Writes one entry of a registered schema.
 
 ### Why
 
 This is the write path. One event, declared fields, an
 optional instant, optional named links. A correction later
-is `amend`, not a second sentence in a note. Many rows in
-one transaction: MCP `rows`, not a shell loop that can
-stop halfway.
+is `amend`, not a second sentence in a note. Many entries
+in one transaction: MCP `entries`, not a shell loop that
+can stop halfway.
 
 ### How
 
@@ -383,10 +383,11 @@ Printed local, with offset, never `Z`.
 
 `--agent` defaults to `BOTTLE_AGENT`. Empty if unset.
 
-`--link session=fitness.session/1` points this row at
-another existing row. Repeat `--link` for different names.
-A name once per command. One name, one target, per row.
-The target must exist (ignored rows still exist). A link
+`--link session=fitness.session/1` points this entry at
+another existing entry. Repeat `--link` for different
+names. A name once per command. One name, one target, per
+entry. The target must exist (ignored entries still
+exist). A link
 name uses the field-name regex, must not be a field on
 this schema, and must not be reserved (`id`, `at`,
 `agent`, `ignored`, `links`, `day`, `week`, `month`,
@@ -419,13 +420,13 @@ id	at	links
 
 ### What
 
-Lists rows of a schema, oldest first.
+Lists entries of a schema, oldest first.
 
 ### Why
 
 The read path for "what was logged." Not SQL. Filters are
 a closed set: time window, agent, field equality, link
-equality. Ignored rows are omitted unless you ask for
+equality. Ignored entries are omitted unless you ask for
 them.
 
 ### How
@@ -447,7 +448,7 @@ instant bound. `--from` alone has no end. `--to` alone
 has no start.
 
 `--agent` filters the bookkeeping column (who wrote the
-row). On `log` / `amend` the same flag sets it.
+entry). On `log` / `amend` the same flag sets it.
 
 `--where` may repeat (AND). If the name is a declared
 field, it filters that field (`enum` folded lowercase,
@@ -470,12 +471,12 @@ pairs, sorted by name. Empty means no links.
 
 ### What
 
-Prints one row by schema and id, including ignored.
+Prints one entry by schema and id, including ignored.
 
 ### Why
 
 Ids are per table. `7` is not a store-wide id, so the
-schema is required. `ls` hides ignored rows; `get` is how
+schema is required. `ls` hides ignored entries; `get` is how
 you still see one.
 
 ### How
@@ -511,11 +512,11 @@ bottle sum <schema> <field> [--from DATE|TIME] \
 ```
 
 Fails if `<field>` is not a declared number. `--from`,
-`--to`, `--agent`, `--where`: same as `ls`. Ignored rows
-are omitted.
+`--to`, `--agent`, `--where`: same as `ls`. Ignored
+entries are omitted.
 
 With no `--group`: columns `field`, `value`. An empty set
-is one row, `value` `0`.
+is one line, `value` `0`.
 
 `--group day|week|month|year` uses the host zone:
 
@@ -525,9 +526,9 @@ is one row, `value` `0`.
 - `year` -- `YYYY`
 
 Any other `--group` name is a link name. The group column
-is that name; the cell is `schema/id`. Rows with no such
-link are one group with an empty cell. An empty set with
-`--group` prints the header and no rows.
+is that name; the cell is `schema/id`. Entries with no
+such link are one group with an empty cell. An empty set
+with `--group` prints the header and no lines.
 
 ```
 bottle sum nutrition.meal protein --from 2026-08-16 \
@@ -544,11 +545,11 @@ Numbers print without trailing zeros (`49` not `49.0`).
 
 ### What
 
-Prints the newest row of a schema, optionally filtered.
+Prints the newest entry of a schema, optionally filtered.
 
 ### Why
 
-"When did I last speak to ada" is one row, not a list.
+"When did I last speak to ada" is one entry, not a list.
 Newest `at`, then highest `id` if two share an instant.
 
 ### How
@@ -559,7 +560,7 @@ bottle last <schema> [--agent NAME] \
 ```
 
 Same columns as `ls`. Same `--agent` / `--where` rules.
-Ignored rows are omitted. Exit 1 if none.
+Ignored entries are omitted. Exit 1 if none.
 
 ```
 bottle last crm.touch --where who=ada
@@ -587,7 +588,7 @@ bottle today <schema> [--agent NAME] \
 ```
 
 Same columns as `ls`. Same `--agent` / `--where` rules.
-Ignored rows are omitted.
+Ignored entries are omitted.
 
 ---
 
@@ -595,13 +596,13 @@ Ignored rows are omitted.
 
 ### What
 
-Changes a row in place: fields, `at`, `agent`, links.
+Changes an entry in place: fields, `at`, `agent`, links.
 
 ### Why
 
 A correction is an edit, not another paragraph. The id
-stays. `ignore` is for a row that should vanish from
-lists; `amend` is for a row that should stay, fixed.
+stays. `ignore` is for an entry that should vanish from
+lists; `amend` is for an entry that should stay, fixed.
 Does not clear `ignored`.
 
 ### How
@@ -616,7 +617,7 @@ At least one of `--at`, `--agent`, `--link`, `--unlink`,
 or a `field=` is required. `--link` sets or replaces that
 name's target. The target must exist. `--unlink name`
 removes that name. Idempotent if the name is already
-absent (still prints the row). `--link` and `--unlink` of
+absent (still prints the entry). `--link` and `--unlink` of
 the same name in one command is an error. Date-only
 `--at` is an error. Prints `id`, `at`, `links`. Exit 1 if
 missing.
@@ -633,14 +634,14 @@ bottle amend fitness.set 2 --unlink session
 
 ### What
 
-Hides a row from `ls`, `sum`, `last`, and `today`. `get`
-still returns it.
+Hides an entry from `ls`, `sum`, `last`, and `today`.
+`get` still returns it.
 
 ### Why
 
-A bad row should not be deleted: drop is for types, and
+A bad entry should not be deleted: drop is for types, and
 there is no un-ignore. The fact is kept. If you need it
-visible again, log a new row. `ignore` does not clear
+visible again, log a new entry. `ignore` does not clear
 links; inbound links still block `schema drop`.
 
 ### How
@@ -680,9 +681,10 @@ Tools: `schema_list`, `schema_show`, `schema_add`,
 `last`, `today`, `amend`, `ignore`.
 
 `help` takes an optional `command` (`log`, `schema add`).
-`log` accepts `fields` (one row) or `rows` (many, one
+`log` accepts `fields` (one entry) or `entries` (many, one
 transaction). Do not send both. Shared `at`, `agent`, and
-`links` apply to every row unless a row overrides them.
+`links` apply to every entry unless an entry overrides
+them.
 `links` is an object of name to `schema/id`. `unlink` is
 a list of names.
 

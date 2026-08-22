@@ -9,7 +9,7 @@ host. A link target is `schema/id`. Link names are chosen
 at write time; they are not in the YAML.
 
 A caller may turn a shorthand like `4x8x24` into several
-`log`s (or one MCP `rows` call). bottle only sees fields
+`log`s (or one MCP `entries` call). bottle only sees fields
 and links.
 
 ## Meals
@@ -74,20 +74,20 @@ per table. `today` does not print a total.
 
 ## Sets
 
-One row is one set. `reps`, `load`, and `unit` stay
+One entry is one set. `reps`, `load`, and `unit` stay
 queryable. Volume is `reps * load` when load is present, so
-`sum volume` is tonnage. How many sets is a row count.
+`sum volume` is tonnage. How many sets is an entry count.
 
-`4x8x24kg` is four rows of `reps=8 load=24 unit=kg`, not
-one row with a sets count. If the last set is 6, the four
-rows differ.
+`4x8x24kg` is four entries of `reps=8 load=24 unit=kg`, not
+one entry with a sets count. If the last set is 6, the four
+entries differ.
 
 `load` is a number. `unit` is `kg` or `lb`. If `load` is
 set, `unit` is required. Bodyweight sets omit both. bottle
 does not convert units. `sum volume` should use
 `--where unit=kg` (or `lb`).
 
-A workout is its own row. Sets link to it as `session`.
+A workout is its own entry. Sets link to it as `session`.
 
 `fitness.session.yaml`
 
@@ -138,8 +138,8 @@ A single set with no workout omits `--link`.
 
 ## Cardio
 
-A cardio bout is one row (duration and kind), not a list of
-intervals.
+A cardio bout is one entry (duration and kind), not a list
+of intervals.
 
 `fitness.cardio.yaml`
 
@@ -208,7 +208,7 @@ bottle last money.txn --where account=operating
 
 ## Hours
 
-A project is its own table. Hour rows link to it as
+A project is its own table. Hour entries link to it as
 `project`.
 
 `work.project.yaml`

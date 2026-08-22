@@ -4,7 +4,7 @@
 bottle [--db PATH] <command>
 ```
 
-Output is TSV: one table, header always, even for one row.
+Output is TSV: one table, header always, even for one line.
 `help` is prose, not TSV. `schema show --yaml` is the spec
 YAML. Errors go to stderr and never share stdout with a
 TSV body.
@@ -18,7 +18,7 @@ Numbers print without trailing zeros (`49` not `49.0`;
 are empty cells. `ls`, `today`, and `last` do not repeat
 the schema name on each line.
 
-Ignored rows are omitted from `ls`, `sum`, `last`, and
+Ignored entries are omitted from `ls`, `sum`, `last`, and
 `today`. `get` still returns them.
 
 A link in flags and TSV is `schema/id`. The `links` cell is
@@ -55,7 +55,7 @@ or `false`.
 bottle schema show <name> [--yaml]
 ```
 
-Default TSV, one row per field, spec order: `name`,
+Default TSV, one line per field, spec order: `name`,
 `type`, `required`, `values`. `required` is `true` or
 `false`. `values` is comma-separated for `enum`, empty
 otherwise.
@@ -70,7 +70,7 @@ bottle schema add <name> --file spec.yaml
 ```
 
 Fails if `name` exists or does not match `family.kind`.
-Writes the registry row and creates the table.
+Writes the spec into the registry and creates the table.
 
 ## schema add-field
 
@@ -80,7 +80,7 @@ bottle schema add-field <name> --name <field> \
 ```
 
 Adds one field. Optional unless `--default` is set. Then
-the field is required and old rows are backfilled.
+the field is required and old entries are backfilled.
 `--values` is required for `enum`. Values are stored
 lowercase. Fails if the field exists, the schema is
 retired, or two values fold to the same lowercase
@@ -96,7 +96,7 @@ bottle schema add-value <schema> --field <name> \
 Appends one value to an enum, stored lowercase. Fails if
 the field is not an enum, the folded value already exists,
 or the schema is retired. You may not remove a value. To
-drop one, add a new schema and copy rows.
+drop one, add a new schema and copy entries.
 
 ## schema retire
 
@@ -112,8 +112,9 @@ bottle schema retire <name>
 bottle schema drop <name>
 ```
 
-Drops the table and its rows, then outbound links from
-those rows. Fails if any link in any table points at those
+Drops the table and its entries, then outbound links from
+those entries. Fails if any link in any table points at
+those
 ids, ignored or not. `amend --unlink` those links first.
 `ignore` does not clear them.
 
@@ -128,7 +129,7 @@ bottle log <schema> [--at TIME] [--agent NAME] \
 See [time.md](time.md). `--agent` defaults to
 `BOTTLE_AGENT`. Fails if the schema is retired. `--link`
 may repeat with different names. A name once per command.
-The target row must exist. Prints `id`, `at`, `links`.
+The target entry must exist. Prints `id`, `at`, `links`.
 
 ```
 bottle log crm.touch who=ada channel=email
@@ -139,8 +140,9 @@ id	at	links
 1	2026-08-22T08:14:00+10:00
 ```
 
-The offset is the host zone at that instant. For many rows
-in one transaction, use MCP `rows`. See [mcp.md](mcp.md).
+The offset is the host zone at that instant. For many
+entries in one transaction, use MCP `entries`. See
+[mcp.md](mcp.md).
 
 ## ls
 
@@ -167,7 +169,7 @@ exact). Otherwise it is a link name and the value must be
 bottle get <schema> <id>
 ```
 
-Same field columns as `ls`, plus `ignored`. One row,
+Same field columns as `ls`, plus `ignored`. One entry,
 including ignored. Exit 1 if missing. Schema is required
 because ids are per table.
 
@@ -189,11 +191,11 @@ bottle sum <schema> <field> [--from DATE|TIME] \
 - `year` -- `YYYY`
 
 Any other `--group` name is a link name. The group column
-is that name; the cell is `schema/id`. Rows with no such
-link are one group with an empty cell.
+is that name; the cell is `schema/id`. Entries with no
+such link are one group with an empty cell.
 
-An empty set prints `value` `0` (one row, or no group
-rows).
+An empty set prints `value` `0` (one line, or no group
+lines).
 
 ## last
 
@@ -226,7 +228,7 @@ At least one of `--at`, `--agent`, `--link`, `--unlink`,
 or a `field=` is required. `--link` sets or replaces that
 name's target. `--unlink name` removes that name.
 Idempotent if the name is already absent (still prints
-the row). `--link` and `--unlink` of the same name in one
+the entry). `--link` and `--unlink` of the same name in one
 command is an error. Prints `id`, `at`, `links`. Exit 1
 if missing. Does not clear `ignored`.
 

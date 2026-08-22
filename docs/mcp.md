@@ -15,29 +15,30 @@ stdio. The same binary can serve it (`bottle mcp`). Tools:
 Arguments match the CLI. `help` takes an optional
 `command` (`log`, `schema add`). `get`, `amend`, and
 `ignore` take `schema` and `id`. On `log` / `amend`,
-`agent` is who wrote the row. On `ls` / `sum` / `last` /
+`agent` is who wrote the entry. On `ls` / `sum` / `last` /
 `today`, `agent` filters that column. A link target is
 the string `schema/id`. `links` is an object of name to
 target. `unlink` is a list of names.
 
-## One row or many
+## One entry or many
 
-`log` accepts `fields` (one row) or `rows` (a list of field
-objects). Do not send both. All `rows` share one schema and
-run in one transaction: all succeed or none do. Shared
-`at`, `agent`, and `links` apply to every row unless a row
-overrides them.
+`log` accepts `fields` (one entry) or `entries` (a list of
+field objects). Do not send both. All `entries` share one
+schema and run in one transaction: all succeed or none do.
+Shared `at`, `agent`, and `links` apply to every entry
+unless an entry overrides them.
 
 Callers that have a compact form (for example `4x8x24`)
-expand it before calling. bottle stores rows, not that
+expand it before calling. bottle stores entries, not that
 string.
 
-The result is one TSV line of `id`, `at`, `links` per row.
+The result is one TSV line of `id`, `at`, `links` per
+entry.
 
 ## Output
 
 The tool result is the same bytes the CLI would print: TSV
-for row commands, prose for `help`, YAML for
+for entry commands, prose for `help`, YAML for
 `schema_show` with `yaml`. Not a JSON array of objects.
 
 Errors are tool errors. A failed call does not return a TSV
@@ -51,5 +52,5 @@ argument. The registry is the type system.
 
 ## TSV
 
-Rows are flat. A header plus values is enough. The MCP
+Lines are flat. A header plus values is enough. The MCP
 layer does not wrap the table in an object.

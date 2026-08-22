@@ -1,12 +1,12 @@
 # Overview
 
 bottle is a small store for bots. They register a schema, log
-rows, and query with a fixed set of verbs: `ls`, `sum`,
+entries, and query with a fixed set of verbs: `ls`, `sum`,
 `last`, `amend`, `ignore`. Output is TSV. The file is sqlite.
 
 A bot may still read a specialized system (training log, bank,
-calendar). It writes a row here so every other bot can query
-that fact the same way.
+calendar). It writes an entry here so every other bot can
+query that fact the same way.
 
 ## Why it exists
 
@@ -14,15 +14,16 @@ Bots are good at noticing a fact and bad at keeping it. The
 usual dump is a running note in markdown. That is not a type.
 You cannot sum it. The date in the sentence may not be the
 date of the event. Two bots writing about the same day do not
-share a row. A correction is another paragraph, not an edit.
+share an entry. A correction is another paragraph, not an
+edit.
 
-A schema is a name, a YAML field list, and a sqlite table. A
-row is one event. A total is a command.
+A schema is a name, a YAML field list, and a sqlite table. An
+entry is one event. A total is a command.
 
 ## Why not markdown
 
-A note is prose. bottle is rows. Rows have types, ids, and
-declared numbers you can sum.
+A note is prose. bottle is entries. Entries have types, ids,
+and declared numbers you can sum.
 
 ## Why not SQL
 
@@ -46,7 +47,7 @@ TSV. That is a second brain. This is a store.
 ## Why not a specialized app
 
 A training app, a bank, or a calendar can stay the source of
-a fact. A bot reads them and writes a row here. Other bots
+a fact. A bot reads them and writes an entry here. Other bots
 should not have to learn each of those APIs to ask what
 happened. They speak bottle.
 
@@ -57,8 +58,8 @@ happened. They speak bottle.
   runs on declared numbers.
 - Nothing ships pre-registered. Adding a schema creates a
   table.
-- A row may carry named links to other existing rows. See
-  [schema.md](schema.md).
+- An entry may carry named links to other existing entries.
+  See [schema.md](schema.md).
 - Instants stored as UTC, shown in the host timezone. See
   [time.md](time.md).
 - TSV on stdout. Errors on stderr. CLI and MCP return the
@@ -77,7 +78,7 @@ happened. They speak bottle.
 - Not a query language. No SQL for bots.
 - Not a hosted service. The file lives on disk.
 - Not a tag system. A link is a named pointer to an existing
-  row, not a free string.
+  entry, not a free string.
 - Not a general migrator. You can add an optional field, add
   an enum value, or retire the schema. See
   [schema.md](schema.md).

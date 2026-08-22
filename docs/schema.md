@@ -20,7 +20,7 @@ CREATE TABLE schemas (
 
 `spec` is the YAML from `schema add`, updated by
 `schema add-field` and `schema add-value`. `retired`
-blocks new `log`s. Existing rows stay readable. sqlite
+blocks new `log`s. Existing entries stay readable. sqlite
 stores `retired` and `ignored` as `0`/`1`. TSV prints
 `true`/`false`.
 
@@ -58,10 +58,10 @@ Numbers are `REAL`. Enums are `TEXT` checked on write.
 
 ## Links
 
-A row may point at other existing rows. Each pointer has a
-name you choose at write time (`session`, `project`,
+An entry may point at other existing entries. Each pointer
+has a name you choose at write time (`session`, `project`,
 `parent`). Names are not declared in the YAML. The target
-is any existing row, any schema. Ignored targets still
+is any existing entry, any schema. Ignored targets still
 count as existing.
 
 ```sql
@@ -75,18 +75,18 @@ CREATE TABLE links (
 );
 ```
 
-One name, one target, per row. Several different names on
-the same row are fine. `--link session=fitness.session/7`
+One name, one target, per entry. Several different names
+on the same entry are fine. `--link session=fitness.session/7`
 replaces that name if it was already set. To point the
-same name at two rows, log two rows.
+same name at two entries, log two entries.
 
 ```
 bottle log fitness.set --link session=fitness.session/7 \
   movement=squat reps=8 load=24 unit=kg
 ```
 
-`--where session=fitness.session/7` lists rows with that
-link. `sum --group session` groups by that target.
+`--where session=fitness.session/7` lists entries with
+that link. `sum --group session` groups by that target.
 
 On the CLI and in TSV the target is `schema/id`. The
 `links` cell is space-separated `name=schema/id` pairs,
@@ -150,9 +150,9 @@ Types: `text`, `number`, `enum`.
 
 ## ignore
 
-`ignore` keeps the row and hides it from `ls`, `sum`,
+`ignore` keeps the entry and hides it from `ls`, `sum`,
 `last`, and `today`. `get` still returns it. There is no
-un-ignore. Log a new row if you need the fact back.
+un-ignore. Log a new entry if you need the fact back.
 
 `amend` changes listed fields, `--at` / `--agent` if
 given, and `--link` / `--unlink`. It does not clear
@@ -161,25 +161,25 @@ given, and `--link` / `--unlink`. It does not clear
 ## Changing a schema
 
 `schema add-field` adds one field (`ALTER TABLE ADD COLUMN`).
-Without `--default` the field is optional and old rows are
-empty there. With `--default` the field becomes required and
-old rows are backfilled.
+Without `--default` the field is optional and old entries
+are empty there. With `--default` the field becomes
+required and old entries are backfilled.
 
 `schema add-value` appends one enum value. You may not
 remove one.
 
 To rename a field, drop a field, or change a type: add a new
-schema, copy the rows you want, `schema retire` the old
+schema, copy the entries you want, `schema retire` the old
 name.
 
 ## retire and drop
 
 `schema retire` blocks `log`. Reads still work.
 
-`schema drop` drops the table and its rows, deletes
-outbound links from those rows, then removes the registry
-entry. It fails if any inbound link references those ids,
-ignored or not.
+`schema drop` drops the table and its entries, deletes
+outbound links from those entries, then removes the
+registry record. It fails if any inbound link references
+those ids, ignored or not.
 
 ## Why not raw SQL
 

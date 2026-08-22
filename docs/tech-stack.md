@@ -67,8 +67,8 @@ field, not found, retired, link target missing, reserved
 `--where`, `--link`/`--unlink` conflict), TSV headers and
 cells (`true`/`false`, numbers without trailing zeros,
 `links` sort), and time bounds including date-only vs
-instant. MCP `log` `rows` is one transaction: all succeed
-or none do.
+instant. MCP `log` `entries` is one transaction: all
+succeed or none do.
 
 The binary gets a thin smoke: clap maps flags into the
 same structured commands, exit `0`/`1`/`2`, stdout vs
