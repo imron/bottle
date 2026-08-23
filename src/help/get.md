@@ -1,19 +1,16 @@
 ## get
 
-### What
-
-Prints one entry by schema and id, including ignored.
-
-### Why
-
-Ids are per table. `7` is not a store-wide id, so the
-schema is required. `ls` hides ignored entries; `get` is how
-you still see one.
-
-### How
+Prints one entry by schema and id, including ignored
+entries. `ls` hides ignored entries; `get` is how you
+still see one.
 
 ```
 bottle get <schema> <id>
 ```
 
-Same columns as `ls`, plus `ignored`. Exit 1 if missing.
+Ids are per schema. `fitness.set` 7 is not
+`fitness.session` 7, so the schema name is required.
+
+Columns are the same as `ls`, plus `ignored` (`true` or
+`false`). Exit 1 if that id does not exist on that
+schema.

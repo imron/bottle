@@ -1,18 +1,12 @@
 ## help
 
-### What
+Prints the long explanation of a command: what it is for,
+the flags, the rules, and an example. This is the page a
+person or a bot should read before using a verb.
 
-Prints the long explanation of a verb: what it does, why
-it exists, how to use it.
-
-### Why
-
-`--help` is a usage line. A bot that has to guess from
-flag names will invent SQL, skip `sum`, or log a paragraph
-into `text`. This page is the contract in prose, inside
-the binary, so the bot does not need the repo.
-
-### How
+`--help` on a command is only a short usage line (flag
+names). `bottle help` is the full page, compiled into the
+binary, so you do not need this repository open.
 
 ```
 bottle help
@@ -20,5 +14,10 @@ bottle help log
 bottle help schema add
 ```
 
-No TSV. `--db` is accepted and ignored: help does not
-open the store.
+With no topic, you get the overview. Schema verbs use the
+two-word name: `bottle help schema add`, not
+`bottle help add`.
+
+The page is prose, not a TSV table. `--db` is accepted and
+ignored; help does not open the store. An unknown topic
+exits 2.

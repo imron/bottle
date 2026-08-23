@@ -1,40 +1,55 @@
 ## overview
 
-bottle is a store for events. A schema is a type. An entry
-is one fact. Bots register a schema, log entries, and
-query with a small set of verbs. They do not invent tables
-or issue SQL.
+bottle is a store for events. You declare a type
+(a schema), log facts of that type (entries), and query
+them with a fixed set of commands. You do not write SQL
+and you do not invent tables as you go.
 
-Nothing ships pre-registered. Add a schema, then log.
+Nothing is built in. Add a schema, then log. Other
+programs — fitness apps, banks, calendars — can stay the
+source of a fact. bottle is the shared ledger those facts
+are copied into, so every bot asks the same way.
 
 ```
 bottle [--db PATH] <command>
 ```
 
-`--db` / `BOTTLE_DB` is the sqlite file. If unset: Linux
-`$XDG_DATA_HOME/bottle/bottle.db` or
-`~/.local/share/bottle/bottle.db`; macOS
-`~/.config/bottle/bottle.db`. `BOTTLE_AGENT` is the default
-`--agent` on write. Set it to the bot's name.
+`--db` or the environment variable `BOTTLE_DB` is the
+sqlite file. If neither is set:
 
-Commands that return entries print TSV: header always,
-even for one line. Booleans print `true` or `false`. Errors go
-to stderr, never mixed into a TSV body. `help` is prose.
-`schema show --yaml` is YAML.
+- Linux: `$XDG_DATA_HOME/bottle/bottle.db`, else
+  `~/.local/share/bottle/bottle.db`
+- macOS: `~/.config/bottle/bottle.db`
 
-Exit codes: `0` ok, `2` usage, `1` anything else (unknown
-schema, bad field, not found).
+`BOTTLE_AGENT` is the default `--agent` on write. Set it
+to the name of the bot that is logging.
 
-A link is a named pointer to an existing entry:
-`--link session=fitness.session/1`. It is not a tag. See
-`bottle help log` and `bottle help ls`.
+Most commands print a TSV table: a header line, then data
+lines, even when there is only one result. Booleans print
+`true` or `false`. Empty optional fields are empty cells.
+Numbers drop trailing zeros (`49` not `49.0`). Errors go
+to stderr and never share stdout with a table. `help` is
+prose. `schema show --yaml` is YAML.
 
-Time is stored UTC and printed in the host timezone. Date
-inputs are civil days in that zone. See `bottle help log`
-and `bottle help ls`.
+Exit codes: `0` ok, `2` a usage mistake, `1` anything else
+(unknown schema, bad field, not found).
+
+An entry has an id (per schema, not global), a time
+(`at`), optional agent, optional named links to other
+entries, and the fields you declared. A link is a pointer,
+not a tag: `--link session=fitness.session/1` means "this
+entry's `session` is entry 1 of `fitness.session`". See
+`bottle help log`.
+
+Times are stored in UTC and printed in the timezone of the
+machine running bottle. A date with no time of day is a
+query window (a civil day), not a timestamp you can log.
+See `bottle help log` and `bottle help ls`.
 
 ```
-bottle help <command>
+bottle help
+bottle help log
+bottle help schema add
 ```
 
 Topics: `help`, `schema`, `schema list`, `schema show`,

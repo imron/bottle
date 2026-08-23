@@ -1,17 +1,9 @@
 ## ls
 
-### What
-
-Lists entries of a schema, oldest first.
-
-### Why
-
-The read path for "what was logged." Not SQL. Filters are
-a closed set: time window, agent, field equality, link
-equality. Ignored entries are omitted unless you ask for
-them.
-
-### How
+Lists entries of one schema, oldest first. This is the
+read path for "what was logged." You do not write SQL.
+Filters are a closed set: a time window, who wrote it,
+field equality, and link equality.
 
 ```
 bottle ls <schema> [--from DATE|TIME] [--to DATE|TIME] \
@@ -19,24 +11,34 @@ bottle ls <schema> [--from DATE|TIME] [--to DATE|TIME] \
   [--include-ignored]
 ```
 
-Columns: `id`, `at`, `links`, schema fields in spec
-order, `agent`. `ignored` only with `--include-ignored`.
-Order: oldest `at`, then `id`. The schema name is not
-repeated on each line.
+Columns, left to right: `id`, `at`, `links`, then every
+schema field in spec order, then `agent`. The schema name
+is not repeated on each line. `ignored` is included only
+with `--include-ignored`.
 
-`--from` / `--to` as a date are that civil day in the host
-zone, inclusive on both ends. As a full timestamp, an
-instant bound. `--from` alone has no end. `--to` alone
-has no start.
+Ignored entries are omitted unless you pass that flag.
+`get` can still fetch an ignored id.
 
-`--agent` filters the bookkeeping column (who wrote the
-entry). On `log` / `amend` the same flag sets it.
+Order is oldest `at`, then lowest `id`.
 
-`--where` may repeat (AND). If the name is a declared
-field, it filters that field (`enum` folded lowercase,
-`text` exact). Otherwise it is a link name and the value
-must be `schema/id`. `--where` on `id`, `at`, `agent`,
-`ignored`, or `links` is an error.
+`--from` and `--to` bound `at`. A date with no time of
+day is that civil day in the host timezone, inclusive on
+both ends: `--from 2026-08-16 --to 2026-08-22` includes
+both days. A full timestamp is an instant bound. `--from`
+alone has no end. `--to` alone has no start. DST days are
+23 or 25 hours; bottle uses the zone database, not a
+fixed offset.
+
+`--agent` filters who wrote the entry (the bookkeeping
+column). On `log` and `amend` the same flag sets it.
+
+`--where` may repeat; all clauses are AND. If the name is
+a declared field, it filters that field (`enum` values
+folded lowercase, `text` exact and case-sensitive).
+Otherwise it is a link name and the value must be
+`schema/id`. `--where` on `id`, `at`, `agent`, `ignored`,
+or `links` is an error; use `--agent`, `get`, or
+`--from` / `--to`.
 
 ```
 bottle ls fitness.set --where session=fitness.session/1

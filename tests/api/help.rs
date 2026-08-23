@@ -21,7 +21,7 @@ fn log_page() {
     )
     .unwrap();
     assert!(out.starts_with("## log\n"));
-    assert!(out.contains("### Why"));
+    assert!(out.contains("Writes one entry"));
 }
 
 #[test]

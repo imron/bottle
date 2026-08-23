@@ -1,22 +1,20 @@
 ## ignore
 
-### What
-
 Hides an entry from `ls`, `sum`, `last`, and `today`.
-`get` still returns it.
-
-### Why
-
-A bad entry should not be deleted: drop is for types, and
-there is no un-ignore. The fact is kept. If you need it
-visible again, log a new entry. `ignore` does not clear
-links; inbound links still block `schema drop`.
-
-### How
+`get` still returns it. There is no un-ignore.
 
 ```
 bottle ignore <schema> <id>
 ```
 
-Sets `ignored`. Idempotent. Prints `id`, `at`. Exit 1 if
-missing.
+A bad fact should not be deleted: `schema drop` is for
+types, and ignore is one-way. The entry is kept. If you
+need the fact visible again, log a new entry.
+
+Ignore does not clear links. Other entries that point here
+still do, and those inbound links still block
+`schema drop`.
+
+Running ignore on an already-ignored id succeeds
+(idempotent). Prints `id` and `at`. Exit 1 if the
+schema/id does not exist.

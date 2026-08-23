@@ -1,19 +1,15 @@
 ## schema
 
-### What
+A schema is a named type of entry: what fields it has,
+which are required, and which values an enum may take.
+bottle ships with none. You add a schema, then you can
+`log` facts of that type.
 
-The `schema` verbs declare and change types: `list`,
-`show`, `add`, `add-field`, `add-value`, `retire`,
-`drop`.
+The name is `family.kind`, for example `nutrition.meal` or
+`fitness.set`. On disk that becomes a sqlite table
+`nutrition_meal`; the commands keep the dotted name.
 
-### Why
-
-An entry is only meaningful if the fields are declared.
-Unknown fields are rejected. `sum` only runs on declared
-numbers. The schema is the type system. Bots do not
-`CREATE TABLE`.
-
-### How
+The `schema` commands:
 
 ```
 bottle schema list
@@ -25,7 +21,13 @@ bottle schema retire <name>
 bottle schema drop <name>
 ```
 
-`bottle help schema add` (and the other names) for one
-verb. Names are `family.kind` (`nutrition.meal`). sqlite
-gets an underscore (`nutrition_meal`). The CLI keeps the
-dot.
+`list` and `show` are reads. `add` creates a type.
+`add-field` and `add-value` grow a type (you cannot rename
+or remove a field). `retire` blocks new logs but keeps
+history. `drop` deletes the type and its entries.
+
+Unknown fields on `log` are rejected. `sum` only runs on
+fields declared as `number`. Links are not part of the
+YAML; you attach them when you log. See
+`bottle help schema add` for the file format, and the
+other `schema` topics for each verb.
