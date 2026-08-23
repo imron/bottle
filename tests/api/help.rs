@@ -5,7 +5,7 @@ use crate::common;
 #[test]
 fn overview_is_prose_not_tsv() {
     let out = run(None, None, Cmd::Help { topic: None }).unwrap();
-    assert!(out.starts_with("## overview\n"));
+    assert!(out.starts_with("# overview\n"));
     assert!(out.contains("bottle is a store for events"));
     assert!(!out.contains('\t'));
 }
@@ -20,8 +20,8 @@ fn log_page() {
         },
     )
     .unwrap();
-    assert!(out.starts_with("## log\n"));
-    assert!(out.contains("Writes one entry"));
+    assert!(out.starts_with("# log\n"));
+    assert!(out.contains("write one entry"));
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn schema_add_page() {
         },
     )
     .unwrap();
-    assert!(out.starts_with("## schema add\n"));
+    assert!(out.starts_with("# schema add\n"));
 }
 
 #[test]

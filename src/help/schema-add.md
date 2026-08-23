@@ -1,12 +1,19 @@
-## schema add
+# schema add
 
-Registers a new type from a YAML file and creates a table
-for it. After this succeeds you can `log` entries of that
-type.
+## Name
+
+schema add — register a type from a YAML file
+
+## Synopsis
 
 ```
 bottle schema add <name> --file spec.yaml
 ```
+
+## Description
+
+Registers a new type and creates a table for it. After
+this succeeds you can `log` entries of that type.
 
 `<name>` must be `family.kind`: two lowercase identifiers
 separated by a dot, for example `nutrition.meal`. It must
@@ -43,8 +50,20 @@ use them as fields): `id`, `at`, `agent`, `ignored`,
 `links`. There is no date field type; the time of the
 event is `at` on every entry.
 
-Links are not declared in the YAML. You set them on
-`log` with `--link name=schema/id`.
+Links are not declared in the YAML. You set them on `log`
+with `--link name=schema/id`.
 
-On success the command prints nothing. On a bad name or
-an existing schema it exits 1.
+On success the command prints nothing.
+
+## Options
+
+`--file spec.yaml` — path to the YAML field list
+(required).
+
+## Exit status
+
+`0` ok. `1` bad name or schema already exists.
+
+## See also
+
+schema, schema show, log

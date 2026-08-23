@@ -1,14 +1,34 @@
-## schema show
+# schema show
 
-Prints the field list for one schema: names, types,
-whether each is required, and enum values.
+## Name
+
+schema show — print the field list of a schema
+
+## Synopsis
 
 ```
 bottle schema show <name>
 bottle schema show <name> --yaml
 ```
 
-Default output is TSV, one line per field, in spec order:
+## Description
+
+Prints the field list for one schema: names, types,
+whether each is required, and enum values.
+
+Retired schemas still show; retiring blocks new logs, not
+this command. Links are not fields and are not in this
+output.
+
+## Options
+
+`--yaml` — print the stored spec, the same YAML that
+`schema add --file` accepts. Use that to copy or
+round-trip a schema.
+
+## Output
+
+Default is TSV, one line per field, in spec order:
 
 ```
 name	type	required	values
@@ -21,12 +41,16 @@ kcal	number	true
 comma-separated for an enum, and empty for `text` and
 `number`.
 
-`--yaml` prints the stored spec, the same YAML that
-`schema add --file` accepts. Use that when you want to
-copy or round-trip a schema.
+## Exit status
 
-Exit 1 if the name is unknown. Retired schemas still
-show; retiring blocks new logs, not this command.
+`0` ok. `1` unknown schema.
 
-Links are not fields. They are not in this output. See
-`bottle help log` for how links work.
+## Examples
+
+```
+bottle schema show nutrition.meal
+```
+
+## See also
+
+schema, schema list, schema add, log

@@ -1,15 +1,10 @@
-## schema
+# schema
 
-A schema is a named type of entry: what fields it has,
-which are required, and which values an enum may take.
-bottle ships with none. You add a schema, then you can
-`log` facts of that type.
+## Name
 
-The name is `family.kind`, for example `nutrition.meal` or
-`fitness.set`. On disk that becomes a sqlite table
-`nutrition_meal`; the commands keep the dotted name.
+schema — declare and change types of entry
 
-The `schema` commands:
+## Synopsis
 
 ```
 bottle schema list
@@ -21,6 +16,17 @@ bottle schema retire <name>
 bottle schema drop <name>
 ```
 
+## Description
+
+A schema is a named type of entry: what fields it has,
+which are required, and which values an enum may take.
+bottle ships with none. You add a schema, then you can
+`log` facts of that type.
+
+The name is `family.kind`, for example `nutrition.meal` or
+`fitness.set`. On disk that becomes a sqlite table
+`nutrition_meal`; the commands keep the dotted name.
+
 `list` and `show` are reads. `add` creates a type.
 `add-field` and `add-value` grow a type (you cannot rename
 or remove a field). `retire` blocks new logs but keeps
@@ -28,6 +34,9 @@ history. `drop` deletes the type and its entries.
 
 Unknown fields on `log` are rejected. `sum` only runs on
 fields declared as `number`. Links are not part of the
-YAML; you attach them when you log. See
-`bottle help schema add` for the file format, and the
-other `schema` topics for each verb.
+YAML; you attach them when you log.
+
+## See also
+
+schema list, schema show, schema add, schema add-field,
+schema add-value, schema retire, schema drop, log

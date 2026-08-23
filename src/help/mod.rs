@@ -24,7 +24,5 @@ pub fn page(topic: Option<&str>) -> Result<String, Error> {
         "mcp" => include_str!("mcp.md"),
         _ => return Err(Error::usage(format!("unknown help topic: {topic}"))),
     };
-    let mut out = body.trim().to_string();
-    out.push('\n');
-    Ok(out)
+    Ok(body.to_string())
 }
