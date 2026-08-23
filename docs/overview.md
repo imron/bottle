@@ -109,7 +109,7 @@ timezone flag.
 - [schema.md](schema.md) -- tables, links, migrate, drop
 - [time.md](time.md) -- storage, input, output
 - [commands.md](commands.md) -- verbs
-- [help.md](help.md) -- long help index (`bottle help`)
+- [help.md](help.md) -- where `bottle help` pages live
 - [mcp.md](mcp.md) -- the same verbs as tools
 - [examples.md](examples.md) -- sample schemas
 - [tech-stack.md](tech-stack.md) -- language, crates, musl
