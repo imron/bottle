@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::error::{Error, Usage};
 
 pub fn page(topic: Option<&str>) -> Result<String, Error> {
     let topic = topic.unwrap_or("overview");
@@ -22,7 +22,7 @@ pub fn page(topic: Option<&str>) -> Result<String, Error> {
         "amend" => include_str!("amend.md"),
         "ignore" => include_str!("ignore.md"),
         "mcp" => include_str!("mcp.md"),
-        _ => return Err(Error::usage(format!("unknown help topic: {topic}"))),
+        _ => return Err(Error::Usage(Usage::UnknownHelpTopic(topic.to_string()))),
     };
     Ok(body.to_string())
 }

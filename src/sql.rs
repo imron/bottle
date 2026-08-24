@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::error::{Error, Fail};
 use crate::ledger::FieldValue;
 use crate::spec::{FieldType, SchemaName};
 use crate::time::Instant;
@@ -53,13 +53,14 @@ pub(crate) fn quote_ident(name: &str) -> String {
 
 pub(crate) fn instant_to_sql(at: Instant) -> Result<String, Error> {
     let zoned = at.timestamp().to_zoned(TimeZone::UTC);
-    strtime::format("%Y-%m-%dT%H:%M:%SZ", &zoned).map_err(|e| Error::fail(e.to_string()))
+    strtime::format("%Y-%m-%dT%H:%M:%SZ", &zoned)
+        .map_err(|e| Error::Fail(Fail::Time(e.to_string())))
 }
 
 pub(crate) fn instant_from_sql(raw: String) -> Result<Instant, Error> {
     let ts = raw
         .parse()
-        .map_err(|_| Error::fail(format!("corrupt stored time: {raw}")))?;
+        .map_err(|_| Error::Fail(Fail::CorruptStoredTime(raw.clone())))?;
     Ok(Instant::from_timestamp(ts))
 }
 

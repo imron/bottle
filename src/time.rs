@@ -3,7 +3,7 @@ use jiff::civil::{Date, DateTime};
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
 
-use crate::error::Error;
+use crate::error::{Error, Fail, Usage};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Instant(Timestamp);
@@ -25,13 +25,14 @@ impl Instant {
 pub fn parse_instant(input: &str) -> Result<Instant, Error> {
     match parse(input)? {
         Parsed::Instant(ts) => Ok(Instant(ts)),
-        Parsed::Date(_) => Err(Error::usage("date-only is a query bound, not an instant")),
+        Parsed::Date(_) => Err(Error::Usage(Usage::DateOnlyNotInstant)),
     }
 }
 
 pub fn display_local(at: Instant) -> Result<String, Error> {
     let zoned = at.0.to_zoned(system_tz());
-    strtime::format("%Y-%m-%dT%H:%M:%S%:z", &zoned).map_err(|e| Error::fail(e.to_string()))
+    strtime::format("%Y-%m-%dT%H:%M:%S%:z", &zoned)
+        .map_err(|e| Error::Fail(Fail::Time(e.to_string())))
 }
 
 fn from_bound(input: &str) -> Result<Instant, Error> {
@@ -66,7 +67,7 @@ impl Range {
         let start = Instant(date_midnight(today)?);
         let next = today
             .checked_add(jiff::Span::new().days(1))
-            .map_err(|e| Error::fail(e.to_string()))?;
+            .map_err(|e| Error::Fail(Fail::Time(e.to_string())))?;
         let end = Instant(date_midnight(next)?);
         Ok(Self {
             from: Some(start),
@@ -81,7 +82,7 @@ fn to_bound(input: &str) -> Result<ToBound, Error> {
         Parsed::Date(date) => {
             let next = date
                 .checked_add(jiff::Span::new().days(1))
-                .map_err(|e| Error::fail(e.to_string()))?;
+                .map_err(|e| Error::Fail(Fail::Time(e.to_string())))?;
             Ok(ToBound::Exclusive(Instant(date_midnight(next)?)))
         }
     }
@@ -98,51 +99,51 @@ enum Parsed {
 
 fn parse(input: &str) -> Result<Parsed, Error> {
     if input.contains(' ') {
-        return Err(Error::usage("time must use T, not a space"));
+        return Err(Error::Usage(Usage::TimeMustUseT));
     }
     if looks_like_date(input) {
         let date: Date = input
             .parse()
-            .map_err(|_| Error::usage(format!("invalid date: {input}")))?;
+            .map_err(|_| Error::Usage(Usage::InvalidDate(input.to_string())))?;
         return Ok(Parsed::Date(date));
     }
     let Some((date, rest)) = input.split_once('T') else {
-        return Err(Error::usage(format!("invalid time: {input}")));
+        return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
     };
     if !looks_like_date(date) || !looks_like_hms(&rest[..rest.len().min(8)]) {
-        return Err(Error::usage(format!("invalid time: {input}")));
+        return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
     }
     if rest.len() == 8 {
         let dt: DateTime = strtime::parse("%Y-%m-%dT%H:%M:%S", input)
             .and_then(|p| p.to_datetime())
-            .map_err(|_| Error::usage(format!("invalid time: {input}")))?;
+            .map_err(|_| Error::Usage(Usage::InvalidTime(input.to_string())))?;
         let zoned = dt
             .to_zoned(system_tz())
-            .map_err(|e| Error::usage(e.to_string()))?;
+            .map_err(|e| Error::Usage(Usage::InvalidTime(e.to_string())))?;
         return Ok(Parsed::Instant(zoned.timestamp()));
     }
     if rest.ends_with('Z') {
         if rest.len() != 9 {
-            return Err(Error::usage(format!("invalid time: {input}")));
+            return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
         }
         let ts: Timestamp = input
             .parse()
-            .map_err(|_| Error::usage(format!("invalid time: {input}")))?;
+            .map_err(|_| Error::Usage(Usage::InvalidTime(input.to_string())))?;
         return Ok(Parsed::Instant(ts));
     }
     let Some(sign_at) = rest.rfind(['+', '-']) else {
-        return Err(Error::usage(format!("invalid time: {input}")));
+        return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
     };
     if sign_at != 8 {
-        return Err(Error::usage(format!("invalid time: {input}")));
+        return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
     }
     let offset = &rest[sign_at..];
     if offset.len() != 6 || offset.as_bytes().get(3) != Some(&b':') {
-        return Err(Error::usage("offset must include a colon (+10:00)"));
+        return Err(Error::Usage(Usage::OffsetNeedsColon));
     }
     let zoned = strtime::parse("%Y-%m-%dT%H:%M:%S%:z", input)
         .and_then(|p| p.to_zoned())
-        .map_err(|_| Error::usage(format!("invalid time: {input}")))?;
+        .map_err(|_| Error::Usage(Usage::InvalidTime(input.to_string())))?;
     Ok(Parsed::Instant(zoned.timestamp()))
 }
 
@@ -163,7 +164,7 @@ fn looks_like_hms(s: &str) -> bool {
 fn date_midnight(date: Date) -> Result<Timestamp, Error> {
     date.to_zoned(system_tz())
         .map(|z| z.timestamp())
-        .map_err(|e| Error::fail(e.to_string()))
+        .map_err(|e| Error::Fail(Fail::Time(e.to_string())))
 }
 
 fn system_tz() -> TimeZone {

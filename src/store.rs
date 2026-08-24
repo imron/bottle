@@ -3,7 +3,7 @@ use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::error::Error;
+use crate::error::{Error, Fail};
 use crate::ledger::{Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
 use crate::spec::{EntryRef, FieldType, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident, table_name};
@@ -78,7 +78,7 @@ pub(crate) fn list_schemas(conn: &Connection) -> Result<Vec<SchemaInfo>, Error> 
     for row in rows {
         let (name, retired) = row?;
         let name = SchemaName::parse(&name)
-            .map_err(|_| Error::fail(format!("corrupt schema name: {name}")))?;
+            .map_err(|_| Error::Fail(Fail::CorruptSchemaName(name.clone())))?;
         out.push(SchemaInfo {
             name,
             retired: retired != 0,
@@ -100,7 +100,7 @@ pub(crate) fn load_schema(conn: &Connection, name: &SchemaName) -> Result<Schema
         )
         .optional()?;
     let Some((spec, retired)) = row else {
-        return Err(Error::fail(format!("unknown schema: {name}")));
+        return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
     };
     Ok(Schema {
         spec: Spec::parse_yaml(&spec)?,
@@ -309,10 +309,10 @@ pub(crate) fn load_links(
     let mut out = Vec::new();
     for row in rows {
         let (name, to_schema, to_id) = row?;
-        let name = LinkName::parse(&name)
-            .map_err(|_| Error::fail(format!("corrupt link name: {name}")))?;
+        let name =
+            LinkName::parse(&name).map_err(|_| Error::Fail(Fail::CorruptLinkName(name.clone())))?;
         let to_schema = SchemaName::parse(&to_schema)
-            .map_err(|_| Error::fail(format!("corrupt link schema: {to_schema}")))?;
+            .map_err(|_| Error::Fail(Fail::CorruptLinkSchema(to_schema.clone())))?;
         out.push(Link {
             name,
             to: EntryRef {

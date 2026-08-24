@@ -13,7 +13,7 @@ mod time;
 use std::path::Path;
 
 pub use db::default_db_path;
-pub use error::Error;
+pub use error::{Error, Fail, Usage};
 pub use input::Cmd;
 pub use spec::FieldType;
 
@@ -35,7 +35,7 @@ pub fn run(db: Option<&Path>, default_agent: Option<String>, cmd: Cmd) -> Result
     if let Cmd::Help { topic } = &cmd {
         return help::page(topic.as_deref());
     }
-    let path = db.ok_or_else(|| Error::fail("db path required"))?;
+    let path = db.ok_or(Error::Fail(Fail::DbPathRequired))?;
     let mut bottle = Bottle::open(path, default_agent)?;
     execute(&mut bottle, cmd)
 }

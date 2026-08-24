@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use rust_decimal::Decimal;
 
-use crate::error::Error;
+use crate::error::{Error, Fail, Usage};
 use crate::ledger::{Amend, Entry, FieldValue, Filter, Op, Order, Outcome};
 use crate::mutable_store::Tx;
 use crate::spec::{
@@ -132,19 +132,19 @@ fn add_field(
 ) -> Result<(), Error> {
     let mut kind = store.load_schema(&schema)?;
     if kind.retired {
-        return Err(Error::fail(format!("schema is retired: {schema}")));
+        return Err(Error::Fail(Fail::SchemaRetired(schema.clone())));
     }
     if kind.spec.field(name.as_str()).is_some() {
-        return Err(Error::fail(format!("field exists: {name}")));
+        return Err(Error::Fail(Fail::FieldExists(name.clone())));
     }
     let mut values = values;
     if type_ == FieldType::Enum {
         let Some(vals) = values.as_mut() else {
-            return Err(Error::usage("--values is required for enum"));
+            return Err(Error::Usage(Usage::EnumValuesRequired));
         };
         fold_enum_values(vals)?;
     } else if values.is_some() {
-        return Err(Error::usage("--values is only valid for enum"));
+        return Err(Error::Usage(Usage::EnumValuesNotAllowed));
     }
     let required = default.is_some();
     if let Some(ref def) = default {
@@ -171,7 +171,7 @@ fn add_value(
 ) -> Result<(), Error> {
     let mut kind = store.load_schema(&schema)?;
     if kind.retired {
-        return Err(Error::fail(format!("schema is retired: {schema}")));
+        return Err(Error::Fail(Fail::SchemaRetired(schema.clone())));
     }
     let Some(f) = kind
         .spec
@@ -179,15 +179,15 @@ fn add_value(
         .iter_mut()
         .find(|f| f.name == field.as_str())
     else {
-        return Err(Error::fail(format!("unknown field: {field}")));
+        return Err(Error::Fail(Fail::UnknownField(field.clone())));
     };
     if f.type_ != FieldType::Enum {
-        return Err(Error::fail(format!("field is not enum: {field}")));
+        return Err(Error::Fail(Fail::FieldNotEnum(field.clone())));
     }
     let folded = fold_enum(&value);
     let values = f.values.get_or_insert_with(Vec::new);
     if values.iter().any(|v| v == &folded) {
-        return Err(Error::fail(format!("enum value exists: {folded}")));
+        return Err(Error::Fail(Fail::EnumValueExists(folded)));
     }
     values.push(folded);
     store.transaction(|tx| tx.save_spec(&schema, &kind.spec))
@@ -195,19 +195,17 @@ fn add_value(
 
 fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     if tx.retire(name)? == 0 {
-        return Err(Error::fail(format!("unknown schema: {name}")));
+        return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
     }
     Ok(())
 }
 
 fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     if !tx.schema_exists(name)? {
-        return Err(Error::fail(format!("unknown schema: {name}")));
+        return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
     }
     if tx.inbound_link_count(name)? > 0 {
-        return Err(Error::fail(format!(
-            "schema {name} still has inbound links"
-        )));
+        return Err(Error::Fail(Fail::SchemaHasInboundLinks(name.clone())));
     }
     tx.drop_schema(name)
 }
@@ -223,7 +221,7 @@ fn log(
 ) -> Result<Outcome, Error> {
     let kind = store.load_schema(&schema)?;
     if kind.retired {
-        return Err(Error::fail(format!("schema is retired: {schema}")));
+        return Err(Error::Fail(Fail::SchemaRetired(schema.clone())));
     }
     let agent = agent
         .or_else(|| default_agent.map(str::to_string))
@@ -245,25 +243,26 @@ fn amend(store: &mut Store, schema: &SchemaName, id: i64, change: Amend) -> Resu
         && change.unlinks.is_empty()
         && change.fields.is_empty()
     {
-        return Err(Error::usage("amend requires at least one change"));
+        return Err(Error::Usage(Usage::AmendEmpty));
     }
     let kind = store.load_schema(schema)?;
     if store.get_entry(schema, &kind.spec, id)?.is_none() {
-        return Err(Error::fail(format!("not found: {schema}/{id}")));
+        return Err(Error::Fail(Fail::EntryNotFound {
+            schema: schema.clone(),
+            id,
+        }));
     }
     let mut unlink_set = HashSet::new();
     for name in &change.unlinks {
         if !unlink_set.insert(name.as_str()) {
-            return Err(Error::usage(format!("duplicate --unlink {name}")));
+            return Err(Error::Usage(Usage::DuplicateUnlink(name.clone())));
         }
         if change
             .links
             .iter()
             .any(|l| l.name.as_str() == name.as_str())
         {
-            return Err(Error::usage(format!(
-                "--link and --unlink of the same name: {name}"
-            )));
+            return Err(Error::Usage(Usage::LinkAndUnlink(name.clone())));
         }
     }
     let values = prepare_fields(&kind.spec, &change.fields, true)?;
@@ -278,9 +277,12 @@ fn amend(store: &mut Store, schema: &SchemaName, id: i64, change: Amend) -> Resu
         for link in &links {
             tx.upsert_link(schema, id, link)?;
         }
-        let entry = tx
-            .get_entry(schema, &kind.spec, id)?
-            .ok_or_else(|| Error::fail(format!("not found: {schema}/{id}")))?;
+        let entry = tx.get_entry(schema, &kind.spec, id)?.ok_or_else(|| {
+            Error::Fail(Fail::EntryNotFound {
+                schema: schema.clone(),
+                id,
+            })
+        })?;
         Ok(Outcome::Posted {
             id,
             at: entry.at,
@@ -292,7 +294,10 @@ fn amend(store: &mut Store, schema: &SchemaName, id: i64, change: Amend) -> Resu
 fn ignore(store: &mut Store, schema: &SchemaName, id: i64) -> Result<Outcome, Error> {
     let spec = store.load_schema(schema)?.spec;
     let Some(entry) = store.get_entry(schema, &spec, id)? else {
-        return Err(Error::fail(format!("not found: {schema}/{id}")));
+        return Err(Error::Fail(Fail::EntryNotFound {
+            schema: schema.clone(),
+            id,
+        }));
     };
     store.transaction(|tx| tx.set_ignored(schema, id))?;
     Ok(Outcome::Stamp { id, at: entry.at })
@@ -301,7 +306,10 @@ fn ignore(store: &mut Store, schema: &SchemaName, id: i64) -> Result<Outcome, Er
 fn get(store: &Store, schema: &SchemaName, id: i64) -> Result<Outcome, Error> {
     let spec = store.load_schema(schema)?.spec;
     let Some(entry) = store.get_entry(schema, &spec, id)? else {
-        return Err(Error::fail(format!("not found: {schema}/{id}")));
+        return Err(Error::Fail(Fail::EntryNotFound {
+            schema: schema.clone(),
+            id,
+        }));
     };
     Ok(Outcome::Entries {
         spec,
@@ -328,7 +336,7 @@ fn last(
         },
     )?;
     match &outcome {
-        Outcome::Entries { entries, .. } if entries.is_empty() => Err(Error::fail("not found")),
+        Outcome::Entries { entries, .. } if entries.is_empty() => Err(Error::Fail(Fail::NotFound)),
         _ => Ok(outcome),
     }
 }
@@ -370,10 +378,10 @@ fn sum(
 ) -> Result<Outcome, Error> {
     let spec = store.load_schema(schema)?.spec;
     let Some(f) = spec.field(field.as_str()) else {
-        return Err(Error::fail(format!("unknown field: {field}")));
+        return Err(Error::Fail(Fail::UnknownField(field.clone())));
     };
     if f.type_ != FieldType::Number {
-        return Err(Error::fail(format!("field is not a number: {field}")));
+        return Err(Error::Fail(Fail::FieldNotNumber(field.clone())));
     }
     let resolved = resolve_filters(&spec, filters)?;
     let entries = store.find(Find {
@@ -401,7 +409,7 @@ fn sum(
         Some(Group::Year) => grouped_time(&entries, key, "year"),
         Some(Group::Link(name)) => {
             if spec.field(name.as_str()).is_some() {
-                return Err(Error::fail(format!("invalid group: {name}")));
+                return Err(Error::Fail(Fail::InvalidGroup(name.to_string())));
             }
             grouped_link(&entries, key, name)
         }
@@ -447,7 +455,7 @@ fn time_group_key(group: &str, at: Instant) -> Result<String, Error> {
             let iso = date.iso_week_date();
             Ok(format!("{}-W{:02}", iso.year(), iso.week()))
         }
-        _ => Err(Error::fail(format!("invalid group: {group}"))),
+        _ => Err(Error::Fail(Fail::InvalidGroup(group.to_string()))),
     }
 }
 
@@ -455,9 +463,7 @@ fn resolve_filters(spec: &Spec, filters: &[(String, String)]) -> Result<Vec<Filt
     let mut out = Vec::new();
     for (name, value) in filters {
         if is_reserved(name) {
-            return Err(Error::usage(format!(
-                "--where {name}= is reserved; use --agent, get, or --from/--to"
-            )));
+            return Err(Error::Usage(Usage::ReservedWhere(name.clone())));
         }
         if let Some(field) = spec.field(name) {
             let value = match field.type_ {
@@ -485,12 +491,11 @@ fn ensure_links(store: &Store, spec: &Spec, links: &[Link]) -> Result<(), Error>
     let mut seen = HashSet::new();
     for link in links {
         if !seen.insert(link.name.as_str()) {
-            return Err(Error::usage(format!("duplicate link name: {}", link.name)));
+            return Err(Error::Usage(Usage::DuplicateLinkName(link.name.clone())));
         }
         if spec.field(link.name.as_str()).is_some() {
-            return Err(Error::fail(format!(
-                "link name collides with field: {}",
-                link.name
+            return Err(Error::Fail(Fail::LinkNameCollidesWithField(
+                link.name.clone(),
             )));
         }
         let target = store.load_schema(&link.to.schema)?;
@@ -498,7 +503,7 @@ fn ensure_links(store: &Store, spec: &Spec, links: &[Link]) -> Result<(), Error>
             .get_entry(&link.to.schema, &target.spec, link.to.id)?
             .is_none()
         {
-            return Err(Error::fail(format!("link target missing: {}", link.to)));
+            return Err(Error::Fail(Fail::LinkTargetMissing(link.to.clone())));
         }
     }
     Ok(())
@@ -513,14 +518,16 @@ fn prepare_fields(
     let mut out = HashMap::new();
     for (name, value) in fields {
         if !seen.insert(name.as_str()) {
-            return Err(Error::usage(format!("duplicate field: {name}")));
+            return Err(Error::Usage(Usage::DuplicateField(name.clone())));
         }
         let Some(field) = spec.field(name.as_str()) else {
-            return Err(Error::fail(format!("unknown field: {name}")));
+            return Err(Error::Fail(Fail::UnknownField(name.clone())));
         };
         if value.is_empty() {
             if field.required {
-                return Err(Error::fail(format!("missing required field: {name}")));
+                return Err(Error::Fail(Fail::MissingRequiredField(
+                    name.as_str().to_string(),
+                )));
             }
             out.insert(name.as_str().to_string(), FieldValue::Empty);
             continue;
@@ -530,10 +537,7 @@ fn prepare_fields(
     if !partial {
         for field in &spec.fields {
             if field.required && !out.contains_key(&field.name) {
-                return Err(Error::fail(format!(
-                    "missing required field: {}",
-                    field.name
-                )));
+                return Err(Error::Fail(Fail::MissingRequiredField(field.name.clone())));
             }
         }
     }
@@ -553,9 +557,7 @@ fn parse_field_value_parts(
     match type_ {
         FieldType::Text => {
             if value.contains('\t') || value.contains('\n') {
-                return Err(Error::fail(format!(
-                    "text {name} may not contain tab or newline"
-                )));
+                return Err(Error::Fail(Fail::TextHasTabOrNewline(name.to_string())));
             }
             Ok(FieldValue::Text(value.to_string()))
         }
@@ -563,10 +565,13 @@ fn parse_field_value_parts(
         FieldType::Enum => {
             let folded = fold_enum(value);
             let Some(values) = values else {
-                return Err(Error::fail(format!("enum {name} has no values")));
+                return Err(Error::Fail(Fail::EnumHasNoValues(name.to_string())));
             };
             if !values.iter().any(|v| v == &folded) {
-                return Err(Error::fail(format!("invalid {name} value: {value}")));
+                return Err(Error::Fail(Fail::InvalidEnumValue {
+                    field: name.to_string(),
+                    value: value.to_string(),
+                }));
             }
             Ok(FieldValue::Text(folded))
         }

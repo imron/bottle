@@ -1,63 +1,101 @@
-use std::fmt;
+use crate::spec::{EntryRef, FieldName, LinkName, SchemaName};
 
-#[derive(Debug)]
-pub struct Error {
-    kind: Kind,
-    message: String,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Error {
+    Usage(Usage),
+    Fail(Fail),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    Usage,
-    Fail,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Usage {
+    EnumValuesRequired,
+    EnumValuesNotAllowed,
+    AmendEmpty,
+    DuplicateUnlink(LinkName),
+    LinkAndUnlink(LinkName),
+    ReservedWhere(String),
+    DuplicateLinkName(LinkName),
+    DuplicateField(FieldName),
+    InvalidLinkTarget(String),
+    DateOnlyNotInstant,
+    TimeMustUseT,
+    InvalidDate(String),
+    InvalidTime(String),
+    OffsetNeedsColon,
+    UnknownHelpTopic(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Fail {
+    SchemaRetired(SchemaName),
+    FieldExists(FieldName),
+    UnknownField(FieldName),
+    FieldNotEnum(FieldName),
+    EnumValueExists(String),
+    UnknownSchema(SchemaName),
+    SchemaHasInboundLinks(SchemaName),
+    SchemaExists(SchemaName),
+    EntryNotFound { schema: SchemaName, id: i64 },
+    NotFound,
+    FieldNotNumber(FieldName),
+    InvalidGroup(String),
+    LinkNameCollidesWithField(LinkName),
+    LinkTargetMissing(EntryRef),
+    MissingRequiredField(String),
+    TextHasTabOrNewline(String),
+    EnumHasNoValues(String),
+    InvalidEnumValue { field: String, value: String },
+    InvalidSpec(String),
+    Yaml(String),
+    InvalidSchemaName(String),
+    InvalidFieldName(String),
+    ReservedFieldName(String),
+    InvalidLinkName(String),
+    ReservedLinkName(String),
+    EmptyEnumValue,
+    DuplicateEnumValue(String),
+    DuplicateSpecField(String),
+    InvalidNumber(String),
+    ValuesOnlyForEnum(String),
+    EnumNeedsValues(String),
+    CorruptSchemaName(String),
+    CorruptLinkName(String),
+    CorruptLinkSchema(String),
+    CorruptStoredTime(String),
+    HomeNotSet,
+    DbPathRequired,
+    HelpNotAnOp,
+    Store(String),
+    Io(String),
+    Time(String),
 }
 
 impl Error {
-    pub fn usage(message: impl Into<String>) -> Self {
-        Self {
-            kind: Kind::Usage,
-            message: message.into(),
-        }
-    }
-
-    pub fn fail(message: impl Into<String>) -> Self {
-        Self {
-            kind: Kind::Fail,
-            message: message.into(),
-        }
-    }
-
     pub fn exit_code(&self) -> i32 {
-        match self.kind {
-            Kind::Usage => 2,
-            Kind::Fail => 1,
+        match self {
+            Self::Usage(_) => 2,
+            Self::Fail(_) => 1,
         }
     }
 
-    pub fn message(&self) -> &str {
-        &self.message
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
+    pub fn message(&self) -> String {
+        self.to_string()
     }
 }
 
 impl std::error::Error for Error {}
 
 pub(crate) trait UniqueConstraint<T> {
-    fn unique(self, message: impl Into<String>) -> Result<T, Error>;
+    fn unique(self, err: Fail) -> Result<T, Error>;
 }
 
 impl<T> UniqueConstraint<T> for Result<T, rusqlite::Error> {
-    fn unique(self, message: impl Into<String>) -> Result<T, Error> {
-        self.map_err(|err| {
-            if err.sqlite_error_code() == Some(rusqlite::ErrorCode::ConstraintViolation) {
-                Error::fail(message)
+    fn unique(self, err: Fail) -> Result<T, Error> {
+        self.map_err(|e| {
+            if e.sqlite_error_code() == Some(rusqlite::ErrorCode::ConstraintViolation) {
+                Error::Fail(err)
             } else {
-                Error::from(err)
+                Error::from(e)
             }
         })
     }
@@ -65,19 +103,19 @@ impl<T> UniqueConstraint<T> for Result<T, rusqlite::Error> {
 
 impl From<rusqlite::Error> for Error {
     fn from(err: rusqlite::Error) -> Self {
-        Self::fail(err.to_string())
+        Self::Fail(Fail::Store(err.to_string()))
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
-        Self::fail(err.to_string())
+        Self::Fail(Fail::Io(err.to_string()))
     }
 }
 
 impl From<rust_decimal::Error> for Error {
     fn from(err: rust_decimal::Error) -> Self {
-        Self::fail(format!("invalid number: {err}"))
+        Self::Fail(Fail::InvalidNumber(err.to_string()))
     }
 }
 

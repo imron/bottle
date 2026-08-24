@@ -1,7 +1,8 @@
 mod cmd;
+mod error;
 mod tsv;
 
-use crate::error::Error;
+use crate::error::{Error, Fail};
 use crate::ledger::{Amend, FieldValue, Op, Outcome};
 use crate::spec::{FieldName, Link, LinkName, SchemaName, Spec};
 use crate::time::{self, Range};
@@ -34,7 +35,7 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
     );
     let op = match cmd {
         Cmd::Help { .. } => {
-            return Err(Error::fail("help is not a ledger operation"));
+            return Err(Error::Fail(Fail::HelpNotAnOp));
         }
         Cmd::SchemaList => Op::SchemaList,
         Cmd::SchemaShow { name, yaml: _ } => Op::SchemaShow {

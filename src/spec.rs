@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use crate::error::Error;
+use crate::error::{Error, Fail, Usage};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Spec {
@@ -29,13 +29,13 @@ pub enum FieldType {
 impl Spec {
     pub fn parse_yaml(raw: &str) -> Result<Self, Error> {
         let mut spec: Spec =
-            serde_yaml::from_str(raw).map_err(|e| Error::fail(format!("invalid spec: {e}")))?;
+            serde_yaml::from_str(raw).map_err(|e| Error::Fail(Fail::InvalidSpec(e.to_string())))?;
         spec.canonicalize()?;
         Ok(spec)
     }
 
     pub fn to_yaml(&self) -> Result<String, Error> {
-        serde_yaml::to_string(self).map_err(|e| Error::fail(e.to_string()))
+        serde_yaml::to_string(self).map_err(|e| Error::Fail(Fail::Yaml(e.to_string())))
     }
 
     pub fn field(&self, name: &str) -> Option<&Field> {
@@ -47,21 +47,18 @@ impl Spec {
         for field in &mut self.fields {
             FieldName::parse(&field.name)?;
             if !seen.insert(field.name.clone()) {
-                return Err(Error::fail(format!("duplicate field: {}", field.name)));
+                return Err(Error::Fail(Fail::DuplicateSpecField(field.name.clone())));
             }
             match field.type_ {
                 FieldType::Enum => {
                     let Some(values) = field.values.as_mut() else {
-                        return Err(Error::fail(format!("enum {} needs values", field.name)));
+                        return Err(Error::Fail(Fail::EnumNeedsValues(field.name.clone())));
                     };
                     fold_enum_values(values)?;
                 }
                 _ => {
                     if field.values.is_some() {
-                        return Err(Error::fail(format!(
-                            "values only apply to enum, not {}",
-                            field.name
-                        )));
+                        return Err(Error::Fail(Fail::ValuesOnlyForEnum(field.name.clone())));
                     }
                 }
             }
@@ -78,7 +75,7 @@ impl SchemaName {
         if is_schema_name(s) {
             Ok(Self(s.to_string()))
         } else {
-            Err(Error::fail(format!("invalid schema name: {s}")))
+            Err(Error::Fail(Fail::InvalidSchemaName(s.to_string())))
         }
     }
 
@@ -99,10 +96,10 @@ pub struct FieldName(String);
 impl FieldName {
     pub fn parse(s: &str) -> Result<Self, Error> {
         if !is_ident(s) {
-            return Err(Error::fail(format!("invalid field name: {s}")));
+            return Err(Error::Fail(Fail::InvalidFieldName(s.to_string())));
         }
         if is_reserved(s) {
-            return Err(Error::fail(format!("reserved field name: {s}")));
+            return Err(Error::Fail(Fail::ReservedFieldName(s.to_string())));
         }
         Ok(Self(s.to_string()))
     }
@@ -124,10 +121,10 @@ pub struct LinkName(String);
 impl LinkName {
     pub fn parse(s: &str) -> Result<Self, Error> {
         if !is_ident(s) {
-            return Err(Error::fail(format!("invalid link name: {s}")));
+            return Err(Error::Fail(Fail::InvalidLinkName(s.to_string())));
         }
         if is_reserved(s) || is_time_group(s) {
-            return Err(Error::fail(format!("reserved link name: {s}")));
+            return Err(Error::Fail(Fail::ReservedLinkName(s.to_string())));
         }
         Ok(Self(s.to_string()))
     }
@@ -173,15 +170,15 @@ pub struct EntryRef {
 impl EntryRef {
     pub fn parse(s: &str) -> Result<Self, Error> {
         let Some((schema, id)) = s.rsplit_once('/') else {
-            return Err(Error::usage(format!("invalid link target: {s}")));
+            return Err(Error::Usage(Usage::InvalidLinkTarget(s.to_string())));
         };
         let schema = SchemaName::parse(schema)
-            .map_err(|_| Error::usage(format!("invalid link target: {s}")))?;
+            .map_err(|_| Error::Usage(Usage::InvalidLinkTarget(s.to_string())))?;
         let id: i64 = id
             .parse()
-            .map_err(|_| Error::usage(format!("invalid link target: {s}")))?;
+            .map_err(|_| Error::Usage(Usage::InvalidLinkTarget(s.to_string())))?;
         if id < 1 {
-            return Err(Error::usage(format!("invalid link target: {s}")));
+            return Err(Error::Usage(Usage::InvalidLinkTarget(s.to_string())));
         }
         Ok(Self { schema, id })
     }
@@ -238,12 +235,10 @@ pub fn fold_enum_values(values: &mut [String]) -> Result<(), Error> {
     for value in values.iter_mut() {
         *value = fold_enum(value);
         if value.is_empty() {
-            return Err(Error::fail("empty enum value"));
+            return Err(Error::Fail(Fail::EmptyEnumValue));
         }
         if !seen.insert(value.clone()) {
-            return Err(Error::fail(format!(
-                "duplicate enum value after fold: {value}"
-            )));
+            return Err(Error::Fail(Fail::DuplicateEnumValue(value.clone())));
         }
     }
     Ok(())
@@ -251,7 +246,7 @@ pub fn fold_enum_values(values: &mut [String]) -> Result<(), Error> {
 
 pub fn parse_number(raw: &str) -> Result<Decimal, Error> {
     if raw.contains(['e', 'E']) {
-        return Err(Error::fail(format!("invalid number: {raw}")));
+        return Err(Error::Fail(Fail::InvalidNumber(raw.to_string())));
     }
     Ok(raw.parse()?)
 }

@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use rusqlite::functions::FunctionFlags;
 use rust_decimal::Decimal;
 
-use crate::error::Error;
+use crate::error::{Error, Fail};
 
 pub fn default_db_path() -> Result<PathBuf, Error> {
     if let Some(path) = std::env::var_os("BOTTLE_DB") {
@@ -82,5 +82,5 @@ fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
 fn home_dir() -> Result<PathBuf, Error> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
-        .ok_or_else(|| Error::fail("HOME is not set"))
+        .ok_or(Error::Fail(Fail::HomeNotSet))
 }

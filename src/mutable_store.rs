@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use rusqlite::{TransactionBehavior, params};
 
-use crate::error::{Error, UniqueConstraint};
+use crate::error::{Error, Fail, UniqueConstraint};
 use crate::ledger::{Entry, FieldValue};
 use crate::spec::{Field, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
@@ -51,7 +51,7 @@ impl<'a> Tx<'a> {
                 "INSERT INTO schemas (name, spec, retired) VALUES (?1, ?2, 0)",
                 params![name.as_str(), yaml],
             )
-            .unique(format!("schema exists: {name}"))?;
+            .unique(Fail::SchemaExists(name.clone()))?;
         self.inner.execute_batch(&sql)?;
         Ok(())
     }
