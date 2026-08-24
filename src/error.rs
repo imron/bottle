@@ -47,11 +47,11 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-pub(crate) trait UniqueExt<T> {
+pub(crate) trait UniqueConstraint<T> {
     fn unique(self, message: impl Into<String>) -> Result<T, Error>;
 }
 
-impl<T> UniqueExt<T> for Result<T, rusqlite::Error> {
+impl<T> UniqueConstraint<T> for Result<T, rusqlite::Error> {
     fn unique(self, message: impl Into<String>) -> Result<T, Error> {
         self.map_err(|err| {
             if err.sqlite_error_code() == Some(rusqlite::ErrorCode::ConstraintViolation) {
