@@ -31,10 +31,6 @@ impl Store {
         })
     }
 
-    pub(crate) fn schema_exists(&self, name: &SchemaName) -> Result<bool, Error> {
-        schema_exists(&self.conn, name)
-    }
-
     pub(crate) fn transaction<T>(
         &mut self,
         f: impl FnOnce(&mut crate::mutable_store::Tx<'_>) -> Result<T, Error>,

@@ -119,9 +119,6 @@ pub(crate) fn execute(
 }
 
 fn add_schema(store: &mut Store, name: SchemaName, spec: Spec) -> Result<(), Error> {
-    if store.schema_exists(&name)? {
-        return Err(Error::fail(format!("schema exists: {name}")));
-    }
     store.transaction(|tx| tx.insert_schema(&name, &spec))
 }
 

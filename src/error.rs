@@ -47,6 +47,22 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+pub(crate) trait UniqueExt<T> {
+    fn unique(self, message: impl Into<String>) -> Result<T, Error>;
+}
+
+impl<T> UniqueExt<T> for Result<T, rusqlite::Error> {
+    fn unique(self, message: impl Into<String>) -> Result<T, Error> {
+        self.map_err(|err| {
+            if err.sqlite_error_code() == Some(rusqlite::ErrorCode::ConstraintViolation) {
+                Error::fail(message)
+            } else {
+                Error::from(err)
+            }
+        })
+    }
+}
+
 impl From<rusqlite::Error> for Error {
     fn from(err: rusqlite::Error) -> Self {
         Self::fail(err.to_string())

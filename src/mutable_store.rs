@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use rusqlite::{TransactionBehavior, params};
 
-use crate::error::Error;
+use crate::error::{Error, UniqueExt};
 use crate::ledger::{Entry, FieldValue};
 use crate::spec::{Field, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
@@ -46,10 +46,12 @@ impl<'a> Tx<'a> {
         let table = table_name(name);
         let cols = create_columns(spec);
         let sql = format!("CREATE TABLE {} ({cols})", quote_ident(&table));
-        self.inner.execute(
-            "INSERT INTO schemas (name, spec, retired) VALUES (?1, ?2, 0)",
-            params![name.as_str(), yaml],
-        )?;
+        self.inner
+            .execute(
+                "INSERT INTO schemas (name, spec, retired) VALUES (?1, ?2, 0)",
+                params![name.as_str(), yaml],
+            )
+            .unique(format!("schema exists: {name}"))?;
         self.inner.execute_batch(&sql)?;
         Ok(())
     }
