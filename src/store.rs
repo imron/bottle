@@ -166,17 +166,25 @@ fn execute_select(conn: &Connection, q: &Find<'_>) -> Result<Vec<Entry>, Error> 
     }
     for filter in q.filters {
         match filter {
-            Filter::Field { name, value } => match value {
-                FieldValue::Number(_) => {}
-                _ => {
-                    bind.push(SqlVal::from_field(value));
-                    sql.push_str(&format!(
-                        " AND {} = ?{}",
-                        quote_ident(name.as_str()),
-                        bind.len()
-                    ));
+            Filter::Field { name, value } => {
+                bind.push(SqlVal::from_field(value));
+                match value {
+                    FieldValue::Number(_) => {
+                        sql.push_str(&format!(
+                            " AND bottle_dec_eq({}, ?{})",
+                            quote_ident(name.as_str()),
+                            bind.len()
+                        ));
+                    }
+                    _ => {
+                        sql.push_str(&format!(
+                            " AND {} = ?{}",
+                            quote_ident(name.as_str()),
+                            bind.len()
+                        ));
+                    }
                 }
-            },
+            }
             Filter::Link { name, to } => {
                 bind.push(SqlVal::Text(q.schema.as_str().to_string()));
                 bind.push(SqlVal::Text(name.as_str().to_string()));

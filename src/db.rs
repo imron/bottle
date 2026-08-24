@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use rusqlite::Connection;
+use rusqlite::functions::FunctionFlags;
+use rust_decimal::Decimal;
 
 use crate::error::Error;
 
@@ -47,7 +49,42 @@ pub fn open(path: &Path) -> Result<Connection, Error> {
             PRIMARY KEY (from_schema, from_id, name)
          );",
     )?;
+    register_functions(&conn)?;
     Ok(conn)
+}
+
+fn register_functions(conn: &Connection) -> Result<(), Error> {
+    conn.create_scalar_function(
+        "bottle_dec_eq",
+        2,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        |ctx| {
+            let left: Option<String> = ctx.get(0)?;
+            let right: Option<String> = ctx.get(1)?;
+            dec_eq(left.as_deref(), right.as_deref())
+        },
+    )?;
+    Ok(())
+}
+
+fn dec_eq(left: Option<&str>, right: Option<&str>) -> rusqlite::Result<bool> {
+    let (Some(left), Some(right)) = (left, right) else {
+        return Ok(false);
+    };
+    if left.is_empty() || right.is_empty() {
+        return Ok(false);
+    }
+    let left: Decimal = left.parse().map_err(|_| {
+        rusqlite::Error::UserFunctionError(Box::new(Error::fail(format!(
+            "corrupt stored number: {left}"
+        ))))
+    })?;
+    let right: Decimal = right.parse().map_err(|_| {
+        rusqlite::Error::UserFunctionError(Box::new(Error::fail(format!(
+            "invalid number: {right}"
+        ))))
+    })?;
+    Ok(left == right)
 }
 
 fn home_dir() -> Result<PathBuf, Error> {

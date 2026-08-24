@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 directories = "6"
 jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.37", features = ["bundled", "functions"] }
 rust_decimal = "1.42.1"
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"

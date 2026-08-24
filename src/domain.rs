@@ -343,12 +343,7 @@ struct Query<'a> {
 fn list(store: &Store, q: Query<'_>) -> Result<Outcome, Error> {
     let spec = store.load_schema(q.schema)?.spec;
     let resolved = resolve_filters(&spec, q.filters)?;
-    let sql_limit = if has_number_filter(&resolved) {
-        None
-    } else {
-        q.limit
-    };
-    let mut entries = store.find(Find {
+    let entries = store.find(Find {
         schema: q.schema,
         spec: &spec,
         range: q.range,
@@ -356,12 +351,8 @@ fn list(store: &Store, q: Query<'_>) -> Result<Outcome, Error> {
         include_ignored: q.include_ignored,
         filters: &resolved,
         order: q.order,
-        limit: sql_limit,
+        limit: q.limit,
     })?;
-    apply_number_filters(&mut entries, &resolved);
-    if let Some(n) = q.limit {
-        entries.truncate(n);
-    }
     Ok(Outcome::Entries { spec, entries })
 }
 
@@ -382,7 +373,7 @@ fn sum(
         return Err(Error::fail(format!("field is not a number: {field}")));
     }
     let resolved = resolve_filters(&spec, filters)?;
-    let mut entries = store.find(Find {
+    let entries = store.find(Find {
         schema,
         spec: &spec,
         range,
@@ -392,7 +383,6 @@ fn sum(
         order: Order::Oldest,
         limit: None,
     })?;
-    apply_number_filters(&mut entries, &resolved);
     let key = field.as_str();
     match group {
         None => {
@@ -456,30 +446,6 @@ fn time_group_key(group: &str, at: Instant) -> Result<String, Error> {
         }
         _ => Err(Error::fail(format!("invalid group: {group}"))),
     }
-}
-
-fn has_number_filter(filters: &[Filter]) -> bool {
-    filters.iter().any(|f| {
-        matches!(
-            f,
-            Filter::Field {
-                value: FieldValue::Number(_),
-                ..
-            }
-        )
-    })
-}
-
-fn apply_number_filters(entries: &mut Vec<Entry>, filters: &[Filter]) {
-    entries.retain(|entry| {
-        filters.iter().all(|f| match f {
-            Filter::Field {
-                name,
-                value: FieldValue::Number(want),
-            } => entry.number(name.as_str()) == Some(*want),
-            _ => true,
-        })
-    });
 }
 
 fn resolve_filters(spec: &Spec, filters: &[(String, String)]) -> Result<Vec<Filter>, Error> {
