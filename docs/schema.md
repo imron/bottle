@@ -43,15 +43,16 @@ CREATE TABLE fitness_set (
   agent    TEXT,
   ignored  INTEGER NOT NULL DEFAULT 0,
   movement TEXT NOT NULL,
-  reps     REAL NOT NULL,
-  load     REAL,
+  reps     TEXT NOT NULL,
+  load     TEXT,
   unit     TEXT,
-  volume   REAL
+  volume   TEXT
 );
 ```
 
 `at` is the event instant in UTC. See [time.md](time.md).
-Numbers are `REAL`. Enums are `TEXT` checked on write.
+Numbers are `TEXT` decimals. Enums are `TEXT` checked on
+write.
 
 `id` is per table. `fitness_set.id = 7` is not
 `fitness_session.id = 7`.

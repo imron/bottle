@@ -53,7 +53,7 @@ logging.
 Most commands print a TSV table: a header line, then data
 lines, even when there is only one result. Booleans print
 `true` or `false`. Empty optional fields are empty cells.
-Numbers drop trailing zeros (`49` not `49.0`). Errors go
+Numbers print as logged (`86.50` stays `86.50`). Errors go
 to stderr and never share stdout with a table. `help` is
 prose. `schema show --yaml` is YAML.
 

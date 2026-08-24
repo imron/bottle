@@ -10,7 +10,6 @@ use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 pub(crate) enum SqlVal {
     Null,
     Int(i64),
-    Real(f64),
     Text(String),
 }
 
@@ -19,7 +18,6 @@ impl SqlVal {
         match self {
             SqlVal::Null => ToSqlOutput::Borrowed(ValueRef::Null),
             SqlVal::Int(n) => ToSqlOutput::Owned(Value::Integer(*n)),
-            SqlVal::Real(n) => ToSqlOutput::Owned(Value::Real(*n)),
             SqlVal::Text(s) => ToSqlOutput::Borrowed(ValueRef::Text(s.as_bytes())),
         }
     }
@@ -28,7 +26,7 @@ impl SqlVal {
         match value {
             FieldValue::Empty => SqlVal::Null,
             FieldValue::Text(s) => SqlVal::Text(s.clone()),
-            FieldValue::Number(n) => SqlVal::Real(*n),
+            FieldValue::Number(n) => SqlVal::Text(n.to_string()),
         }
     }
 }
@@ -41,8 +39,7 @@ impl rusqlite::ToSql for SqlVal {
 
 pub(crate) fn sql_type(t: FieldType) -> &'static str {
     match t {
-        FieldType::Number => "REAL",
-        FieldType::Text | FieldType::Enum => "TEXT",
+        FieldType::Number | FieldType::Text | FieldType::Enum => "TEXT",
     }
 }
 
@@ -68,7 +65,8 @@ pub(crate) fn instant_from_sql(raw: String) -> Result<Instant, Error> {
 
 pub(crate) fn sql_default(type_: FieldType, def: &str) -> String {
     match type_ {
-        FieldType::Number => def.to_string(),
-        FieldType::Text | FieldType::Enum => format!("'{}'", def.replace('\'', "''")),
+        FieldType::Number | FieldType::Text | FieldType::Enum => {
+            format!("'{}'", def.replace('\'', "''"))
+        }
     }
 }

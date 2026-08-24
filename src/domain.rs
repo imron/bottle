@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use rust_decimal::Decimal;
+
 use crate::error::Error;
 use crate::ledger::{Amend, Entry, FieldValue, Filter, Op, Order, Outcome};
 use crate::mutable_store::Tx;
@@ -341,7 +343,12 @@ struct Query<'a> {
 fn list(store: &Store, q: Query<'_>) -> Result<Outcome, Error> {
     let spec = store.load_schema(q.schema)?.spec;
     let resolved = resolve_filters(&spec, q.filters)?;
-    let entries = store.find(Find {
+    let sql_limit = if has_number_filter(&resolved) {
+        None
+    } else {
+        q.limit
+    };
+    let mut entries = store.find(Find {
         schema: q.schema,
         spec: &spec,
         range: q.range,
@@ -349,8 +356,12 @@ fn list(store: &Store, q: Query<'_>) -> Result<Outcome, Error> {
         include_ignored: q.include_ignored,
         filters: &resolved,
         order: q.order,
-        limit: q.limit,
+        limit: sql_limit,
     })?;
+    apply_number_filters(&mut entries, &resolved);
+    if let Some(n) = q.limit {
+        entries.truncate(n);
+    }
     Ok(Outcome::Entries { spec, entries })
 }
 
@@ -371,7 +382,7 @@ fn sum(
         return Err(Error::fail(format!("field is not a number: {field}")));
     }
     let resolved = resolve_filters(&spec, filters)?;
-    let entries = store.find(Find {
+    let mut entries = store.find(Find {
         schema,
         spec: &spec,
         range,
@@ -381,10 +392,11 @@ fn sum(
         order: Order::Oldest,
         limit: None,
     })?;
+    apply_number_filters(&mut entries, &resolved);
     let key = field.as_str();
     match group {
         None => {
-            let total: f64 = entries.iter().filter_map(|e| e.number(key)).sum();
+            let total: Decimal = entries.iter().filter_map(|e| e.number(key)).sum();
             Ok(Outcome::Total {
                 field: field.clone(),
                 value: total,
@@ -404,10 +416,10 @@ fn sum(
 }
 
 fn grouped_time(entries: &[Entry], field: &str, unit: &str) -> Result<Outcome, Error> {
-    let mut buckets: BTreeMap<String, f64> = BTreeMap::new();
+    let mut buckets: BTreeMap<String, Decimal> = BTreeMap::new();
     for entry in entries {
         let k = time_group_key(unit, entry.at)?;
-        *buckets.entry(k).or_insert(0.0) += entry.number(field).unwrap_or(0.0);
+        *buckets.entry(k).or_insert(Decimal::ZERO) += entry.number(field).unwrap_or(Decimal::ZERO);
     }
     Ok(Outcome::GroupedTime {
         unit: unit.to_string(),
@@ -416,14 +428,15 @@ fn grouped_time(entries: &[Entry], field: &str, unit: &str) -> Result<Outcome, E
 }
 
 fn grouped_link(entries: &[Entry], field: &str, name: LinkName) -> Result<Outcome, Error> {
-    let mut buckets: BTreeMap<Option<EntryRef>, f64> = BTreeMap::new();
+    let mut buckets: BTreeMap<Option<EntryRef>, Decimal> = BTreeMap::new();
     for entry in entries {
         let key = entry
             .links
             .iter()
             .find(|l| l.name.as_str() == name.as_str())
             .map(|l| l.to.clone());
-        *buckets.entry(key).or_insert(0.0) += entry.number(field).unwrap_or(0.0);
+        *buckets.entry(key).or_insert(Decimal::ZERO) +=
+            entry.number(field).unwrap_or(Decimal::ZERO);
     }
     Ok(Outcome::GroupedLink {
         name,
@@ -443,6 +456,30 @@ fn time_group_key(group: &str, at: Instant) -> Result<String, Error> {
         }
         _ => Err(Error::fail(format!("invalid group: {group}"))),
     }
+}
+
+fn has_number_filter(filters: &[Filter]) -> bool {
+    filters.iter().any(|f| {
+        matches!(
+            f,
+            Filter::Field {
+                value: FieldValue::Number(_),
+                ..
+            }
+        )
+    })
+}
+
+fn apply_number_filters(entries: &mut Vec<Entry>, filters: &[Filter]) {
+    entries.retain(|entry| {
+        filters.iter().all(|f| match f {
+            Filter::Field {
+                name,
+                value: FieldValue::Number(want),
+            } => entry.number(name.as_str()) == Some(*want),
+            _ => true,
+        })
+    });
 }
 
 fn resolve_filters(spec: &Spec, filters: &[(String, String)]) -> Result<Vec<Filter>, Error> {

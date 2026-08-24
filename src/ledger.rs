@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use rust_decimal::Decimal;
+
 use crate::spec::{EntryRef, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec};
 use crate::time::{Instant, Range};
 
@@ -7,7 +9,7 @@ use crate::time::{Instant, Range};
 pub enum FieldValue {
     Empty,
     Text(String),
-    Number(f64),
+    Number(Decimal),
 }
 
 #[derive(Debug, Clone)]
@@ -21,7 +23,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn number(&self, field: &str) -> Option<f64> {
+    pub fn number(&self, field: &str) -> Option<Decimal> {
         match self.values.get(field) {
             Some(FieldValue::Number(n)) => Some(*n),
             _ => None,
@@ -157,14 +159,14 @@ pub enum Outcome {
     },
     Total {
         field: FieldName,
-        value: f64,
+        value: Decimal,
     },
     GroupedTime {
         unit: String,
-        buckets: Vec<(String, f64)>,
+        buckets: Vec<(String, Decimal)>,
     },
     GroupedLink {
         name: LinkName,
-        buckets: Vec<(Option<EntryRef>, f64)>,
+        buckets: Vec<(Option<EntryRef>, Decimal)>,
     },
 }

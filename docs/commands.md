@@ -12,8 +12,8 @@ TSV body.
 Exit codes: `0` ok, `2` usage, `1` anything else (unknown
 schema, bad field, not found).
 
-Numbers print without trailing zeros (`49` not `49.0`;
-`39.6` stays `39.6`). Booleans print `true` or `false`
+Numbers print as logged (`86.50` stays `86.50`; `49` stays
+`49`). Booleans print `true` or `false`
 (`retired`, `required`, `ignored`). Empty optional fields
 are empty cells. `ls`, `today`, and `last` do not repeat
 the schema name on each line.

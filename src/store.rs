@@ -166,14 +166,17 @@ fn execute_select(conn: &Connection, q: &Find<'_>) -> Result<Vec<Entry>, Error> 
     }
     for filter in q.filters {
         match filter {
-            Filter::Field { name, value } => {
-                bind.push(SqlVal::from_field(value));
-                sql.push_str(&format!(
-                    " AND {} = ?{}",
-                    quote_ident(name.as_str()),
-                    bind.len()
-                ));
-            }
+            Filter::Field { name, value } => match value {
+                FieldValue::Number(_) => {}
+                _ => {
+                    bind.push(SqlVal::from_field(value));
+                    sql.push_str(&format!(
+                        " AND {} = ?{}",
+                        quote_ident(name.as_str()),
+                        bind.len()
+                    ));
+                }
+            },
             Filter::Link { name, to } => {
                 bind.push(SqlVal::Text(q.schema.as_str().to_string()));
                 bind.push(SqlVal::Text(name.as_str().to_string()));
@@ -236,12 +239,16 @@ fn read_entry(
                 if let Some(field) = spec.field(other) {
                     match field.type_ {
                         FieldType::Number => {
-                            let v: Option<f64> = r.get(i)?;
+                            let v: Option<String> = r.get(i)?;
                             values.insert(
                                 other.to_string(),
                                 match v {
-                                    Some(n) => FieldValue::Number(n),
-                                    None => FieldValue::Empty,
+                                    Some(s) if !s.is_empty() => {
+                                        FieldValue::Number(s.parse().map_err(|_| {
+                                            Error::fail(format!("corrupt stored number: {s}"))
+                                        })?)
+                                    }
+                                    _ => FieldValue::Empty,
                                 },
                             );
                         }

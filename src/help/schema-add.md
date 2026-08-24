@@ -40,8 +40,8 @@ Types:
 
 - `text` — a string. Comparison is case-sensitive. Tabs
   and newlines are rejected.
-- `number` — an integer or float, not scientific notation.
-  Only number fields can be summed.
+- `number` — a decimal, not scientific notation. Only
+  number fields can be summed.
 - `enum` — one of the listed values. Values are stored
   lowercase (`Water` becomes `water`). Duplicates after
   that fold are rejected.

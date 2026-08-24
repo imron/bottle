@@ -56,7 +56,7 @@ match still prints one line with `value` `0`.
 With `--group`: the group column and `value`. An empty
 match prints the header and no data lines.
 
-Numbers print without trailing zeros (`49` not `49.0`).
+Numbers print as logged (`86.50` stays `86.50`).
 
 ## Examples
 

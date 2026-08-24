@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
@@ -248,15 +249,10 @@ pub fn fold_enum_values(values: &mut [String]) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn parse_number(raw: &str) -> Result<f64, Error> {
+pub fn parse_number(raw: &str) -> Result<Decimal, Error> {
     if raw.contains(['e', 'E']) {
         return Err(Error::fail(format!("invalid number: {raw}")));
     }
-    let n: f64 = raw
-        .parse()
-        .map_err(|_| Error::fail(format!("invalid number: {raw}")))?;
-    if !n.is_finite() {
-        return Err(Error::fail(format!("invalid number: {raw}")));
-    }
-    Ok(n)
+    raw.parse()
+        .map_err(|_| Error::fail(format!("invalid number: {raw}")))
 }

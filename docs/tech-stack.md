@@ -66,7 +66,7 @@ path, each
 flag, each documented failure (usage, unknown schema, bad
 field, not found, retired, link target missing, reserved
 `--where`, `--link`/`--unlink` conflict), TSV headers and
-cells (`true`/`false`, numbers without trailing zeros,
+cells (`true`/`false`, numbers as logged,
 `links` sort), and time bounds including date-only vs
 instant. MCP `log` `entries` is one transaction: all
 succeed or none do.

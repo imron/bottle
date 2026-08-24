@@ -57,6 +57,44 @@ fn ls_columns_and_number_format() {
 }
 
 #[test]
+fn ls_keeps_logged_number_scale() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "568"),
+            ("protein", "49"),
+            ("carbs", "5"),
+            ("fat", "39.60"),
+        ],
+        &[],
+        Some("2026-08-22T08:14:00Z"),
+    );
+    let out = h.run_ok(Cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        include_ignored: false,
+    });
+    let lines = tsv_lines(&out);
+    assert_eq!(lines[1][8], "39.60");
+    let matched = h.run_ok(Cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![("fat".into(), "39.6".into())],
+        include_ignored: false,
+    });
+    assert_eq!(tsv_lines(&matched).len(), 2);
+}
+
+#[test]
 fn ls_instant_to_is_inclusive() {
     let mut h = harness();
     seed_meals(&mut h);
