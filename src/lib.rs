@@ -1,4 +1,3 @@
-mod cmd;
 mod db;
 mod domain;
 mod error;
@@ -10,13 +9,12 @@ mod spec;
 mod sql;
 mod store;
 mod time;
-mod tsv;
 
 use std::path::Path;
 
-pub use cmd::Cmd;
 pub use db::default_db_path;
 pub use error::Error;
+pub use input::Cmd;
 pub use spec::FieldType;
 
 pub struct Bottle {

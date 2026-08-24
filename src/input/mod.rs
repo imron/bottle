@@ -1,9 +1,12 @@
-use crate::cmd::Cmd;
+mod cmd;
+mod tsv;
+
 use crate::error::Error;
 use crate::ledger::{Amend, FieldValue, Op, Outcome};
 use crate::spec::{FieldName, Link, LinkName, SchemaName, Spec};
 use crate::time::{self, Range};
-use crate::tsv;
+
+pub use cmd::Cmd;
 
 pub(crate) enum Style {
     Tsv,
