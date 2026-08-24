@@ -344,29 +344,28 @@ fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
         order: Order::Oldest,
         limit: None,
     })?;
-    let key = op.field.as_str();
     match op.group {
         None => {
-            let total: Decimal = entries.iter().filter_map(|e| e.number(key)).sum();
+            let total: Decimal = entries.iter().filter_map(|e| e.number(&op.field)).sum();
             Ok(Outcome::Total {
                 field: op.field,
                 value: total,
             })
         }
-        Some(Group::Day) => grouped_time(&entries, key, "day"),
-        Some(Group::Week) => grouped_time(&entries, key, "week"),
-        Some(Group::Month) => grouped_time(&entries, key, "month"),
-        Some(Group::Year) => grouped_time(&entries, key, "year"),
+        Some(Group::Day) => grouped_time(&entries, &op.field, "day"),
+        Some(Group::Week) => grouped_time(&entries, &op.field, "week"),
+        Some(Group::Month) => grouped_time(&entries, &op.field, "month"),
+        Some(Group::Year) => grouped_time(&entries, &op.field, "year"),
         Some(Group::Link(name)) => {
             if spec.field(name.as_str()).is_some() {
                 return Err(Error::Fail(Fail::InvalidGroup(name.to_string())));
             }
-            grouped_link(&entries, key, name)
+            grouped_link(&entries, &op.field, name)
         }
     }
 }
 
-fn grouped_time(entries: &[Entry], field: &str, unit: &str) -> Result<Outcome, Error> {
+fn grouped_time(entries: &[Entry], field: &FieldName, unit: &str) -> Result<Outcome, Error> {
     let mut buckets: BTreeMap<String, Decimal> = BTreeMap::new();
     for entry in entries {
         let k = time_group_key(unit, entry.at)?;
@@ -378,7 +377,7 @@ fn grouped_time(entries: &[Entry], field: &str, unit: &str) -> Result<Outcome, E
     })
 }
 
-fn grouped_link(entries: &[Entry], field: &str, name: LinkName) -> Result<Outcome, Error> {
+fn grouped_link(entries: &[Entry], field: &FieldName, name: LinkName) -> Result<Outcome, Error> {
     let mut buckets: BTreeMap<Option<EntryRef>, Decimal> = BTreeMap::new();
     for entry in entries {
         let key = entry
@@ -463,7 +462,7 @@ fn prepare_fields(
     spec: &Spec,
     fields: &[(FieldName, String)],
     partial: bool,
-) -> Result<HashMap<String, FieldValue>, Error> {
+) -> Result<HashMap<FieldName, FieldValue>, Error> {
     let mut seen = HashSet::new();
     let mut out = HashMap::new();
     for (name, value) in fields {
@@ -479,14 +478,14 @@ fn prepare_fields(
                     name.as_str().to_string(),
                 )));
             }
-            out.insert(name.as_str().to_string(), FieldValue::Empty);
+            out.insert(name.clone(), FieldValue::Empty);
             continue;
         }
-        out.insert(name.as_str().to_string(), parse_field_value(field, value)?);
+        out.insert(name.clone(), parse_field_value(field, value)?);
     }
     if !partial {
         for field in &spec.fields {
-            if field.required && !out.contains_key(&field.name) {
+            if field.required && !out.contains_key(field.name.as_str()) {
                 return Err(Error::Fail(Fail::MissingRequiredField(field.name.clone())));
             }
         }

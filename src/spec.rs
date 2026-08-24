@@ -115,6 +115,12 @@ impl std::fmt::Display for FieldName {
     }
 }
 
+impl std::borrow::Borrow<str> for FieldName {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LinkName(String);
 

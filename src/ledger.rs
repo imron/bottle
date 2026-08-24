@@ -18,12 +18,12 @@ pub struct Entry {
     pub at: Instant,
     pub agent: Option<String>,
     pub ignored: bool,
-    pub values: HashMap<String, FieldValue>,
+    pub values: HashMap<FieldName, FieldValue>,
     pub links: Vec<Link>,
 }
 
 impl Entry {
-    pub fn number(&self, field: &str) -> Option<Decimal> {
+    pub fn number(&self, field: &FieldName) -> Option<Decimal> {
         match self.values.get(field) {
             Some(FieldValue::Number(n)) => Some(*n),
             _ => None,

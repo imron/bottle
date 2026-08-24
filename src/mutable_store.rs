@@ -4,7 +4,7 @@ use rusqlite::{TransactionBehavior, params};
 
 use crate::error::{Error, Fail, UniqueConstraint};
 use crate::ledger::{Entry, FieldValue};
-use crate::spec::{Field, Link, LinkName, SchemaName, Spec};
+use crate::spec::{Field, FieldName, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
 use crate::store::{inbound_link_count, load_entry, schema_exists};
 use crate::time::Instant;
@@ -116,7 +116,7 @@ impl<'a> Tx<'a> {
         spec: &Spec,
         at: Instant,
         agent: Option<&str>,
-        values: &HashMap<String, FieldValue>,
+        values: &HashMap<FieldName, FieldValue>,
         links: &[Link],
     ) -> Result<i64, Error> {
         let table = table_name(schema);
@@ -134,7 +134,7 @@ impl<'a> Tx<'a> {
             placeholders.push(format!("?{}", bind.len() + 1));
             bind.push(
                 values
-                    .get(&field.name)
+                    .get(field.name.as_str())
                     .map(SqlVal::from_field)
                     .unwrap_or(SqlVal::Null),
             );
@@ -166,7 +166,7 @@ impl<'a> Tx<'a> {
         id: i64,
         at: Option<Instant>,
         agent: Option<&str>,
-        values: &HashMap<String, FieldValue>,
+        values: &HashMap<FieldName, FieldValue>,
     ) -> Result<(), Error> {
         let table = table_name(schema);
         let mut sets = Vec::new();
@@ -180,7 +180,11 @@ impl<'a> Tx<'a> {
             bind.push(SqlVal::Text(agent.to_string()));
         }
         for (name, val) in values {
-            sets.push(format!("{} = ?{}", quote_ident(name), bind.len() + 1));
+            sets.push(format!(
+                "{} = ?{}",
+                quote_ident(name.as_str()),
+                bind.len() + 1
+            ));
             bind.push(SqlVal::from_field(val));
         }
         if sets.is_empty() {

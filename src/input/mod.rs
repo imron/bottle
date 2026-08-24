@@ -290,7 +290,7 @@ fn render_entries(
             render_links(&entry.links),
         ];
         for field in &spec.fields {
-            cells.push(render_value(entry.values.get(&field.name)));
+            cells.push(render_value(entry.values.get(field.name.as_str())));
         }
         cells.push(entry.agent.clone().unwrap_or_default());
         if show_ignored {
