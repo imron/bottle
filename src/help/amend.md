@@ -33,13 +33,13 @@ are accepted.
 
 `--agent NAME` — set who wrote the entry.
 
-`--link name=SCHEMA/ID` — set or replace that name's
-target. The target entry must exist.
+`--link name=SCHEMA/ID` — set or replace the target for
+the named link. The target entry must exist.
 
-`--unlink name` — remove that name. If the name is already
-absent, unlink still succeeds and prints the entry.
-`--link` and `--unlink` of the same name in one command is
-an error.
+`--unlink name` — remove that named link. If the named
+link is already absent, unlink still succeeds and prints
+the entry. `--link` and `--unlink` of the same name in one
+command is an error.
 
 `field=value` — fields to change.
 
