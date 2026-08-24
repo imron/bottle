@@ -31,6 +31,10 @@ impl Store {
         })
     }
 
+    pub(crate) fn schema_exists(&self, name: &SchemaName) -> Result<bool, Error> {
+        schema_exists(&self.conn, name)
+    }
+
     pub(crate) fn transaction<T>(
         &mut self,
         f: impl FnOnce(&mut crate::mutable_store::Tx<'_>) -> Result<T, Error>,
@@ -115,6 +119,15 @@ pub(crate) fn schema_exists(conn: &Connection, name: &SchemaName) -> Result<bool
         |row| row.get(0),
     )?;
     Ok(n > 0)
+}
+
+pub(crate) fn inbound_link_count(conn: &Connection, name: &SchemaName) -> Result<i64, Error> {
+    let n: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM links WHERE to_schema = ?1",
+        [name.as_str()],
+        |row| row.get(0),
+    )?;
+    Ok(n)
 }
 
 pub(crate) fn load_entry(

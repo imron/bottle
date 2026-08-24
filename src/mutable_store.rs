@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use rusqlite::params;
+use rusqlite::{TransactionBehavior, params};
 
 use crate::error::Error;
-use crate::ledger::{Entry, FieldValue, Schema};
+use crate::ledger::{Entry, FieldValue};
 use crate::spec::{Field, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
-use crate::store::{load_entry, load_schema, schema_exists};
+use crate::store::{inbound_link_count, load_entry, schema_exists};
 use crate::time::Instant;
 
 pub(crate) struct Tx<'a> {
@@ -16,16 +16,12 @@ pub(crate) struct Tx<'a> {
 impl<'a> Tx<'a> {
     pub(crate) fn begin(conn: &'a mut rusqlite::Connection) -> Result<Self, Error> {
         Ok(Self {
-            inner: conn.transaction()?,
+            inner: conn.transaction_with_behavior(TransactionBehavior::Immediate)?,
         })
     }
 
     pub(crate) fn commit(self) -> Result<(), Error> {
         self.inner.commit().map_err(Error::from)
-    }
-
-    pub(crate) fn load_schema(&self, name: &SchemaName) -> Result<Schema, Error> {
-        load_schema(&self.inner, name)
     }
 
     pub(crate) fn schema_exists(&self, name: &SchemaName) -> Result<bool, Error> {
@@ -42,12 +38,7 @@ impl<'a> Tx<'a> {
     }
 
     pub(crate) fn inbound_link_count(&self, name: &SchemaName) -> Result<i64, Error> {
-        let n: i64 = self.inner.query_row(
-            "SELECT COUNT(*) FROM links WHERE to_schema = ?1",
-            [name.as_str()],
-            |row| row.get(0),
-        )?;
-        Ok(n)
+        inbound_link_count(&self.inner, name)
     }
 
     pub(crate) fn insert_schema(&mut self, name: &SchemaName, spec: &Spec) -> Result<(), Error> {

@@ -20,28 +20,28 @@ pub(crate) fn execute(
     match op {
         Op::SchemaList => Ok(Outcome::Schemas(store.list_schemas()?)),
         Op::SchemaShow { name } => Ok(Outcome::Spec(store.load_schema(&name)?.spec)),
-        Op::SchemaAdd { name, spec } => store.transaction(|tx| {
-            add_schema(tx, &name, spec)?;
+        Op::SchemaAdd { name, spec } => {
+            add_schema(store, name, spec)?;
             Ok(Outcome::Empty)
-        }),
+        }
         Op::SchemaAddField {
             schema,
             name,
             type_,
             values,
             default,
-        } => store.transaction(|tx| {
-            add_field(tx, &schema, name, type_, values, default)?;
+        } => {
+            add_field(store, schema, name, type_, values, default)?;
             Ok(Outcome::Empty)
-        }),
+        }
         Op::SchemaAddValue {
             schema,
             field,
             value,
-        } => store.transaction(|tx| {
-            add_value(tx, &schema, &field, &value)?;
+        } => {
+            add_value(store, schema, field, value)?;
             Ok(Outcome::Empty)
-        }),
+        }
         Op::SchemaRetire { name } => store.transaction(|tx| {
             retire(tx, &name)?;
             Ok(Outcome::Empty)
@@ -56,7 +56,7 @@ pub(crate) fn execute(
             agent,
             links,
             fields,
-        } => store.transaction(|tx| log(tx, default_agent, schema, at, agent, links, fields)),
+        } => log(store, default_agent, schema, at, agent, links, fields),
         Op::List {
             schema,
             range,
@@ -113,27 +113,27 @@ pub(crate) fn execute(
                 limit: None,
             },
         ),
-        Op::Amend { schema, id, change } => store.transaction(|tx| amend(tx, &schema, id, change)),
-        Op::Ignore { schema, id } => store.transaction(|tx| ignore(tx, &schema, id)),
+        Op::Amend { schema, id, change } => amend(store, &schema, id, change),
+        Op::Ignore { schema, id } => ignore(store, &schema, id),
     }
 }
 
-fn add_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: Spec) -> Result<(), Error> {
-    if tx.schema_exists(name)? {
+fn add_schema(store: &mut Store, name: SchemaName, spec: Spec) -> Result<(), Error> {
+    if store.schema_exists(&name)? {
         return Err(Error::fail(format!("schema exists: {name}")));
     }
-    tx.insert_schema(name, &spec)
+    store.transaction(|tx| tx.insert_schema(&name, &spec))
 }
 
 fn add_field(
-    tx: &mut Tx<'_>,
-    schema: &SchemaName,
+    store: &mut Store,
+    schema: SchemaName,
     name: FieldName,
     type_: FieldType,
     values: Option<Vec<String>>,
     default: Option<String>,
 ) -> Result<(), Error> {
-    let mut kind = tx.load_schema(schema)?;
+    let mut kind = store.load_schema(&schema)?;
     if kind.retired {
         return Err(Error::fail(format!("schema is retired: {schema}")));
     }
@@ -159,18 +159,20 @@ fn add_field(
         required,
         values,
     };
-    tx.add_column(schema, &field, default.as_deref())?;
-    kind.spec.fields.push(field);
-    tx.save_spec(schema, &kind.spec)
+    store.transaction(|tx| {
+        tx.add_column(&schema, &field, default.as_deref())?;
+        kind.spec.fields.push(field);
+        tx.save_spec(&schema, &kind.spec)
+    })
 }
 
 fn add_value(
-    tx: &mut Tx<'_>,
-    schema: &SchemaName,
-    field: &FieldName,
-    value: &str,
+    store: &mut Store,
+    schema: SchemaName,
+    field: FieldName,
+    value: String,
 ) -> Result<(), Error> {
-    let mut kind = tx.load_schema(schema)?;
+    let mut kind = store.load_schema(&schema)?;
     if kind.retired {
         return Err(Error::fail(format!("schema is retired: {schema}")));
     }
@@ -185,13 +187,13 @@ fn add_value(
     if f.type_ != FieldType::Enum {
         return Err(Error::fail(format!("field is not enum: {field}")));
     }
-    let folded = fold_enum(value);
+    let folded = fold_enum(&value);
     let values = f.values.get_or_insert_with(Vec::new);
     if values.iter().any(|v| v == &folded) {
         return Err(Error::fail(format!("enum value exists: {folded}")));
     }
     values.push(folded);
-    tx.save_spec(schema, &kind.spec)
+    store.transaction(|tx| tx.save_spec(&schema, &kind.spec))
 }
 
 fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
@@ -214,7 +216,7 @@ fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
 }
 
 fn log(
-    tx: &mut Tx<'_>,
+    store: &mut Store,
     default_agent: Option<&str>,
     schema: SchemaName,
     at: Option<Instant>,
@@ -222,7 +224,7 @@ fn log(
     mut links: Vec<Link>,
     fields: Vec<(FieldName, String)>,
 ) -> Result<Outcome, Error> {
-    let kind = tx.load_schema(&schema)?;
+    let kind = store.load_schema(&schema)?;
     if kind.retired {
         return Err(Error::fail(format!("schema is retired: {schema}")));
     }
@@ -231,13 +233,15 @@ fn log(
         .or_else(|| Some("bottle".to_string()));
     let at = at.unwrap_or_else(Instant::now);
     let values = prepare_fields(&kind.spec, &fields, false)?;
-    ensure_links(tx, &kind.spec, &links)?;
+    ensure_links(store, &kind.spec, &links)?;
     links.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
-    let id = tx.insert_entry(&schema, &kind.spec, at, agent.as_deref(), &values, &links)?;
+    let id = store.transaction(|tx| {
+        tx.insert_entry(&schema, &kind.spec, at, agent.as_deref(), &values, &links)
+    })?;
     Ok(Outcome::Posted { id, at, links })
 }
 
-fn amend(tx: &mut Tx<'_>, schema: &SchemaName, id: i64, change: Amend) -> Result<Outcome, Error> {
+fn amend(store: &mut Store, schema: &SchemaName, id: i64, change: Amend) -> Result<Outcome, Error> {
     if change.at.is_none()
         && change.agent.is_none()
         && change.links.is_empty()
@@ -246,8 +250,8 @@ fn amend(tx: &mut Tx<'_>, schema: &SchemaName, id: i64, change: Amend) -> Result
     {
         return Err(Error::usage("amend requires at least one change"));
     }
-    let kind = tx.load_schema(schema)?;
-    if tx.get_entry(schema, &kind.spec, id)?.is_none() {
+    let kind = store.load_schema(schema)?;
+    if store.get_entry(schema, &kind.spec, id)?.is_none() {
         return Err(Error::fail(format!("not found: {schema}/{id}")));
     }
     let mut unlink_set = HashSet::new();
@@ -266,32 +270,34 @@ fn amend(tx: &mut Tx<'_>, schema: &SchemaName, id: i64, change: Amend) -> Result
         }
     }
     let values = prepare_fields(&kind.spec, &change.fields, true)?;
-    ensure_links(tx, &kind.spec, &change.links)?;
-    tx.update_entry(schema, id, change.at, change.agent.as_deref(), &values)?;
-    for name in &change.unlinks {
-        tx.delete_link(schema, id, name)?;
-    }
-    let mut links = change.links;
-    links.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
-    for link in &links {
-        tx.upsert_link(schema, id, link)?;
-    }
-    let entry = tx
-        .get_entry(schema, &kind.spec, id)?
-        .ok_or_else(|| Error::fail(format!("not found: {schema}/{id}")))?;
-    Ok(Outcome::Posted {
-        id,
-        at: entry.at,
-        links: entry.links,
+    ensure_links(store, &kind.spec, &change.links)?;
+    store.transaction(|tx| {
+        tx.update_entry(schema, id, change.at, change.agent.as_deref(), &values)?;
+        for name in &change.unlinks {
+            tx.delete_link(schema, id, name)?;
+        }
+        let mut links = change.links;
+        links.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
+        for link in &links {
+            tx.upsert_link(schema, id, link)?;
+        }
+        let entry = tx
+            .get_entry(schema, &kind.spec, id)?
+            .ok_or_else(|| Error::fail(format!("not found: {schema}/{id}")))?;
+        Ok(Outcome::Posted {
+            id,
+            at: entry.at,
+            links: entry.links,
+        })
     })
 }
 
-fn ignore(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<Outcome, Error> {
-    let spec = tx.load_schema(schema)?.spec;
-    let Some(entry) = tx.get_entry(schema, &spec, id)? else {
+fn ignore(store: &mut Store, schema: &SchemaName, id: i64) -> Result<Outcome, Error> {
+    let spec = store.load_schema(schema)?.spec;
+    let Some(entry) = store.get_entry(schema, &spec, id)? else {
         return Err(Error::fail(format!("not found: {schema}/{id}")));
     };
-    tx.set_ignored(schema, id)?;
+    store.transaction(|tx| tx.set_ignored(schema, id))?;
     Ok(Outcome::Stamp { id, at: entry.at })
 }
 
@@ -478,7 +484,7 @@ fn resolve_filters(spec: &Spec, filters: &[(String, String)]) -> Result<Vec<Filt
     Ok(out)
 }
 
-fn ensure_links(tx: &Tx<'_>, spec: &Spec, links: &[Link]) -> Result<(), Error> {
+fn ensure_links(store: &Store, spec: &Spec, links: &[Link]) -> Result<(), Error> {
     let mut seen = HashSet::new();
     for link in links {
         if !seen.insert(link.name.as_str()) {
@@ -490,8 +496,8 @@ fn ensure_links(tx: &Tx<'_>, spec: &Spec, links: &[Link]) -> Result<(), Error> {
                 link.name
             )));
         }
-        let target = tx.load_schema(&link.to.schema)?;
-        if tx
+        let target = store.load_schema(&link.to.schema)?;
+        if store
             .get_entry(&link.to.schema, &target.spec, link.to.id)?
             .is_none()
         {
