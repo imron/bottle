@@ -2,21 +2,48 @@ use std::collections::HashMap;
 
 use rust_decimal::Decimal;
 
-use crate::spec::{EntryRef, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec};
-use crate::time::{Instant, Range};
+use crate::spec::{
+    EntryRef, EnumValue, FieldName, FieldType, Group, Ident, Link, LinkName, SchemaName, Spec,
+    TimeUnit,
+};
+use crate::time::{Instant, Period, Range};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldValue {
     Empty,
     Text(String),
     Number(Decimal),
+    Enum(EnumValue),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Agent(String);
+
+impl Agent {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+
+    pub fn bottle() -> Self {
+        Self("bottle".to_string())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for Agent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Entry {
     pub id: i64,
     pub at: Instant,
-    pub agent: Option<String>,
+    pub agent: Option<Agent>,
     pub ignored: bool,
     pub values: HashMap<FieldName, FieldValue>,
     pub links: Vec<Link>,
@@ -47,6 +74,18 @@ pub struct SchemaInfo {
 pub enum Filter {
     Field { name: FieldName, value: FieldValue },
     Link { name: LinkName, to: EntryRef },
+}
+
+#[derive(Debug, Clone)]
+pub struct Clause {
+    pub name: Ident,
+    pub value: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct FieldInput {
+    pub name: FieldName,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -96,17 +135,17 @@ pub struct SchemaDrop {
 pub struct Log {
     pub schema: SchemaName,
     pub at: Option<Instant>,
-    pub agent: Option<String>,
+    pub agent: Option<Agent>,
     pub links: Vec<Link>,
-    pub fields: Vec<(FieldName, String)>,
+    pub fields: Vec<FieldInput>,
 }
 
 #[derive(Debug, Clone)]
 pub struct List {
     pub schema: SchemaName,
     pub range: Range,
-    pub agent: Option<String>,
-    pub filters: Vec<(String, String)>,
+    pub agent: Option<Agent>,
+    pub filters: Vec<Clause>,
     pub include_ignored: bool,
 }
 
@@ -121,23 +160,23 @@ pub struct Sum {
     pub schema: SchemaName,
     pub field: FieldName,
     pub range: Range,
-    pub agent: Option<String>,
-    pub filters: Vec<(String, String)>,
+    pub agent: Option<Agent>,
+    pub filters: Vec<Clause>,
     pub group: Option<Group>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Last {
     pub schema: SchemaName,
-    pub agent: Option<String>,
-    pub filters: Vec<(String, String)>,
+    pub agent: Option<Agent>,
+    pub filters: Vec<Clause>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Today {
     pub schema: SchemaName,
-    pub agent: Option<String>,
-    pub filters: Vec<(String, String)>,
+    pub agent: Option<Agent>,
+    pub filters: Vec<Clause>,
 }
 
 #[derive(Debug, Clone)]
@@ -145,10 +184,10 @@ pub struct Amend {
     pub schema: SchemaName,
     pub id: i64,
     pub at: Option<Instant>,
-    pub agent: Option<String>,
+    pub agent: Option<Agent>,
     pub links: Vec<Link>,
     pub unlinks: Vec<LinkName>,
-    pub fields: Vec<(FieldName, String)>,
+    pub fields: Vec<FieldInput>,
 }
 
 #[derive(Debug, Clone)]
@@ -199,8 +238,8 @@ pub enum Outcome {
         value: Decimal,
     },
     GroupedTime {
-        unit: String,
-        buckets: Vec<(String, Decimal)>,
+        unit: TimeUnit,
+        buckets: Vec<(Period, Decimal)>,
     },
     GroupedLink {
         name: LinkName,

@@ -2,13 +2,13 @@ mod cmd;
 mod error;
 mod tsv;
 
-use crate::error::{Error, Fail};
+use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
-    Amend, FieldValue, Get, Ignore, Last, List, Log, Op, Outcome, SchemaAdd, SchemaAddField,
-    SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Sum, Today,
+    Agent, Amend, Clause, FieldInput, FieldValue, Get, Ignore, Last, List, Log, Op, Outcome,
+    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Sum, Today,
 };
-use crate::spec::{FieldName, Link, LinkName, SchemaName, Spec};
-use crate::time::{self, Range};
+use crate::spec::{FieldName, Ident, Link, LinkName, SchemaName, Spec, is_reserved};
+use crate::time::{self, Period, Range};
 
 pub use cmd::Cmd;
 
@@ -88,7 +88,7 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
         } => Op::Log(Log {
             schema: SchemaName::parse(&schema)?,
             at: at.as_deref().map(time::parse_instant).transpose()?,
-            agent,
+            agent: agent.map(Agent::new),
             links: parse_links(links)?,
             fields: parse_fields(fields)?,
         }),
@@ -102,8 +102,8 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
         } => Op::List(List {
             schema: SchemaName::parse(&schema)?,
             range: Range::parse(from.as_deref(), to.as_deref())?,
-            agent,
-            filters: wheres,
+            agent: agent.map(Agent::new),
+            filters: parse_clauses(wheres)?,
             include_ignored,
         }),
         Cmd::Get { schema, id } => Op::Get(Get {
@@ -122,8 +122,8 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
             schema: SchemaName::parse(&schema)?,
             field: FieldName::parse(&field)?,
             range: Range::parse(from.as_deref(), to.as_deref())?,
-            agent,
-            filters: wheres,
+            agent: agent.map(Agent::new),
+            filters: parse_clauses(wheres)?,
             group: group
                 .as_deref()
                 .map(crate::spec::Group::parse)
@@ -135,8 +135,8 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
             wheres,
         } => Op::Last(Last {
             schema: SchemaName::parse(&schema)?,
-            agent,
-            filters: wheres,
+            agent: agent.map(Agent::new),
+            filters: parse_clauses(wheres)?,
         }),
         Cmd::Today {
             schema,
@@ -144,8 +144,8 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
             wheres,
         } => Op::Today(Today {
             schema: SchemaName::parse(&schema)?,
-            agent,
-            filters: wheres,
+            agent: agent.map(Agent::new),
+            filters: parse_clauses(wheres)?,
         }),
         Cmd::Amend {
             schema,
@@ -159,7 +159,7 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
             schema: SchemaName::parse(&schema)?,
             id,
             at: at.as_deref().map(time::parse_instant).transpose()?,
-            agent,
+            agent: agent.map(Agent::new),
             links: parse_links(links)?,
             unlinks: parse_unlinks(unlinks)?,
             fields: parse_fields(fields)?,
@@ -214,7 +214,7 @@ pub(crate) fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Res
         Outcome::GroupedTime { unit, buckets } => {
             let rows: Vec<Vec<String>> = buckets
                 .iter()
-                .map(|(k, v)| vec![k.clone(), tsv::number(*v)])
+                .map(|(k, v)| vec![render_period(*k), tsv::number(*v)])
                 .collect();
             Ok(tsv::table(&[unit.as_str(), "value"], &rows))
         }
@@ -244,22 +244,55 @@ fn parse_unlinks(names: Vec<String>) -> Result<Vec<LinkName>, Error> {
     names.iter().map(|n| LinkName::parse(n)).collect()
 }
 
-fn parse_fields(fields: Vec<(String, String)>) -> Result<Vec<(FieldName, String)>, Error> {
+fn parse_fields(fields: Vec<(String, String)>) -> Result<Vec<FieldInput>, Error> {
     fields
         .into_iter()
-        .map(|(name, value)| Ok((FieldName::parse(&name)?, value)))
+        .map(|(name, value)| {
+            Ok(FieldInput {
+                name: FieldName::parse(&name)?,
+                value,
+            })
+        })
         .collect()
+}
+
+fn parse_clauses(wheres: Vec<(String, String)>) -> Result<Vec<Clause>, Error> {
+    wheres
+        .into_iter()
+        .map(|(name, value)| {
+            if is_reserved(&name) {
+                return Err(Error::Usage(Usage::ReservedWhere(Ident::parse(&name)?)));
+            }
+            Ok(Clause {
+                name: Ident::parse(&name)?,
+                value,
+            })
+        })
+        .collect()
+}
+
+fn render_period(period: Period) -> String {
+    match period {
+        Period::Day(date) => date.to_string(),
+        Period::Week { year, week } => format!("{year}-W{week:02}"),
+        Period::Month { year, month } => format!("{year:04}-{month:02}"),
+        Period::Year(year) => format!("{year:04}"),
+    }
 }
 
 fn render_spec(spec: &Spec) -> Result<String, Error> {
     let mut rows = Vec::new();
     for field in &spec.fields {
         let values = match &field.values {
-            Some(v) => v.join(","),
+            Some(v) => v
+                .iter()
+                .map(crate::spec::EnumValue::as_str)
+                .collect::<Vec<_>>()
+                .join(","),
             None => String::new(),
         };
         rows.push(vec![
-            field.name.clone(),
+            field.name.as_str().to_string(),
             type_name(field.type_).to_string(),
             tsv::bool_cell(field.required).to_string(),
             values,
@@ -275,7 +308,7 @@ fn render_entries(
 ) -> Result<String, Error> {
     let mut headers = vec!["id".to_string(), "at".to_string(), "links".to_string()];
     for field in &spec.fields {
-        headers.push(field.name.clone());
+        headers.push(field.name.as_str().to_string());
     }
     headers.push("agent".to_string());
     if show_ignored {
@@ -292,7 +325,14 @@ fn render_entries(
         for field in &spec.fields {
             cells.push(render_value(entry.values.get(field.name.as_str())));
         }
-        cells.push(entry.agent.clone().unwrap_or_default());
+        cells.push(
+            entry
+                .agent
+                .as_ref()
+                .map(Agent::as_str)
+                .unwrap_or_default()
+                .to_string(),
+        );
         if show_ignored {
             cells.push(tsv::bool_cell(entry.ignored).to_string());
         }
@@ -306,6 +346,7 @@ fn render_value(value: Option<&FieldValue>) -> String {
         None | Some(FieldValue::Empty) => String::new(),
         Some(FieldValue::Text(s)) => s.clone(),
         Some(FieldValue::Number(n)) => tsv::number(*n),
+        Some(FieldValue::Enum(v)) => v.as_str().to_string(),
     }
 }
 

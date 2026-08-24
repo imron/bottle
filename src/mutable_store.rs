@@ -69,13 +69,13 @@ impl<'a> Tx<'a> {
             format!(
                 "ALTER TABLE {} ADD COLUMN {} {col_type} NOT NULL DEFAULT {sql_def}",
                 quote_ident(&table),
-                quote_ident(&field.name)
+                quote_ident(field.name.as_str())
             )
         } else {
             format!(
                 "ALTER TABLE {} ADD COLUMN {} {col_type}",
                 quote_ident(&table),
-                quote_ident(&field.name)
+                quote_ident(field.name.as_str())
             )
         };
         self.inner.execute_batch(&alter)?;
@@ -130,7 +130,7 @@ impl<'a> Tx<'a> {
             },
         ];
         for field in &spec.fields {
-            col_names.push(field.name.clone());
+            col_names.push(field.name.as_str().to_string());
             placeholders.push(format!("?{}", bind.len() + 1));
             bind.push(
                 values
@@ -283,7 +283,11 @@ fn create_columns(spec: &Spec) -> String {
         "ignored INTEGER NOT NULL DEFAULT 0".to_string(),
     ];
     for field in &spec.fields {
-        let mut col = format!("{} {}", quote_ident(&field.name), sql_type(field.type_));
+        let mut col = format!(
+            "{} {}",
+            quote_ident(field.name.as_str()),
+            sql_type(field.type_)
+        );
         if field.required {
             col.push_str(" NOT NULL");
         }

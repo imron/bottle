@@ -4,8 +4,8 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::{Error, Fail};
-use crate::ledger::{Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
-use crate::spec::{EntryRef, FieldName, FieldType, Link, LinkName, SchemaName, Spec};
+use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
+use crate::spec::{EntryRef, FieldType, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident, table_name};
 use crate::time::{Range, ToBound};
 
@@ -241,7 +241,7 @@ fn read_entry(
     let mut values = HashMap::new();
     let mut id = 0_i64;
     let mut at_raw = String::new();
-    let mut agent = None;
+    let mut agent: Option<String> = None;
     let mut ignored = false;
     for (i, name) in names.iter().enumerate() {
         match name.as_str() {
@@ -254,7 +254,7 @@ fn read_entry(
             }
             other => {
                 if let Some(field) = spec.field(other) {
-                    let name = FieldName::parse(other)?;
+                    let name = field.name.clone();
                     match field.type_ {
                         FieldType::Number => {
                             let v: Option<String> = r.get(i)?;
@@ -266,7 +266,19 @@ fn read_entry(
                                 },
                             );
                         }
-                        _ => {
+                        FieldType::Enum => {
+                            let v: Option<String> = r.get(i)?;
+                            values.insert(
+                                name,
+                                match v {
+                                    Some(s) if !s.is_empty() => {
+                                        FieldValue::Enum(crate::spec::EnumValue::parse(&s)?)
+                                    }
+                                    _ => FieldValue::Empty,
+                                },
+                            );
+                        }
+                        FieldType::Text => {
                             let v: Option<String> = r.get(i)?;
                             values.insert(
                                 name,
@@ -284,7 +296,7 @@ fn read_entry(
     Ok(Entry {
         id,
         at: instant_from_sql(at_raw)?,
-        agent,
+        agent: agent.map(Agent::new),
         ignored,
         values,
         links: load_links(conn, schema, id)?,

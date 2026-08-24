@@ -27,6 +27,7 @@ impl SqlVal {
             FieldValue::Empty => SqlVal::Null,
             FieldValue::Text(s) => SqlVal::Text(s.clone()),
             FieldValue::Number(n) => SqlVal::Text(n.to_string()),
+            FieldValue::Enum(v) => SqlVal::Text(v.as_str().to_string()),
         }
     }
 }

@@ -4,20 +4,21 @@ use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
-    Amend, Entry, FieldValue, Filter, Get, Ignore, Last, List, Log, Op, Order, Outcome, SchemaAdd,
-    SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Sum, Today,
+    Agent, Amend, Clause, Entry, FieldInput, FieldValue, Filter, Get, Ignore, Last, List, Log, Op,
+    Order, Outcome, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire,
+    SchemaShow, Sum, Today,
 };
 use crate::mutable_store::Tx;
 use crate::spec::{
     EntryRef, Field, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec, fold_enum,
-    fold_enum_values, is_reserved, parse_number,
+    fold_enum_values, parse_number,
 };
 use crate::store::{Find, Store};
-use crate::time::{self, Instant, Range};
+use crate::time::{self, Instant, Period, Range};
 
 pub(crate) fn execute(
     store: &mut Store,
-    default_agent: Option<&str>,
+    default_agent: Option<&Agent>,
     op: Op,
 ) -> Result<Outcome, Error> {
     match op {
@@ -62,7 +63,7 @@ fn add_schema(store: &mut Store, op: SchemaAdd) -> Result<(), Error> {
     store.transaction(|tx| tx.insert_schema(&op.name, &op.spec))
 }
 
-fn add_field(store: &mut Store, mut op: SchemaAddField) -> Result<(), Error> {
+fn add_field(store: &mut Store, op: SchemaAddField) -> Result<(), Error> {
     let mut kind = store.load_schema(&op.schema)?;
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
@@ -70,23 +71,25 @@ fn add_field(store: &mut Store, mut op: SchemaAddField) -> Result<(), Error> {
     if kind.spec.field(op.name.as_str()).is_some() {
         return Err(Error::Fail(Fail::FieldExists(op.name.clone())));
     }
-    if op.type_ == FieldType::Enum {
-        let Some(vals) = op.values.as_mut() else {
+    let values = if op.type_ == FieldType::Enum {
+        let Some(vals) = op.values else {
             return Err(Error::Usage(Usage::EnumValuesRequired));
         };
-        fold_enum_values(vals)?;
+        Some(fold_enum_values(vals)?)
     } else if op.values.is_some() {
         return Err(Error::Usage(Usage::EnumValuesNotAllowed));
-    }
+    } else {
+        None
+    };
     let required = op.default.is_some();
     if let Some(ref def) = op.default {
-        parse_field_value_parts(op.name.as_str(), op.type_, op.values.as_deref(), def)?;
+        parse_field_value_parts(&op.name, op.type_, values.as_deref(), def)?;
     }
     let field = Field {
-        name: op.name.as_str().to_string(),
+        name: op.name,
         type_: op.type_,
         required,
-        values: op.values,
+        values,
     };
     store.transaction(|tx| {
         tx.add_column(&op.schema, &field, op.default.as_deref())?;
@@ -100,18 +103,13 @@ fn add_value(store: &mut Store, op: SchemaAddValue) -> Result<(), Error> {
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
-    let Some(f) = kind
-        .spec
-        .fields
-        .iter_mut()
-        .find(|f| f.name == op.field.as_str())
-    else {
+    let Some(f) = kind.spec.fields.iter_mut().find(|f| f.name == op.field) else {
         return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
     };
     if f.type_ != FieldType::Enum {
         return Err(Error::Fail(Fail::FieldNotEnum(op.field.clone())));
     }
-    let folded = fold_enum(&op.value);
+    let folded = fold_enum(&op.value)?;
     let values = f.values.get_or_insert_with(Vec::new);
     if values.iter().any(|v| v == &folded) {
         return Err(Error::Fail(Fail::EnumValueExists(folded)));
@@ -137,15 +135,15 @@ fn drop_schema(tx: &mut Tx<'_>, op: &SchemaDrop) -> Result<(), Error> {
     tx.drop_schema(&op.name)
 }
 
-fn log(store: &mut Store, default_agent: Option<&str>, mut op: Log) -> Result<Outcome, Error> {
+fn log(store: &mut Store, default_agent: Option<&Agent>, mut op: Log) -> Result<Outcome, Error> {
     let kind = store.load_schema(&op.schema)?;
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
     let agent = op
         .agent
-        .or_else(|| default_agent.map(str::to_string))
-        .or_else(|| Some("bottle".to_string()));
+        .or_else(|| default_agent.cloned())
+        .or_else(|| Some(Agent::bottle()));
     let at = op.at.unwrap_or_else(Instant::now);
     let values = prepare_fields(&kind.spec, &op.fields, false)?;
     ensure_links(store, &kind.spec, &op.links)?;
@@ -156,7 +154,7 @@ fn log(store: &mut Store, default_agent: Option<&str>, mut op: Log) -> Result<Ou
             &op.schema,
             &kind.spec,
             at,
-            agent.as_deref(),
+            agent.as_ref().map(Agent::as_str),
             &values,
             &op.links,
         )
@@ -196,7 +194,13 @@ fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
     let values = prepare_fields(&kind.spec, &op.fields, true)?;
     ensure_links(store, &kind.spec, &op.links)?;
     store.transaction(|tx| {
-        tx.update_entry(&op.schema, op.id, op.at, op.agent.as_deref(), &values)?;
+        tx.update_entry(
+            &op.schema,
+            op.id,
+            op.at,
+            op.agent.as_ref().map(Agent::as_str),
+            &values,
+        )?;
         for name in &op.unlinks {
             tx.delete_link(&op.schema, op.id, name)?;
         }
@@ -256,7 +260,7 @@ fn last(store: &Store, op: Last) -> Result<Outcome, Error> {
         Query {
             schema: &op.schema,
             range: Range::default(),
-            agent: op.agent.as_deref(),
+            agent: op.agent.as_ref().map(Agent::as_str),
             filters: &op.filters,
             include_ignored: false,
             order: Order::Newest,
@@ -275,7 +279,7 @@ fn today(store: &Store, op: Today) -> Result<Outcome, Error> {
         Query {
             schema: &op.schema,
             range: Range::today()?,
-            agent: op.agent.as_deref(),
+            agent: op.agent.as_ref().map(Agent::as_str),
             filters: &op.filters,
             include_ignored: false,
             order: Order::Oldest,
@@ -290,7 +294,7 @@ fn list(store: &Store, op: List) -> Result<Outcome, Error> {
         Query {
             schema: &op.schema,
             range: op.range,
-            agent: op.agent.as_deref(),
+            agent: op.agent.as_ref().map(Agent::as_str),
             filters: &op.filters,
             include_ignored: op.include_ignored,
             order: Order::Oldest,
@@ -303,7 +307,7 @@ struct Query<'a> {
     schema: &'a SchemaName,
     range: Range,
     agent: Option<&'a str>,
-    filters: &'a [(String, String)],
+    filters: &'a [Clause],
     include_ignored: bool,
     order: Order,
     limit: Option<usize>,
@@ -338,7 +342,7 @@ fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
         schema: &op.schema,
         spec: &spec,
         range: op.range,
-        agent: op.agent.as_deref(),
+        agent: op.agent.as_ref().map(Agent::as_str),
         include_ignored: false,
         filters: &resolved,
         order: Order::Oldest,
@@ -352,27 +356,28 @@ fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
                 value: total,
             })
         }
-        Some(Group::Day) => grouped_time(&entries, &op.field, "day"),
-        Some(Group::Week) => grouped_time(&entries, &op.field, "week"),
-        Some(Group::Month) => grouped_time(&entries, &op.field, "month"),
-        Some(Group::Year) => grouped_time(&entries, &op.field, "year"),
+        Some(Group::Time(unit)) => grouped_time(&entries, &op.field, unit),
         Some(Group::Link(name)) => {
             if spec.field(name.as_str()).is_some() {
-                return Err(Error::Fail(Fail::InvalidGroup(name.to_string())));
+                return Err(Error::Fail(Fail::LinkNameCollidesWithField(name)));
             }
             grouped_link(&entries, &op.field, name)
         }
     }
 }
 
-fn grouped_time(entries: &[Entry], field: &FieldName, unit: &str) -> Result<Outcome, Error> {
-    let mut buckets: BTreeMap<String, Decimal> = BTreeMap::new();
+fn grouped_time(
+    entries: &[Entry],
+    field: &FieldName,
+    unit: crate::spec::TimeUnit,
+) -> Result<Outcome, Error> {
+    let mut buckets: BTreeMap<Period, Decimal> = BTreeMap::new();
     for entry in entries {
-        let k = time_group_key(unit, entry.at)?;
+        let k = time::period(unit, entry.at);
         *buckets.entry(k).or_insert(Decimal::ZERO) += entry.number(field).unwrap_or(Decimal::ZERO);
     }
     Ok(Outcome::GroupedTime {
-        unit: unit.to_string(),
+        unit,
         buckets: buckets.into_iter().collect(),
     })
 }
@@ -394,39 +399,22 @@ fn grouped_link(entries: &[Entry], field: &FieldName, name: LinkName) -> Result<
     })
 }
 
-fn time_group_key(group: &str, at: Instant) -> Result<String, Error> {
-    let date = time::local_civil(at);
-    match group {
-        "day" => Ok(date.to_string()),
-        "month" => Ok(format!("{:04}-{:02}", date.year(), date.month())),
-        "year" => Ok(format!("{:04}", date.year())),
-        "week" => {
-            let iso = date.iso_week_date();
-            Ok(format!("{}-W{:02}", iso.year(), iso.week()))
-        }
-        _ => Err(Error::Fail(Fail::InvalidGroup(group.to_string()))),
-    }
-}
-
-fn resolve_filters(spec: &Spec, filters: &[(String, String)]) -> Result<Vec<Filter>, Error> {
+fn resolve_filters(spec: &Spec, filters: &[Clause]) -> Result<Vec<Filter>, Error> {
     let mut out = Vec::new();
-    for (name, value) in filters {
-        if is_reserved(name) {
-            return Err(Error::Usage(Usage::ReservedWhere(name.clone())));
-        }
-        if let Some(field) = spec.field(name) {
+    for clause in filters {
+        if let Some(field) = spec.field(clause.name.as_str()) {
             let value = match field.type_ {
-                FieldType::Number => FieldValue::Number(parse_number(value)?),
-                FieldType::Enum => FieldValue::Text(fold_enum(value)),
-                FieldType::Text => FieldValue::Text(value.clone()),
+                FieldType::Number => FieldValue::Number(parse_number(&clause.value)?),
+                FieldType::Enum => FieldValue::Enum(fold_enum(&clause.value)?),
+                FieldType::Text => FieldValue::Text(clause.value.clone()),
             };
             out.push(Filter::Field {
-                name: FieldName::parse(name)?,
+                name: field.name.clone(),
                 value,
             });
         } else {
-            let link_name = LinkName::parse(name)?;
-            let to = EntryRef::parse(value)?;
+            let link_name = LinkName::parse(clause.name.as_str())?;
+            let to = EntryRef::parse(&clause.value)?;
             out.push(Filter::Link {
                 name: link_name,
                 to,
@@ -460,33 +448,36 @@ fn ensure_links(store: &Store, spec: &Spec, links: &[Link]) -> Result<(), Error>
 
 fn prepare_fields(
     spec: &Spec,
-    fields: &[(FieldName, String)],
+    fields: &[FieldInput],
     partial: bool,
 ) -> Result<HashMap<FieldName, FieldValue>, Error> {
     let mut seen = HashSet::new();
     let mut out = HashMap::new();
-    for (name, value) in fields {
-        if !seen.insert(name.as_str()) {
-            return Err(Error::Usage(Usage::DuplicateField(name.clone())));
+    for field in fields {
+        if !seen.insert(field.name.as_str()) {
+            return Err(Error::Usage(Usage::DuplicateField(field.name.clone())));
         }
-        let Some(field) = spec.field(name.as_str()) else {
-            return Err(Error::Fail(Fail::UnknownField(name.clone())));
+        let Some(spec_field) = spec.field(field.name.as_str()) else {
+            return Err(Error::Fail(Fail::UnknownField(field.name.clone())));
         };
-        if value.is_empty() {
-            if field.required {
-                return Err(Error::Fail(Fail::MissingRequiredField(
-                    name.as_str().to_string(),
-                )));
+        if field.value.is_empty() {
+            if spec_field.required {
+                return Err(Error::Fail(Fail::MissingRequiredField(field.name.clone())));
             }
-            out.insert(name.clone(), FieldValue::Empty);
+            out.insert(field.name.clone(), FieldValue::Empty);
             continue;
         }
-        out.insert(name.clone(), parse_field_value(field, value)?);
+        out.insert(
+            field.name.clone(),
+            parse_field_value(spec_field, &field.value)?,
+        );
     }
     if !partial {
-        for field in &spec.fields {
-            if field.required && !out.contains_key(field.name.as_str()) {
-                return Err(Error::Fail(Fail::MissingRequiredField(field.name.clone())));
+        for spec_field in &spec.fields {
+            if spec_field.required && !out.contains_key(spec_field.name.as_str()) {
+                return Err(Error::Fail(Fail::MissingRequiredField(
+                    spec_field.name.clone(),
+                )));
             }
         }
     }
@@ -498,31 +489,31 @@ fn parse_field_value(field: &Field, value: &str) -> Result<FieldValue, Error> {
 }
 
 fn parse_field_value_parts(
-    name: &str,
+    name: &FieldName,
     type_: FieldType,
-    values: Option<&[String]>,
+    values: Option<&[crate::spec::EnumValue]>,
     value: &str,
 ) -> Result<FieldValue, Error> {
     match type_ {
         FieldType::Text => {
             if value.contains('\t') || value.contains('\n') {
-                return Err(Error::Fail(Fail::TextHasTabOrNewline(name.to_string())));
+                return Err(Error::Fail(Fail::TextHasTabOrNewline(name.clone())));
             }
             Ok(FieldValue::Text(value.to_string()))
         }
         FieldType::Number => Ok(FieldValue::Number(parse_number(value)?)),
         FieldType::Enum => {
-            let folded = fold_enum(value);
+            let folded = fold_enum(value)?;
             let Some(values) = values else {
-                return Err(Error::Fail(Fail::EnumHasNoValues(name.to_string())));
+                return Err(Error::Fail(Fail::EnumHasNoValues(name.clone())));
             };
             if !values.iter().any(|v| v == &folded) {
                 return Err(Error::Fail(Fail::InvalidEnumValue {
-                    field: name.to_string(),
+                    field: name.clone(),
                     value: value.to_string(),
                 }));
             }
-            Ok(FieldValue::Text(folded))
+            Ok(FieldValue::Enum(folded))
         }
     }
 }

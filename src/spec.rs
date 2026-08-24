@@ -10,12 +10,12 @@ pub struct Spec {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Field {
-    pub name: String,
+    pub name: FieldName,
     #[serde(rename = "type")]
     pub type_: FieldType,
     pub required: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub values: Option<Vec<String>>,
+    pub values: Option<Vec<EnumValue>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,13 +39,12 @@ impl Spec {
     }
 
     pub fn field(&self, name: &str) -> Option<&Field> {
-        self.fields.iter().find(|f| f.name == name)
+        self.fields.iter().find(|f| f.name.as_str() == name)
     }
 
     fn canonicalize(&mut self) -> Result<(), Error> {
         let mut seen = std::collections::HashSet::new();
         for field in &mut self.fields {
-            FieldName::parse(&field.name)?;
             if !seen.insert(field.name.clone()) {
                 return Err(Error::Fail(Fail::DuplicateSpecField(field.name.clone())));
             }
@@ -54,7 +53,12 @@ impl Spec {
                     let Some(values) = field.values.as_mut() else {
                         return Err(Error::Fail(Fail::EnumNeedsValues(field.name.clone())));
                     };
-                    fold_enum_values(values)?;
+                    let mut seen_values = std::collections::HashSet::new();
+                    for value in values.iter() {
+                        if !seen_values.insert(value.clone()) {
+                            return Err(Error::Fail(Fail::DuplicateEnumValue(value.clone())));
+                        }
+                    }
                 }
                 _ => {
                     if field.values.is_some() {
@@ -64,6 +68,35 @@ impl Spec {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Ident(String);
+
+impl Ident {
+    pub fn parse(s: &str) -> Result<Self, Error> {
+        if is_ident(s) {
+            Ok(Self(s.to_string()))
+        } else {
+            Err(Error::Fail(Fail::InvalidIdent(s.to_string())))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for Ident {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::borrow::Borrow<str> for Ident {
+    fn borrow(&self) -> &str {
+        &self.0
     }
 }
 
@@ -87,6 +120,12 @@ impl SchemaName {
 impl std::fmt::Display for SchemaName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+impl AsRef<str> for SchemaName {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 
@@ -121,6 +160,25 @@ impl std::borrow::Borrow<str> for FieldName {
     }
 }
 
+impl AsRef<str> for FieldName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Serialize for FieldName {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for FieldName {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(deserializer)?;
+        FieldName::parse(&raw).map_err(serde::de::Error::custom)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LinkName(String);
 
@@ -146,22 +204,80 @@ impl std::fmt::Display for LinkName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Group {
+impl AsRef<str> for LinkName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EnumValue(String);
+
+impl EnumValue {
+    pub fn parse(s: &str) -> Result<Self, Error> {
+        let folded = s.to_ascii_lowercase();
+        if folded.is_empty() {
+            return Err(Error::Fail(Fail::EmptyEnumValue));
+        }
+        Ok(Self(folded))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for EnumValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl Serialize for EnumValue {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for EnumValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(deserializer)?;
+        EnumValue::parse(&raw).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeUnit {
     Day,
     Week,
     Month,
     Year,
+}
+
+impl TimeUnit {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Day => "day",
+            Self::Week => "week",
+            Self::Month => "month",
+            Self::Year => "year",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Group {
+    Time(TimeUnit),
     Link(LinkName),
 }
 
 impl Group {
     pub fn parse(s: &str) -> Result<Self, Error> {
         match s {
-            "day" => Ok(Self::Day),
-            "week" => Ok(Self::Week),
-            "month" => Ok(Self::Month),
-            "year" => Ok(Self::Year),
+            "day" => Ok(Self::Time(TimeUnit::Day)),
+            "week" => Ok(Self::Time(TimeUnit::Week)),
+            "month" => Ok(Self::Time(TimeUnit::Month)),
+            "year" => Ok(Self::Time(TimeUnit::Year)),
             other => Ok(Self::Link(LinkName::parse(other)?)),
         }
     }
@@ -232,22 +348,21 @@ pub fn is_time_group(s: &str) -> bool {
     matches!(s, "day" | "week" | "month" | "year")
 }
 
-pub fn fold_enum(value: &str) -> String {
-    value.to_ascii_lowercase()
+pub fn fold_enum(value: &str) -> Result<EnumValue, Error> {
+    EnumValue::parse(value)
 }
 
-pub fn fold_enum_values(values: &mut [String]) -> Result<(), Error> {
+pub fn fold_enum_values(values: Vec<String>) -> Result<Vec<EnumValue>, Error> {
+    let mut out = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    for value in values.iter_mut() {
-        *value = fold_enum(value);
-        if value.is_empty() {
-            return Err(Error::Fail(Fail::EmptyEnumValue));
+    for value in values {
+        let folded = EnumValue::parse(&value)?;
+        if !seen.insert(folded.clone()) {
+            return Err(Error::Fail(Fail::DuplicateEnumValue(folded)));
         }
-        if !seen.insert(value.clone()) {
-            return Err(Error::Fail(Fail::DuplicateEnumValue(value.clone())));
-        }
+        out.push(folded);
     }
-    Ok(())
+    Ok(out)
 }
 
 pub fn parse_number(raw: &str) -> Result<Decimal, Error> {

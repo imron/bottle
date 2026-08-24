@@ -4,6 +4,7 @@ use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
 
 use crate::error::{Error, Fail, Usage};
+use crate::spec::TimeUnit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Instant(Timestamp);
@@ -90,6 +91,33 @@ fn to_bound(input: &str) -> Result<ToBound, Error> {
 
 pub fn local_civil(at: Instant) -> Date {
     at.0.to_zoned(system_tz()).date()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Period {
+    Day(Date),
+    Week { year: i16, week: i8 },
+    Month { year: i16, month: i8 },
+    Year(i16),
+}
+
+pub fn period(unit: TimeUnit, at: Instant) -> Period {
+    let date = local_civil(at);
+    match unit {
+        TimeUnit::Day => Period::Day(date),
+        TimeUnit::Month => Period::Month {
+            year: date.year(),
+            month: date.month(),
+        },
+        TimeUnit::Year => Period::Year(date.year()),
+        TimeUnit::Week => {
+            let iso = date.iso_week_date();
+            Period::Week {
+                year: iso.year(),
+                week: iso.week(),
+            }
+        }
+    }
 }
 
 enum Parsed {
