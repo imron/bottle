@@ -148,15 +148,15 @@ Types: `text`, `number`, `enum`.
   Link names also may not be `day`, `week`, `month`,
   `year` (`sum --group`).
 
-## ignore
+## ignore and restore
 
 `ignore` keeps the entry and hides it from `ls`, `sum`,
-`last`, and `today`. `get` still returns it. There is no
-un-ignore. Log a new entry if you need the fact back.
-
-`amend` changes listed fields, `--at` / `--agent` if
-given, and `--link` / `--unlink`. It does not clear
+`last`, and `today`. `get` still returns it. `restore`
+clears `ignored` so those queries see it again. Both are
+idempotent. Neither clears links. `amend` does not clear
 `ignored`.
+
+TODO: `restore` is specified, not implemented.
 
 ## Changing a schema
 

@@ -61,7 +61,8 @@ instead of failing immediately. Several bots, one file.
 ## Tests
 
 `tests/` drives the library against a temp db. Cover every
-command in [commands.md](commands.md): happy path, each
+implemented command in [commands.md](commands.md): happy
+path, each
 flag, each documented failure (usage, unknown schema, bad
 field, not found, retired, link target missing, reserved
 `--where`, `--link`/`--unlink` conflict), TSV headers and

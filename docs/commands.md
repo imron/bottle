@@ -19,7 +19,8 @@ are empty cells. `ls`, `today`, and `last` do not repeat
 the schema name on each line.
 
 Ignored entries are omitted from `ls`, `sum`, `last`, and
-`today`. `get` still returns them.
+`today`. `get` still returns them. `restore` clears
+`ignored` so those queries see the entry again.
 
 A link in flags and TSV is `schema/id`. The `links` cell is
 space-separated `name=schema/id` pairs, sorted by name.
@@ -240,4 +241,18 @@ bottle ignore <schema> <id>
 ```
 
 Sets `ignored`. Idempotent. Prints `id`, `at`. Exit 1 if
-missing.
+missing. Does not clear links. `restore` is the inverse.
+
+## restore
+
+```
+bottle restore <schema> <id>
+```
+
+Clears `ignored`. The entry is again visible to `ls`,
+`sum`, `last`, and `today`. Idempotent if it was not
+ignored (still prints `id`, `at`). Prints `id`, `at`.
+Exit 1 if missing. Does not change fields, `at`, `agent`,
+or links.
+
+TODO: not implemented.
