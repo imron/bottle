@@ -44,15 +44,6 @@ pub struct SchemaInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct Amend {
-    pub at: Option<Instant>,
-    pub agent: Option<String>,
-    pub links: Vec<Link>,
-    pub unlinks: Vec<LinkName>,
-    pub fields: Vec<(FieldName, String)>,
-}
-
-#[derive(Debug, Clone)]
 pub enum Filter {
     Field { name: FieldName, value: FieldValue },
     Link { name: LinkName, to: EntryRef },
@@ -65,78 +56,124 @@ pub enum Order {
 }
 
 #[derive(Debug, Clone)]
+pub struct SchemaShow {
+    pub name: SchemaName,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaAdd {
+    pub name: SchemaName,
+    pub spec: Spec,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaAddField {
+    pub schema: SchemaName,
+    pub name: FieldName,
+    pub type_: FieldType,
+    pub values: Option<Vec<String>>,
+    pub default: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaAddValue {
+    pub schema: SchemaName,
+    pub field: FieldName,
+    pub value: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaRetire {
+    pub name: SchemaName,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaDrop {
+    pub name: SchemaName,
+}
+
+#[derive(Debug, Clone)]
+pub struct Log {
+    pub schema: SchemaName,
+    pub at: Option<Instant>,
+    pub agent: Option<String>,
+    pub links: Vec<Link>,
+    pub fields: Vec<(FieldName, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct List {
+    pub schema: SchemaName,
+    pub range: Range,
+    pub agent: Option<String>,
+    pub filters: Vec<(String, String)>,
+    pub include_ignored: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct Get {
+    pub schema: SchemaName,
+    pub id: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct Sum {
+    pub schema: SchemaName,
+    pub field: FieldName,
+    pub range: Range,
+    pub agent: Option<String>,
+    pub filters: Vec<(String, String)>,
+    pub group: Option<Group>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Last {
+    pub schema: SchemaName,
+    pub agent: Option<String>,
+    pub filters: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Today {
+    pub schema: SchemaName,
+    pub agent: Option<String>,
+    pub filters: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Amend {
+    pub schema: SchemaName,
+    pub id: i64,
+    pub at: Option<Instant>,
+    pub agent: Option<String>,
+    pub links: Vec<Link>,
+    pub unlinks: Vec<LinkName>,
+    pub fields: Vec<(FieldName, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Ignore {
+    pub schema: SchemaName,
+    pub id: i64,
+}
+
+#[derive(Debug, Clone)]
 pub enum Op {
     SchemaList,
-    SchemaShow {
-        name: SchemaName,
-    },
-    SchemaAdd {
-        name: SchemaName,
-        spec: Spec,
-    },
-    SchemaAddField {
-        schema: SchemaName,
-        name: FieldName,
-        type_: FieldType,
-        values: Option<Vec<String>>,
-        default: Option<String>,
-    },
-    SchemaAddValue {
-        schema: SchemaName,
-        field: FieldName,
-        value: String,
-    },
-    SchemaRetire {
-        name: SchemaName,
-    },
-    SchemaDrop {
-        name: SchemaName,
-    },
-    Log {
-        schema: SchemaName,
-        at: Option<Instant>,
-        agent: Option<String>,
-        links: Vec<Link>,
-        fields: Vec<(FieldName, String)>,
-    },
-    List {
-        schema: SchemaName,
-        range: Range,
-        agent: Option<String>,
-        filters: Vec<(String, String)>,
-        include_ignored: bool,
-    },
-    Get {
-        schema: SchemaName,
-        id: i64,
-    },
-    Sum {
-        schema: SchemaName,
-        field: FieldName,
-        range: Range,
-        agent: Option<String>,
-        filters: Vec<(String, String)>,
-        group: Option<Group>,
-    },
-    Last {
-        schema: SchemaName,
-        agent: Option<String>,
-        filters: Vec<(String, String)>,
-    },
-    Today {
-        schema: SchemaName,
-        agent: Option<String>,
-        filters: Vec<(String, String)>,
-    },
-    Amend {
-        schema: SchemaName,
-        id: i64,
-        change: Amend,
-    },
-    Ignore {
-        schema: SchemaName,
-        id: i64,
-    },
+    SchemaShow(SchemaShow),
+    SchemaAdd(SchemaAdd),
+    SchemaAddField(SchemaAddField),
+    SchemaAddValue(SchemaAddValue),
+    SchemaRetire(SchemaRetire),
+    SchemaDrop(SchemaDrop),
+    Log(Log),
+    List(List),
+    Get(Get),
+    Sum(Sum),
+    Last(Last),
+    Today(Today),
+    Amend(Amend),
+    Ignore(Ignore),
 }
 
 #[derive(Debug, Clone)]

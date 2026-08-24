@@ -3,7 +3,10 @@ mod error;
 mod tsv;
 
 use crate::error::{Error, Fail};
-use crate::ledger::{Amend, FieldValue, Op, Outcome};
+use crate::ledger::{
+    Amend, FieldValue, Get, Ignore, Last, List, Log, Op, Outcome, SchemaAdd, SchemaAddField,
+    SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Sum, Today,
+};
 use crate::spec::{FieldName, Link, LinkName, SchemaName, Spec};
 use crate::time::{self, Range};
 
@@ -38,15 +41,15 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
             return Err(Error::Fail(Fail::HelpNotAnOp));
         }
         Cmd::SchemaList => Op::SchemaList,
-        Cmd::SchemaShow { name, yaml: _ } => Op::SchemaShow {
+        Cmd::SchemaShow { name, yaml: _ } => Op::SchemaShow(SchemaShow {
             name: SchemaName::parse(&name)?,
-        },
+        }),
         Cmd::SchemaAdd { name, file } => {
             let raw = std::fs::read_to_string(&file)?;
-            Op::SchemaAdd {
+            Op::SchemaAdd(SchemaAdd {
                 name: SchemaName::parse(&name)?,
                 spec: Spec::parse_yaml(&raw)?,
-            }
+            })
         }
         Cmd::SchemaAddField {
             schema,
@@ -54,41 +57,41 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
             type_,
             values,
             default,
-        } => Op::SchemaAddField {
+        } => Op::SchemaAddField(SchemaAddField {
             schema: SchemaName::parse(&schema)?,
             name: FieldName::parse(&name)?,
             type_,
             values,
             default,
-        },
+        }),
         Cmd::SchemaAddValue {
             schema,
             field,
             value,
-        } => Op::SchemaAddValue {
+        } => Op::SchemaAddValue(SchemaAddValue {
             schema: SchemaName::parse(&schema)?,
             field: FieldName::parse(&field)?,
             value,
-        },
-        Cmd::SchemaRetire { name } => Op::SchemaRetire {
+        }),
+        Cmd::SchemaRetire { name } => Op::SchemaRetire(SchemaRetire {
             name: SchemaName::parse(&name)?,
-        },
-        Cmd::SchemaDrop { name } => Op::SchemaDrop {
+        }),
+        Cmd::SchemaDrop { name } => Op::SchemaDrop(SchemaDrop {
             name: SchemaName::parse(&name)?,
-        },
+        }),
         Cmd::Log {
             schema,
             at,
             agent,
             links,
             fields,
-        } => Op::Log {
+        } => Op::Log(Log {
             schema: SchemaName::parse(&schema)?,
             at: at.as_deref().map(time::parse_instant).transpose()?,
             agent,
             links: parse_links(links)?,
             fields: parse_fields(fields)?,
-        },
+        }),
         Cmd::Ls {
             schema,
             from,
@@ -96,17 +99,17 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
             agent,
             wheres,
             include_ignored,
-        } => Op::List {
+        } => Op::List(List {
             schema: SchemaName::parse(&schema)?,
             range: Range::parse(from.as_deref(), to.as_deref())?,
             agent,
             filters: wheres,
             include_ignored,
-        },
-        Cmd::Get { schema, id } => Op::Get {
+        }),
+        Cmd::Get { schema, id } => Op::Get(Get {
             schema: SchemaName::parse(&schema)?,
             id,
-        },
+        }),
         Cmd::Sum {
             schema,
             field,
@@ -115,7 +118,7 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
             agent,
             wheres,
             group,
-        } => Op::Sum {
+        } => Op::Sum(Sum {
             schema: SchemaName::parse(&schema)?,
             field: FieldName::parse(&field)?,
             range: Range::parse(from.as_deref(), to.as_deref())?,
@@ -125,25 +128,25 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
                 .as_deref()
                 .map(crate::spec::Group::parse)
                 .transpose()?,
-        },
+        }),
         Cmd::Last {
             schema,
             agent,
             wheres,
-        } => Op::Last {
+        } => Op::Last(Last {
             schema: SchemaName::parse(&schema)?,
             agent,
             filters: wheres,
-        },
+        }),
         Cmd::Today {
             schema,
             agent,
             wheres,
-        } => Op::Today {
+        } => Op::Today(Today {
             schema: SchemaName::parse(&schema)?,
             agent,
             filters: wheres,
-        },
+        }),
         Cmd::Amend {
             schema,
             id,
@@ -152,21 +155,19 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
             links,
             unlinks,
             fields,
-        } => Op::Amend {
+        } => Op::Amend(Amend {
             schema: SchemaName::parse(&schema)?,
             id,
-            change: Amend {
-                at: at.as_deref().map(time::parse_instant).transpose()?,
-                agent,
-                links: parse_links(links)?,
-                unlinks: parse_unlinks(unlinks)?,
-                fields: parse_fields(fields)?,
-            },
-        },
-        Cmd::Ignore { schema, id } => Op::Ignore {
+            at: at.as_deref().map(time::parse_instant).transpose()?,
+            agent,
+            links: parse_links(links)?,
+            unlinks: parse_unlinks(unlinks)?,
+            fields: parse_fields(fields)?,
+        }),
+        Cmd::Ignore { schema, id } => Op::Ignore(Ignore {
             schema: SchemaName::parse(&schema)?,
             id,
-        },
+        }),
     };
     Ok(Request {
         op,
