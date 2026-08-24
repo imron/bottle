@@ -61,29 +61,21 @@ fn register_functions(conn: &Connection) -> Result<(), Error> {
         |ctx| {
             let left: Option<String> = ctx.get(0)?;
             let right: Option<String> = ctx.get(1)?;
-            dec_eq(left.as_deref(), right.as_deref())
+            Ok(dec_eq(left.as_deref(), right.as_deref())?)
         },
     )?;
     Ok(())
 }
 
-fn dec_eq(left: Option<&str>, right: Option<&str>) -> rusqlite::Result<bool> {
+fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
     let (Some(left), Some(right)) = (left, right) else {
         return Ok(false);
     };
     if left.is_empty() || right.is_empty() {
         return Ok(false);
     }
-    let left: Decimal = left.parse().map_err(|_| {
-        rusqlite::Error::UserFunctionError(Box::new(Error::fail(format!(
-            "corrupt stored number: {left}"
-        ))))
-    })?;
-    let right: Decimal = right.parse().map_err(|_| {
-        rusqlite::Error::UserFunctionError(Box::new(Error::fail(format!(
-            "invalid number: {right}"
-        ))))
-    })?;
+    let left: Decimal = left.parse()?;
+    let right: Decimal = right.parse()?;
     Ok(left == right)
 }
 

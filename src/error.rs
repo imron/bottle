@@ -58,3 +58,15 @@ impl From<std::io::Error> for Error {
         Self::fail(err.to_string())
     }
 }
+
+impl From<rust_decimal::Error> for Error {
+    fn from(err: rust_decimal::Error) -> Self {
+        Self::fail(format!("invalid number: {err}"))
+    }
+}
+
+impl From<Error> for rusqlite::Error {
+    fn from(err: Error) -> Self {
+        rusqlite::Error::UserFunctionError(Box::new(err))
+    }
+}

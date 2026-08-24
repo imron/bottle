@@ -253,6 +253,5 @@ pub fn parse_number(raw: &str) -> Result<Decimal, Error> {
     if raw.contains(['e', 'E']) {
         return Err(Error::fail(format!("invalid number: {raw}")));
     }
-    raw.parse()
-        .map_err(|_| Error::fail(format!("invalid number: {raw}")))
+    Ok(raw.parse()?)
 }

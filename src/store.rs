@@ -251,11 +251,7 @@ fn read_entry(
                             values.insert(
                                 other.to_string(),
                                 match v {
-                                    Some(s) if !s.is_empty() => {
-                                        FieldValue::Number(s.parse().map_err(|_| {
-                                            Error::fail(format!("corrupt stored number: {s}"))
-                                        })?)
-                                    }
+                                    Some(s) if !s.is_empty() => FieldValue::Number(s.parse()?),
                                     _ => FieldValue::Empty,
                                 },
                             );
