@@ -18,8 +18,8 @@ Changes an existing entry: fields, time, agent, and links.
 The id stays. A correction is an edit, not another
 paragraph.
 
-`ignore` hides an entry from lists. `amend` keeps it
-visible and fixes it. Amend does not clear `ignored`.
+Amend does not clear `ignored`. Use the `ignore` command
+to hide an entry.
 
 At least one of `--at`, `--agent`, `--link`, `--unlink`,
 or a `field=value` is required.
