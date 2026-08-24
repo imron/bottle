@@ -4,7 +4,7 @@ use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
 
 use crate::error::{Error, Fail, Usage};
-use crate::spec::TimeUnit;
+use crate::spec::TimePeriod;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Instant(Timestamp);
@@ -101,16 +101,16 @@ pub enum Period {
     Year(i16),
 }
 
-pub fn period(unit: TimeUnit, at: Instant) -> Period {
+pub fn period(unit: TimePeriod, at: Instant) -> Period {
     let date = local_civil(at);
     match unit {
-        TimeUnit::Day => Period::Day(date),
-        TimeUnit::Month => Period::Month {
+        TimePeriod::Day => Period::Day(date),
+        TimePeriod::Month => Period::Month {
             year: date.year(),
             month: date.month(),
         },
-        TimeUnit::Year => Period::Year(date.year()),
-        TimeUnit::Week => {
+        TimePeriod::Year => Period::Year(date.year()),
+        TimePeriod::Week => {
             let iso = date.iso_week_date();
             Period::Week {
                 year: iso.year(),

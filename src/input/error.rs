@@ -57,7 +57,7 @@ fn fail_message(err: &Fail) -> String {
         Fail::ReservedFieldName(s) => format!("reserved field name: {s}"),
         Fail::InvalidLinkName(s) => format!("invalid link name: {s}"),
         Fail::ReservedLinkName(s) => format!("reserved link name: {s}"),
-        Fail::InvalidIdent(s) => format!("invalid name: {s}"),
+        Fail::InvalidIdentifier(s) => format!("invalid name: {s}"),
         Fail::EmptyEnumValue => "empty enum value".into(),
         Fail::DuplicateEnumValue(value) => format!("duplicate enum value after fold: {value}"),
         Fail::DuplicateSpecField(name) => format!("duplicate field: {name}"),

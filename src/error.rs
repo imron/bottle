@@ -1,4 +1,4 @@
-use crate::spec::{EntryRef, EnumValue, FieldName, Ident, LinkName, SchemaName};
+use crate::spec::{EntryRef, EnumValue, FieldName, Identifier, LinkName, SchemaName};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -13,7 +13,7 @@ pub enum Usage {
     AmendEmpty,
     DuplicateUnlink(LinkName),
     LinkAndUnlink(LinkName),
-    ReservedWhere(Ident),
+    ReservedWhere(Identifier),
     DuplicateLinkName(LinkName),
     DuplicateField(FieldName),
     InvalidLinkTarget(String),
@@ -57,7 +57,7 @@ pub enum Fail {
     InvalidNumber(String),
     ValuesOnlyForEnum(FieldName),
     EnumNeedsValues(FieldName),
-    InvalidIdent(String),
+    InvalidIdentifier(String),
     CorruptSchemaName(String),
     CorruptLinkName(String),
     CorruptLinkSchema(String),

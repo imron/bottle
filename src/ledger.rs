@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use rust_decimal::Decimal;
 
 use crate::spec::{
-    EntryRef, EnumValue, FieldName, FieldType, Group, Ident, Link, LinkName, SchemaName, Spec,
-    TimeUnit,
+    EntryRef, EnumValue, FieldName, FieldType, Group, Identifier, Link, LinkName, SchemaName, Spec,
+    TimePeriod,
 };
 use crate::time::{Instant, Period, Range};
 
@@ -78,7 +78,7 @@ pub enum Filter {
 
 #[derive(Debug, Clone)]
 pub struct Clause {
-    pub name: Ident,
+    pub name: Identifier,
     pub value: String,
 }
 
@@ -238,7 +238,7 @@ pub enum Outcome {
         value: Decimal,
     },
     GroupedTime {
-        unit: TimeUnit,
+        unit: TimePeriod,
         buckets: Vec<(Period, Decimal)>,
     },
     GroupedLink {

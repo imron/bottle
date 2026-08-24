@@ -72,14 +72,14 @@ impl Spec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Ident(String);
+pub struct Identifier(String);
 
-impl Ident {
+impl Identifier {
     pub fn parse(s: &str) -> Result<Self, Error> {
-        if is_ident(s) {
+        if is_identifier(s) {
             Ok(Self(s.to_string()))
         } else {
-            Err(Error::Fail(Fail::InvalidIdent(s.to_string())))
+            Err(Error::Fail(Fail::InvalidIdentifier(s.to_string())))
         }
     }
 
@@ -88,13 +88,13 @@ impl Ident {
     }
 }
 
-impl std::fmt::Display for Ident {
+impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
     }
 }
 
-impl std::borrow::Borrow<str> for Ident {
+impl std::borrow::Borrow<str> for Identifier {
     fn borrow(&self) -> &str {
         &self.0
     }
@@ -134,7 +134,7 @@ pub struct FieldName(String);
 
 impl FieldName {
     pub fn parse(s: &str) -> Result<Self, Error> {
-        if !is_ident(s) {
+        if !is_identifier(s) {
             return Err(Error::Fail(Fail::InvalidFieldName(s.to_string())));
         }
         if is_reserved(s) {
@@ -184,7 +184,7 @@ pub struct LinkName(String);
 
 impl LinkName {
     pub fn parse(s: &str) -> Result<Self, Error> {
-        if !is_ident(s) {
+        if !is_identifier(s) {
             return Err(Error::Fail(Fail::InvalidLinkName(s.to_string())));
         }
         if is_reserved(s) || is_time_group(s) {
@@ -247,14 +247,14 @@ impl<'de> Deserialize<'de> for EnumValue {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TimeUnit {
+pub enum TimePeriod {
     Day,
     Week,
     Month,
     Year,
 }
 
-impl TimeUnit {
+impl TimePeriod {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Day => "day",
@@ -267,17 +267,17 @@ impl TimeUnit {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Group {
-    Time(TimeUnit),
+    Time(TimePeriod),
     Link(LinkName),
 }
 
 impl Group {
     pub fn parse(s: &str) -> Result<Self, Error> {
         match s {
-            "day" => Ok(Self::Time(TimeUnit::Day)),
-            "week" => Ok(Self::Time(TimeUnit::Week)),
-            "month" => Ok(Self::Time(TimeUnit::Month)),
-            "year" => Ok(Self::Time(TimeUnit::Year)),
+            "day" => Ok(Self::Time(TimePeriod::Day)),
+            "week" => Ok(Self::Time(TimePeriod::Week)),
+            "month" => Ok(Self::Time(TimePeriod::Month)),
+            "year" => Ok(Self::Time(TimePeriod::Year)),
             other => Ok(Self::Link(LinkName::parse(other)?)),
         }
     }
@@ -327,7 +327,7 @@ impl Link {
     }
 }
 
-pub fn is_ident(s: &str) -> bool {
+pub fn is_identifier(s: &str) -> bool {
     let mut chars = s.chars();
     match chars.next() {
         Some(c) if c.is_ascii_lowercase() => {}
@@ -337,7 +337,7 @@ pub fn is_ident(s: &str) -> bool {
 }
 
 pub fn is_schema_name(s: &str) -> bool {
-    !s.is_empty() && s.split('.').all(is_ident)
+    !s.is_empty() && s.split('.').all(is_identifier)
 }
 
 pub fn is_reserved(s: &str) -> bool {

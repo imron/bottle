@@ -369,7 +369,7 @@ fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
 fn grouped_time(
     entries: &[Entry],
     field: &FieldName,
-    unit: crate::spec::TimeUnit,
+    unit: crate::spec::TimePeriod,
 ) -> Result<Outcome, Error> {
     let mut buckets: BTreeMap<Period, Decimal> = BTreeMap::new();
     for entry in entries {

@@ -7,7 +7,7 @@ use crate::ledger::{
     Agent, Amend, Clause, FieldInput, FieldValue, Get, Ignore, Last, List, Log, Op, Outcome,
     SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Sum, Today,
 };
-use crate::spec::{FieldName, Ident, Link, LinkName, SchemaName, Spec, is_reserved};
+use crate::spec::{FieldName, Identifier, Link, LinkName, SchemaName, Spec, is_reserved};
 use crate::time::{self, Period, Range};
 
 pub use cmd::Cmd;
@@ -261,10 +261,12 @@ fn parse_clauses(wheres: Vec<(String, String)>) -> Result<Vec<Clause>, Error> {
         .into_iter()
         .map(|(name, value)| {
             if is_reserved(&name) {
-                return Err(Error::Usage(Usage::ReservedWhere(Ident::parse(&name)?)));
+                return Err(Error::Usage(Usage::ReservedWhere(Identifier::parse(
+                    &name,
+                )?)));
             }
             Ok(Clause {
-                name: Ident::parse(&name)?,
+                name: Identifier::parse(&name)?,
                 value,
             })
         })
