@@ -13,13 +13,11 @@ bottle log <schema> [--at TIME] [--agent NAME] \
 
 ## Description
 
-Writes one entry of a registered schema. This is how a
-fact gets into the store: one event, the fields you
+Writes one entry of a registered schema: the fields you
 declared, an optional time, an optional agent, and
 optional named links to other entries.
 
-A later correction is `amend` on this id, not a second
-sentence in a note.
+Use `amend` to correct an entry if needed.
 
 The schema must already exist and must not be retired.
 Every required field must be present. Unknown field names
@@ -34,24 +32,18 @@ Field rules:
 - `enum` values are folded to lowercase and must match a
   declared value (`Breakfast` is stored as `breakfast`).
 
-To write many entries in one transaction (all succeed or
-none do), use MCP `log` with `entries`. See `mcp`.
-
 ## Options
 
 `--at TIME` — time of the event. Omit it and bottle uses
-now. A date with no time of day is rejected here (that is
-a query bound; see `ls`). Accepted instants:
+now. A date with no time of day is not accepted. Seconds
+are required. Use `T`, not a space. An offset must include
+a colon (`+10:00`). Accepted instants:
 
 - `2026-08-21T22:14:00Z` — UTC
-- `2026-08-22T08:14:00+10:00` — offset, converted to UTC
-- `2026-08-22T08:14:00` — no zone; treated as local time
-  on this machine, then stored as UTC
+- `2026-08-22T08:14:00+10:00` — with offset
+- `2026-08-22T08:14:00` — local time on this machine
 
-Always stored as UTC seconds ending in `Z`. Always printed
-in the host timezone with an offset, never `Z`. Seconds
-are required. Use `T`, not a space. An offset must include
-a colon (`+10:00`).
+Printed times use this machine's timezone, with an offset.
 
 `--agent NAME` — who wrote the entry. Defaults to
 `BOTTLE_AGENT`. If that is unset, the agent cell is empty.
@@ -61,8 +53,9 @@ existing entry. The name is yours to choose (`session`,
 `project`, `parent`). It is not declared in the schema
 YAML. Repeat `--link` for different names. A name once per
 command. One name, one target, per entry. The target must
-exist (ignored entries still count). A link name uses the
-field-name regex, must not collide with a field on this
+exist (ignored entries still count). A link name starts
+with a lowercase letter, then letters, digits, or
+underscores. It must not collide with a field on this
 schema, and must not be reserved (`id`, `at`, `agent`,
 `ignored`, `links`, `day`, `week`, `month`, `year`).
 

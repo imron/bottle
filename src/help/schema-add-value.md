@@ -13,10 +13,9 @@ bottle schema add-value <schema> --field <name> \
 
 ## Description
 
-Adds one allowed value to an enum field. Enums are closed
-on write: `log` will reject anything not on the list. When
-the real world grows a new case (a new `channel`, a new
-`kind`), append it here instead of creating a whole new
+Adds one allowed value to an enum field. `log` rejects
+anything not on the list. Use this when you need a new
+value (`channel`, `kind`, and so on) without replacing the
 schema.
 
 The value is stored lowercase (`Brunch` becomes `brunch`).

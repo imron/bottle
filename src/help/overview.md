@@ -14,28 +14,27 @@ bottle [--db PATH] <command>
 
 bottle is a store for events. You declare a type (a
 schema), log facts of that type (entries), and query them
-with a fixed set of commands. You do not write SQL and you
-do not invent tables as you go.
+with a fixed set of commands.
 
 Nothing is built in. Add a schema, then log. Other
-programs — fitness apps, banks, calendars — can stay the
-source of a fact. bottle is the shared ledger those facts
-are copied into, so every bot asks the same way.
+programs — banks, calendars, fitness apps — can stay the
+source of a fact. You copy that fact into bottle so every
+bot can query it here.
 
 An entry has an id (per schema, not global), a time
 (`at`), optional agent, optional named links to other
-entries, and the fields you declared. A link is a pointer,
-not a tag: `--link session=fitness.session/1` means this
-entry's `session` is entry 1 of `fitness.session`.
+entries, and the fields you declared. A link
+`--link session=fitness.session/1` means this entry's
+`session` is entry 1 of `fitness.session`.
 
-Times are stored in UTC and printed in the timezone of the
-machine running bottle. A date with no time of day is a
-query window (a civil day), not a timestamp you can log.
+Times print in the timezone of the machine running bottle.
+A date with no time of day is that whole day, not a
+timestamp you can log.
 
 ## Files
 
 `--db` or the environment variable `BOTTLE_DB` is the
-sqlite file. If neither is set:
+database file. If neither is set:
 
 - Linux: `$XDG_DATA_HOME/bottle/bottle.db`, else
   `~/.local/share/bottle/bottle.db`
@@ -43,7 +42,7 @@ sqlite file. If neither is set:
 
 ## Environment
 
-`BOTTLE_DB` — path to the sqlite file.
+`BOTTLE_DB` — path to the database file.
 
 `BOTTLE_AGENT` — default `--agent` on write. Set it to the
 name of the bot that is logging.

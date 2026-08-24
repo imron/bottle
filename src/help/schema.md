@@ -24,13 +24,12 @@ bottle ships with none. You add a schema, then you can
 `log` facts of that type.
 
 The name is `family.kind`, for example `nutrition.meal` or
-`fitness.set`. On disk that becomes a sqlite table
-`nutrition_meal`; the commands keep the dotted name.
+`fitness.set`.
 
 `list` and `show` are reads. `add` creates a type.
 `add-field` and `add-value` grow a type (you cannot rename
 or remove a field). `retire` blocks new logs but keeps
-history. `drop` deletes the type and its entries.
+existing entries. `drop` deletes the type and its entries.
 
 Unknown fields on `log` are rejected. `sum` only runs on
 fields declared as `number`. Links are not part of the

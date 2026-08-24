@@ -14,10 +14,9 @@ bottle ls <schema> [--from DATE|TIME] [--to DATE|TIME] \
 
 ## Description
 
-Lists entries of one schema, oldest first. This is the
-read path for "what was logged." You do not write SQL.
-Filters are a closed set: a time window, who wrote it,
-field equality, and link equality.
+Lists entries of one schema, oldest first. You can filter
+by a time window, who wrote the entry, field equality, and
+link equality.
 
 Ignored entries are omitted unless `--include-ignored`.
 `get` can still fetch an ignored id.
@@ -34,9 +33,8 @@ alone has no end.
 
 `--to DATE|TIME` — upper bound on `at`. A date is that
 civil day, inclusive. `--from 2026-08-16 --to 2026-08-22`
-includes both days. `--to` alone has no start. DST days
-are 23 or 25 hours; bottle uses the zone database, not a
-fixed offset.
+includes both days. `--to` alone has no start. Days that
+change daylight saving time are 23 or 25 hours long.
 
 `--agent NAME` — filter who wrote the entry. On `log` and
 `amend` the same flag sets it.

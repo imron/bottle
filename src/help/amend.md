@@ -15,8 +15,7 @@ bottle amend <schema> <id> [--at TIME] [--agent NAME] \
 ## Description
 
 Changes an existing entry: fields, time, agent, and links.
-The id stays. A correction is an edit, not another
-paragraph.
+The id stays.
 
 Amend does not clear `ignored`. Use the `ignore` command
 to hide an entry.
@@ -26,8 +25,11 @@ or a `field=value` is required.
 
 ## Options
 
-`--at TIME` — same instant rules as `log`. A date with no
-time of day is rejected.
+`--at TIME` — time of the event. A date with no time of
+day is not accepted. Seconds are required. Use `T`, not a
+space. An offset must include a colon (`+10:00`). UTC
+(`Z`), an offset (`+10:00`), or local time with no zone
+are accepted.
 
 `--agent NAME` — set who wrote the entry.
 

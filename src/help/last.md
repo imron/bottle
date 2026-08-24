@@ -2,7 +2,7 @@
 
 ## Name
 
-last — print the newest entry of a schema
+last — print the most recent entry of a schema
 
 ## Synopsis
 
@@ -13,20 +13,24 @@ bottle last <schema> [--agent NAME] \
 
 ## Description
 
-Prints the newest entry of a schema, optionally filtered.
-Use this for questions like "when did I last speak to
-ada" — one result, not a list.
+Prints the most recent entry of a schema, optionally
+filtered. One result, not a list.
 
-Newest `at` wins. If two entries share an instant, the
-highest `id` wins. Ignored entries are omitted.
+Most recent `at` wins. If two entries share an instant,
+the highest `id` wins. Ignored entries are omitted.
 
 ## Options
 
-`--agent`, `--where` — same rules as `ls`.
+`--agent NAME` — only entries written by that agent.
+
+`--where field=value` — may repeat; all clauses are AND.
+A declared field name filters that field. Any other name
+is a link; the value must be `schema/id`.
 
 ## Output
 
-Same columns as `ls`.
+Columns: `id`, `at`, `links`, the schema's fields in
+declaration order, then `agent`.
 
 ## Exit status
 

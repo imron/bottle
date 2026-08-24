@@ -13,10 +13,10 @@ bottle schema add-field <name> --name <field> \
 
 ## Description
 
-Adds one field to an existing schema. This is how a type
-grows. You cannot rename a field, drop a field, or change
-its type. For those, add a new schema, copy the entries
-you still want, and `schema retire` the old name.
+Adds one field to an existing schema. You cannot rename a
+field, drop a field, or change its type. For those, add a
+new schema, copy the entries you still want, and
+`schema retire` the old name.
 
 Without `--default` the new field is optional. Existing
 entries have an empty cell there.

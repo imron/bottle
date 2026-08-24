@@ -12,14 +12,14 @@ bottle schema add <name> --file spec.yaml
 
 ## Description
 
-Registers a new type and creates a table for it. After
-this succeeds you can `log` entries of that type.
+Registers a new type. After this succeeds you can `log`
+entries of that type.
 
 `<name>` must be `family.kind`: two lowercase identifiers
 separated by a dot, for example `nutrition.meal`. It must
 not already exist.
 
-The YAML is a field list, not the event log:
+The YAML is a field list:
 
 ```yaml
 fields:

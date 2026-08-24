@@ -12,16 +12,16 @@ bottle schema list
 
 ## Description
 
-Lists every schema that has been registered in this store,
-including retired ones.
+Lists every schema that has been registered, including
+retired ones.
 
-An empty store prints only the header. That is normal:
-bottle ships with no schemas. Add one with `schema add`,
-then list again.
+An empty list prints only the header. That is normal:
+bottle ships with no schemas. Add one with
+`bottle schema add`, then list again.
 
-Retired schemas stay on the list so you can still `show`,
-`ls`, and `get` them. To see the fields of one name, use
-`schema show`.
+Retired schemas stay on the list so you can still show
+their fields and read their entries. To see the fields of
+one name, use `bottle schema show <name>`.
 
 ## Output
 

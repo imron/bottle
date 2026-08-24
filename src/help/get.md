@@ -12,15 +12,18 @@ bottle get <schema> <id>
 
 ## Description
 
-Prints one entry, including ignored entries. `ls` hides
-ignored entries; `get` is how you still see one.
+Prints one entry by schema and id, including entries that
+have been ignored. `ls` omits those; `get` still shows
+them.
 
 Ids are per schema. `fitness.set` 7 is not
 `fitness.session` 7, so the schema name is required.
 
 ## Output
 
-Same columns as `ls`, plus `ignored` (`true` or `false`).
+Columns: `id`, `at`, `links`, the schema's fields in
+declaration order, `agent`, and `ignored` (`true` or
+`false`).
 
 ## Exit status
 

@@ -15,17 +15,25 @@ bottle sum <schema> <field> [--from DATE|TIME] \
 
 ## Description
 
-Totals a number field across entries of a schema. This is
-why the store is not a markdown diary: only fields
-declared `number` can be summed. `today` and `ls` do not
-print a total; run `sum` when you want one.
+Totals a number field across entries of a schema. Only
+fields declared `number` can be summed. `today` and `ls`
+do not print a total.
 
 Fails if `<field>` is not a declared number. Ignored
 entries are omitted.
 
 ## Options
 
-`--from`, `--to`, `--agent`, `--where` — same as `ls`.
+`--from DATE|TIME`, `--to DATE|TIME` — bound `at`. A date
+with no time of day is that whole day in this machine's
+timezone, inclusive on both ends. A full timestamp is an
+instant bound.
+
+`--agent NAME` — only entries written by that agent.
+
+`--where field=value` — may repeat; all clauses are AND.
+A declared field name filters that field. Any other name
+is a link; the value must be `schema/id`.
 
 `--group day|week|month|year` — bucket by the entry's time
 in the host timezone:

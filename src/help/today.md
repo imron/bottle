@@ -14,22 +14,27 @@ bottle today <schema> [--agent NAME] \
 ## Description
 
 Lists entries of a schema whose `at` falls on the current
-civil day in the timezone of this machine. Same columns as
-`ls`. It does not print a total; run `sum` for that.
+day in the timezone of this machine. It does not print a
+total; run `sum` for that.
 
 The window is local midnight through the next local
-midnight. DST days are 23 or 25 hours; bottle uses the
-zone database, not a fixed offset such as "+10 hours".
+midnight. Days that change daylight saving time are 23 or
+25 hours long.
 
 Ignored entries are omitted.
 
 ## Options
 
-`--agent`, `--where` — same rules as `ls`.
+`--agent NAME` — only entries written by that agent.
+
+`--where field=value` — may repeat; all clauses are AND.
+A declared field name filters that field. Any other name
+is a link; the value must be `schema/id`.
 
 ## Output
 
-Same columns as `ls`.
+Columns: `id`, `at`, `links`, the schema's fields in
+declaration order, then `agent`.
 
 ## See also
 

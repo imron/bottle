@@ -13,17 +13,15 @@ bottle mcp
 ## Description
 
 Runs bottle as an MCP server on stdio. The tools are the
-same verbs as the CLI. Use this when a bot should not get
-a shell.
+same commands as the CLI. Use this when a bot should talk
+to bottle without a shell.
 
-There is one `log` tool, not a generated `log_meal`. A new
-schema does not require an MCP rebuild; the schema name is
-an argument.
+The schema name is an argument on tools that need one.
 
-The process speaks MCP on the pipe. Each tool result's
-body is the same bytes the CLI would print: TSV for entry
-commands, prose for `help`, YAML for `schema_show` with
-`yaml`. A failed call is a tool error, not a TSV body.
+Each tool result is the same bytes the CLI would print:
+TSV for entry commands, prose for `help`, YAML for
+`schema_show` with `yaml`. A failed call is a tool error,
+not a TSV body.
 
 ## Tools
 

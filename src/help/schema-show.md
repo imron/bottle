@@ -16,15 +16,13 @@ bottle schema show <name> --yaml
 Prints the field list for one schema: names, types,
 whether each is required, and enum values.
 
-Retired schemas still show; retiring blocks new logs, not
-this command. Links are not fields and are not in this
-output.
+Retired schemas still show. Links are not fields and are
+not in this output.
 
 ## Options
 
-`--yaml` — print the stored spec, the same YAML that
-`schema add --file` accepts. Use that to copy or
-round-trip a schema.
+`--yaml` — print the YAML field list, the same form that
+`schema add --file` accepts.
 
 ## Output
 
