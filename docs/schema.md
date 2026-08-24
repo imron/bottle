@@ -141,7 +141,10 @@ Types: `text`, `number`, `enum`.
   after fold are rejected.
 - There is no date field type. Time is `at`.
 - Field names: `^[a-z][a-z0-9_]*$`.
-- Schema names: `^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$`.
+- Schema names: one or more field-name idents joined by
+  `.` (`meal`, `nutrition.meal`, `fitness.strength.set`).
+  Empty segments are rejected (`meal.`, `.meal`,
+  `foo..bar`). Dots are a namespace convention only.
 - Link names use the field-name regex. A link name may not
   be a field on that schema, and may not be reserved.
 - Reserved: `id`, `at`, `agent`, `ignored`, `links`.

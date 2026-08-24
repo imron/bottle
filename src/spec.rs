@@ -77,7 +77,7 @@ impl SchemaName {
         if is_schema_name(s) {
             Ok(Self(s.to_string()))
         } else {
-            Err(Error::fail(format!("schema name must be family.kind: {s}")))
+            Err(Error::fail(format!("invalid schema name: {s}")))
         }
     }
 
@@ -217,11 +217,7 @@ pub fn is_ident(s: &str) -> bool {
 }
 
 pub fn is_schema_name(s: &str) -> bool {
-    let mut parts = s.split('.');
-    matches!(
-        (parts.next(), parts.next(), parts.next()),
-        (Some(a), Some(b), None) if is_ident(a) && is_ident(b)
-    )
+    !s.is_empty() && s.split('.').all(is_ident)
 }
 
 pub fn is_reserved(s: &str) -> bool {

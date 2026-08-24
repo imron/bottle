@@ -53,7 +53,32 @@ fn add_rejects_bad_name() {
             file,
         })
         .unwrap_err();
-    assert_fail(err, "family.kind");
+    assert_fail(err, "invalid schema name");
+}
+
+#[test]
+fn add_accepts_one_segment_and_many() {
+    let mut h = harness();
+    h.add_schema("meal", MEAL);
+    h.add_schema("fitness.strength.set", MEAL);
+    let list = h.run_ok(Cmd::SchemaList);
+    assert!(list.contains("meal\tfalse"));
+    assert!(list.contains("fitness.strength.set\tfalse"));
+}
+
+#[test]
+fn add_rejects_empty_segments() {
+    let mut h = harness();
+    for name in ["meal.", ".meal", "foo..bar"] {
+        let file = h.yaml_file(&format!("{name}.yaml"), MEAL);
+        let err = h
+            .run(Cmd::SchemaAdd {
+                name: name.into(),
+                file,
+            })
+            .unwrap_err();
+        assert_fail(err, "invalid schema name");
+    }
 }
 
 #[test]

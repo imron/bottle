@@ -23,8 +23,10 @@ which are required, and which values an enum may take.
 bottle ships with none. You add a schema, then you can
 `log` facts of that type.
 
-The name is `family.kind`, for example `nutrition.meal` or
-`fitness.set`.
+The name is one or more lowercase identifiers separated by
+dots, for example `meal`, `nutrition.meal`, or
+`fitness.strength.set`. Dots are a namespace convention,
+not a requirement.
 
 `list` and `show` are reads. `add` creates a type.
 `add-field` and `add-value` grow a type (you cannot rename
