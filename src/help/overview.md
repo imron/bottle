@@ -44,8 +44,9 @@ database file. If neither is set:
 
 `BOTTLE_DB` — path to the database file.
 
-`BOTTLE_AGENT` — default `--agent` on write. Set it to the
-name of the bot that is logging.
+`BOTTLE_AGENT` — default `--agent` on write. If unset, the
+agent is `bottle`. Set it to the name of the bot that is
+logging.
 
 ## Output
 

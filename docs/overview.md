@@ -99,8 +99,8 @@ without opening sqlite.
   `~/.local/share/bottle/bottle.db`
 - macOS: `~/.config/bottle/bottle.db`
 
-`BOTTLE_AGENT` is the default `--agent` on write. Bots should
-set this to their name.
+`BOTTLE_AGENT` is the default `--agent` on write. If unset,
+the agent is `bottle`. Bots should set this to their name.
 
 Local time is the host computer's timezone. There is no
 timezone flag.

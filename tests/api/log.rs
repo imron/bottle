@@ -1,4 +1,4 @@
-use bottle::Cmd;
+use bottle::{Bottle, Cmd};
 
 use crate::common::{MEAL, assert_fail, assert_usage, harness, tsv_lines};
 
@@ -186,4 +186,40 @@ fn default_agent() {
     let lines = tsv_lines(&ls);
     let agent_idx = lines[0].iter().position(|c| *c == "agent").unwrap();
     assert_eq!(lines[1][agent_idx], "test");
+}
+
+#[test]
+fn unset_agent_defaults_to_bottle() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let db = h.dir.path().join("bottle.db");
+    let mut bottle = Bottle::open(&db, None).unwrap();
+    bottle::execute(
+        &mut bottle,
+        Cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: None,
+            links: vec![],
+            fields: vec![
+                ("when".into(), "breakfast".into()),
+                ("what".into(), "eggs".into()),
+                ("kcal".into(), "1".into()),
+                ("protein".into(), "1".into()),
+                ("carbs".into(), "0".into()),
+            ],
+        },
+    )
+    .unwrap();
+    let ls = h.run_ok(Cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        include_ignored: false,
+    });
+    let lines = tsv_lines(&ls);
+    let agent_idx = lines[0].iter().position(|c| *c == "agent").unwrap();
+    assert_eq!(lines[1][agent_idx], "bottle");
 }

@@ -46,7 +46,7 @@ a colon (`+10:00`). Accepted instants:
 Printed times use this machine's timezone, with an offset.
 
 `--agent NAME` — who wrote the entry. Defaults to
-`BOTTLE_AGENT`. If that is unset, the agent cell is empty.
+`BOTTLE_AGENT`, or `bottle` if that is unset.
 
 `--link name=SCHEMA/ID` — point this entry at another
 existing entry. The name is yours to choose (`session`,

@@ -224,7 +224,9 @@ fn log(
     if kind.retired {
         return Err(Error::fail(format!("schema is retired: {schema}")));
     }
-    let agent = agent.or_else(|| default_agent.map(str::to_string));
+    let agent = agent
+        .or_else(|| default_agent.map(str::to_string))
+        .or_else(|| Some("bottle".to_string()));
     let at = at.unwrap_or_else(Instant::now);
     let values = prepare_fields(&kind.spec, &fields, false)?;
     ensure_links(tx, &kind.spec, &links)?;

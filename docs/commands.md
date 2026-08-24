@@ -129,7 +129,8 @@ bottle log <schema> [--at TIME] [--agent NAME] \
 
 `--at` defaults to now. A date-only `--at` is an error.
 See [time.md](time.md). `--agent` defaults to
-`BOTTLE_AGENT`. Fails if the schema is retired. `--link`
+`BOTTLE_AGENT`, or `bottle` if that is unset. Fails if
+the schema is retired. `--link`
 may repeat with different names. A name once per command.
 The target entry must exist. Prints `id`, `at`, `links`.
 
