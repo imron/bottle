@@ -38,8 +38,8 @@ impl Spec {
         serde_yaml::to_string(self).map_err(|e| Error::Fail(Fail::Yaml(e.to_string())))
     }
 
-    pub fn field(&self, name: &str) -> Option<&Field> {
-        self.fields.iter().find(|f| f.name.as_str() == name)
+    pub fn field(&self, name: &FieldName) -> Option<&Field> {
+        self.fields.iter().find(|f| &f.name == name)
     }
 
     fn canonicalize(&mut self) -> Result<(), Error> {
@@ -94,12 +94,6 @@ impl std::fmt::Display for Identifier {
     }
 }
 
-impl std::borrow::Borrow<str> for Identifier {
-    fn borrow(&self) -> &str {
-        &self.0
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SchemaName(String);
 
@@ -151,12 +145,6 @@ impl FieldName {
 impl std::fmt::Display for FieldName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
-    }
-}
-
-impl std::borrow::Borrow<str> for FieldName {
-    fn borrow(&self) -> &str {
-        &self.0
     }
 }
 

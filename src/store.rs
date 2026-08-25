@@ -5,7 +5,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
-use crate::spec::{EntryRef, FieldType, Link, LinkName, SchemaName, Spec};
+use crate::spec::{EntryRef, FieldName, FieldType, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident, table_name};
 use crate::time::{Range, ToBound};
 
@@ -253,7 +253,10 @@ fn read_entry(
                 ignored = v != 0;
             }
             other => {
-                if let Some(field) = spec.field(other) {
+                let Ok(field_name) = FieldName::parse(other) else {
+                    continue;
+                };
+                if let Some(field) = spec.field(&field_name) {
                     let name = field.name.clone();
                     match field.type_ {
                         FieldType::Number => {

@@ -68,7 +68,7 @@ fn add_field(store: &mut Store, op: SchemaAddField) -> Result<(), Error> {
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
-    if kind.spec.field(op.name.as_str()).is_some() {
+    if kind.spec.field(&op.name).is_some() {
         return Err(Error::Fail(Fail::FieldExists(op.name.clone())));
     }
     let values = if op.type_ == FieldType::Enum {
@@ -147,8 +147,7 @@ fn log(store: &mut Store, default_agent: Option<&Agent>, mut op: Log) -> Result<
     let at = op.at.unwrap_or_else(Instant::now);
     let values = prepare_fields(&kind.spec, &op.fields, false)?;
     ensure_links(store, &kind.spec, &op.links)?;
-    op.links
-        .sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
+    op.links.sort_by(|a, b| a.name.cmp(&b.name));
     let id = store.transaction(|tx| {
         tx.insert_entry(
             &op.schema,
@@ -184,10 +183,10 @@ fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
     }
     let mut unlink_set = HashSet::new();
     for name in &op.unlinks {
-        if !unlink_set.insert(name.as_str()) {
+        if !unlink_set.insert(name) {
             return Err(Error::Usage(Usage::DuplicateUnlink(name.clone())));
         }
-        if op.links.iter().any(|l| l.name.as_str() == name.as_str()) {
+        if op.links.iter().any(|l| &l.name == name) {
             return Err(Error::Usage(Usage::LinkAndUnlink(name.clone())));
         }
     }
@@ -204,8 +203,7 @@ fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
         for name in &op.unlinks {
             tx.delete_link(&op.schema, op.id, name)?;
         }
-        op.links
-            .sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
+        op.links.sort_by(|a, b| a.name.cmp(&b.name));
         for link in &op.links {
             tx.upsert_link(&op.schema, op.id, link)?;
         }
@@ -331,7 +329,7 @@ fn find_entries(store: &Store, q: Query<'_>) -> Result<Outcome, Error> {
 
 fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
     let spec = store.load_schema(&op.schema)?.spec;
-    let Some(f) = spec.field(op.field.as_str()) else {
+    let Some(f) = spec.field(&op.field) else {
         return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
     };
     if f.type_ != FieldType::Number {
@@ -358,7 +356,7 @@ fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
         }
         Some(Group::Time(unit)) => grouped_time(&entries, &op.field, unit),
         Some(Group::Link(name)) => {
-            if spec.field(name.as_str()).is_some() {
+            if field_named(&spec, &name) {
                 return Err(Error::Fail(Fail::LinkNameCollidesWithField(name)));
             }
             grouped_link(&entries, &op.field, name)
@@ -388,7 +386,7 @@ fn grouped_link(entries: &[Entry], field: &FieldName, name: LinkName) -> Result<
         let key = entry
             .links
             .iter()
-            .find(|l| l.name.as_str() == name.as_str())
+            .find(|l| l.name == name)
             .map(|l| l.to.clone());
         *buckets.entry(key).or_insert(Decimal::ZERO) +=
             entry.number(field).unwrap_or(Decimal::ZERO);
@@ -402,7 +400,9 @@ fn grouped_link(entries: &[Entry], field: &FieldName, name: LinkName) -> Result<
 fn resolve_filters(spec: &Spec, filters: &[Clause]) -> Result<Vec<Filter>, Error> {
     let mut out = Vec::new();
     for clause in filters {
-        if let Some(field) = spec.field(clause.name.as_str()) {
+        if let Ok(name) = FieldName::parse(clause.name.as_str())
+            && let Some(field) = spec.field(&name)
+        {
             let value = match field.type_ {
                 FieldType::Number => FieldValue::Number(parse_number(&clause.value)?),
                 FieldType::Enum => FieldValue::Enum(fold_enum(&clause.value)?),
@@ -412,25 +412,31 @@ fn resolve_filters(spec: &Spec, filters: &[Clause]) -> Result<Vec<Filter>, Error
                 name: field.name.clone(),
                 value,
             });
-        } else {
-            let link_name = LinkName::parse(clause.name.as_str())?;
-            let to = EntryRef::parse(&clause.value)?;
-            out.push(Filter::Link {
-                name: link_name,
-                to,
-            });
+            continue;
         }
+        let link_name = LinkName::parse(clause.name.as_str())?;
+        let to = EntryRef::parse(&clause.value)?;
+        out.push(Filter::Link {
+            name: link_name,
+            to,
+        });
     }
     Ok(out)
+}
+
+fn field_named(spec: &Spec, name: &LinkName) -> bool {
+    FieldName::parse(name.as_str())
+        .ok()
+        .is_some_and(|n| spec.field(&n).is_some())
 }
 
 fn ensure_links(store: &Store, spec: &Spec, links: &[Link]) -> Result<(), Error> {
     let mut seen = HashSet::new();
     for link in links {
-        if !seen.insert(link.name.as_str()) {
+        if !seen.insert(&link.name) {
             return Err(Error::Usage(Usage::DuplicateLinkName(link.name.clone())));
         }
-        if spec.field(link.name.as_str()).is_some() {
+        if field_named(spec, &link.name) {
             return Err(Error::Fail(Fail::LinkNameCollidesWithField(
                 link.name.clone(),
             )));
@@ -454,10 +460,10 @@ fn prepare_fields(
     let mut seen = HashSet::new();
     let mut out = HashMap::new();
     for field in fields {
-        if !seen.insert(field.name.as_str()) {
+        if !seen.insert(&field.name) {
             return Err(Error::Usage(Usage::DuplicateField(field.name.clone())));
         }
-        let Some(spec_field) = spec.field(field.name.as_str()) else {
+        let Some(spec_field) = spec.field(&field.name) else {
             return Err(Error::Fail(Fail::UnknownField(field.name.clone())));
         };
         if field.value.is_empty() {
@@ -474,7 +480,7 @@ fn prepare_fields(
     }
     if !partial {
         for spec_field in &spec.fields {
-            if spec_field.required && !out.contains_key(spec_field.name.as_str()) {
+            if spec_field.required && !out.contains_key(&spec_field.name) {
                 return Err(Error::Fail(Fail::MissingRequiredField(
                     spec_field.name.clone(),
                 )));

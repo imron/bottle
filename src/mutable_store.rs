@@ -134,7 +134,7 @@ impl<'a> Tx<'a> {
             placeholders.push(format!("?{}", bind.len() + 1));
             bind.push(
                 values
-                    .get(field.name.as_str())
+                    .get(&field.name)
                     .map(SqlVal::from_field)
                     .unwrap_or(SqlVal::Null),
             );
