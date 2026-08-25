@@ -73,27 +73,30 @@ pub(crate) fn save_spec(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Resu
     Ok(())
 }
 
-pub(crate) fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<u64, Error> {
+pub(crate) fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     let n = tx.conn().execute(
         "UPDATE schemas SET retired = 1 WHERE name = ?1",
         [name.as_str()],
     )?;
-    Ok(n as u64)
+    if n == 0 {
+        return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
+    }
+    Ok(())
 }
 
-pub(crate) fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<u64, Error> {
+pub(crate) fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     let n = tx
         .conn()
         .execute("DELETE FROM schemas WHERE name = ?1", [name.as_str()])?;
     if n == 0 {
-        return Ok(0);
+        return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
     }
     let table = table_name(name);
     tx.conn()
         .execute("DELETE FROM links WHERE from_schema = ?1", [name.as_str()])?;
     tx.conn()
         .execute_batch(&format!("DROP TABLE {}", quote_ident(&table)))?;
-    Ok(n as u64)
+    Ok(())
 }
 
 pub(crate) fn insert_entry(

@@ -118,12 +118,7 @@ fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
 }
 
 fn retire(db: &mut Db, op: SchemaRetire) -> Result<(), Error> {
-    db.transaction(|tx| {
-        if mutable_store::retire(tx, &op.name)? == 0 {
-            return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
-        }
-        Ok(())
-    })
+    db.transaction(|tx| mutable_store::retire(tx, &op.name))
 }
 
 fn drop_schema(db: &mut Db, op: SchemaDrop) -> Result<(), Error> {
@@ -131,10 +126,7 @@ fn drop_schema(db: &mut Db, op: SchemaDrop) -> Result<(), Error> {
         if mutable_store::inbound_link_count(tx, &op.name)? > 0 {
             return Err(Error::Fail(Fail::SchemaHasInboundLinks(op.name.clone())));
         }
-        if mutable_store::drop_schema(tx, &op.name)? == 0 {
-            return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
-        }
-        Ok(())
+        mutable_store::drop_schema(tx, &op.name)
     })
 }
 
