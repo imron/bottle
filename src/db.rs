@@ -71,7 +71,8 @@ impl<'a> Tx<'a> {
     }
 
     fn commit(self) -> Result<(), Error> {
-        self.inner.commit().map_err(Error::from)
+        self.inner.commit()?;
+        Ok(())
     }
 
     pub(crate) fn conn(&self) -> &Connection {
