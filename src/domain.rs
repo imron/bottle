@@ -16,8 +16,9 @@ use crate::spec::{
 };
 use crate::store::{self, Find};
 use crate::time::{self, Instant, Period, Range};
+use jiff::tz::TimeZone;
 
-pub fn execute(db: &mut Db, agent: &Agent, op: Op) -> Result<Outcome, Error> {
+pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outcome, Error> {
     match op {
         Op::SchemaList => Ok(Outcome::Schemas(Schemas {
             schemas: store::list_schemas(db)?,
@@ -46,9 +47,9 @@ pub fn execute(db: &mut Db, agent: &Agent, op: Op) -> Result<Outcome, Error> {
         Op::Log(op) => log(db, agent, op),
         Op::List(op) => list(db, op),
         Op::Get(op) => get(db, op),
-        Op::Sum(op) => sum(db, op),
+        Op::Sum(op) => sum(db, op, tz),
         Op::Last(op) => last(db, op),
-        Op::Today(op) => today(db, op),
+        Op::Today(op) => today(db, op, tz),
         Op::Amend(op) => amend(db, op),
         Op::Ignore(op) => ignore(db, op),
     }
@@ -266,12 +267,12 @@ fn last(db: &Db, op: Last) -> Result<Outcome, Error> {
     }
 }
 
-fn today(db: &Db, op: Today) -> Result<Outcome, Error> {
+fn today(db: &Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
     find_entries(
         db,
         Query {
             schema: &op.schema,
-            range: Range::today()?,
+            range: Range::today(tz)?,
             agent: op.agent.as_ref().map(Agent::as_str),
             filters: &op.filters,
             include_ignored: false,
@@ -325,7 +326,7 @@ fn find_entries(db: &Db, q: Query<'_>) -> Result<Outcome, Error> {
     Ok(Outcome::Entries(Entries { spec, entries }))
 }
 
-fn sum(db: &Db, op: Sum) -> Result<Outcome, Error> {
+fn sum(db: &Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
     let spec = store::load_schema(db, &op.schema)?.spec;
     let Some(f) = spec.field(&op.field) else {
         return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
@@ -355,7 +356,7 @@ fn sum(db: &Db, op: Sum) -> Result<Outcome, Error> {
                 value: total,
             }))
         }
-        Some(Group::Time(unit)) => grouped_time(&entries, &op.field, unit),
+        Some(Group::Time(unit)) => grouped_time(&entries, &op.field, unit, tz),
         Some(Group::Link(name)) => {
             if field_named(&spec, &name) {
                 return Err(Error::Fail(Fail::LinkNameCollidesWithField(name)));
@@ -369,10 +370,11 @@ fn grouped_time(
     entries: &[Entry],
     field: &FieldName,
     unit: crate::spec::TimePeriod,
+    tz: &TimeZone,
 ) -> Result<Outcome, Error> {
     let mut buckets: BTreeMap<Period, Decimal> = BTreeMap::new();
     for entry in entries {
-        let k = time::period(unit, entry.at);
+        let k = time::period(unit, entry.at, tz);
         *buckets.entry(k).or_insert(Decimal::ZERO) += entry.number(field).unwrap_or(Decimal::ZERO);
     }
     Ok(Outcome::GroupedTime(GroupedTime {

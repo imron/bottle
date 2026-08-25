@@ -23,23 +23,32 @@ impl Instant {
     }
 }
 
-pub fn parse_instant(input: &str) -> Result<Instant, Error> {
-    match parse(input)? {
+pub fn zone(name: Option<&str>) -> Result<TimeZone, Error> {
+    match name {
+        None => Ok(TimeZone::system()),
+        Some(name) => {
+            TimeZone::get(name).map_err(|_| Error::Fail(Fail::UnknownTimeZone(name.to_string())))
+        }
+    }
+}
+
+pub fn parse_instant(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
+    match parse(input, tz)? {
         Parsed::Instant(ts) => Ok(Instant(ts)),
         Parsed::Date(_) => Err(Error::Usage(Usage::DateOnlyNotInstant)),
     }
 }
 
-pub fn display_local(at: Instant) -> Result<String, Error> {
-    let zoned = at.0.to_zoned(system_tz());
+pub fn display_local(at: Instant, tz: &TimeZone) -> Result<String, Error> {
+    let zoned = at.0.to_zoned(tz.clone());
     strtime::format("%Y-%m-%dT%H:%M:%S%:z", &zoned)
         .map_err(|e| Error::Fail(Fail::Time(e.to_string())))
 }
 
-fn from_bound(input: &str) -> Result<Instant, Error> {
-    match parse(input)? {
+fn from_bound(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
+    match parse(input, tz)? {
         Parsed::Instant(ts) => Ok(Instant(ts)),
-        Parsed::Date(date) => Ok(Instant(date_midnight(date)?)),
+        Parsed::Date(date) => Ok(Instant(date_midnight(date, tz)?)),
     }
 }
 
@@ -56,20 +65,20 @@ pub struct Range {
 }
 
 impl Range {
-    pub fn parse(from: Option<&str>, to: Option<&str>) -> Result<Self, Error> {
+    pub fn parse(from: Option<&str>, to: Option<&str>, tz: &TimeZone) -> Result<Self, Error> {
         Ok(Self {
-            from: from.map(from_bound).transpose()?,
-            to: to.map(to_bound).transpose()?,
+            from: from.map(|s| from_bound(s, tz)).transpose()?,
+            to: to.map(|s| to_bound(s, tz)).transpose()?,
         })
     }
 
-    pub fn today() -> Result<Self, Error> {
-        let today = Timestamp::now().to_zoned(system_tz()).date();
-        let start = Instant(date_midnight(today)?);
+    pub fn today(tz: &TimeZone) -> Result<Self, Error> {
+        let today = Timestamp::now().to_zoned(tz.clone()).date();
+        let start = Instant(date_midnight(today, tz)?);
         let next = today
             .checked_add(jiff::Span::new().days(1))
             .map_err(|e| Error::Fail(Fail::Time(e.to_string())))?;
-        let end = Instant(date_midnight(next)?);
+        let end = Instant(date_midnight(next, tz)?);
         Ok(Self {
             from: Some(start),
             to: Some(ToBound::Exclusive(end)),
@@ -77,20 +86,20 @@ impl Range {
     }
 }
 
-fn to_bound(input: &str) -> Result<ToBound, Error> {
-    match parse(input)? {
+fn to_bound(input: &str, tz: &TimeZone) -> Result<ToBound, Error> {
+    match parse(input, tz)? {
         Parsed::Instant(ts) => Ok(ToBound::Inclusive(Instant(ts))),
         Parsed::Date(date) => {
             let next = date
                 .checked_add(jiff::Span::new().days(1))
                 .map_err(|e| Error::Fail(Fail::Time(e.to_string())))?;
-            Ok(ToBound::Exclusive(Instant(date_midnight(next)?)))
+            Ok(ToBound::Exclusive(Instant(date_midnight(next, tz)?)))
         }
     }
 }
 
-pub fn local_civil(at: Instant) -> Date {
-    at.0.to_zoned(system_tz()).date()
+pub fn local_civil(at: Instant, tz: &TimeZone) -> Date {
+    at.0.to_zoned(tz.clone()).date()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -101,8 +110,8 @@ pub enum Period {
     Year(i16),
 }
 
-pub fn period(unit: TimePeriod, at: Instant) -> Period {
-    let date = local_civil(at);
+pub fn period(unit: TimePeriod, at: Instant, tz: &TimeZone) -> Period {
+    let date = local_civil(at, tz);
     match unit {
         TimePeriod::Day => Period::Day(date),
         TimePeriod::Month => Period::Month {
@@ -125,7 +134,7 @@ enum Parsed {
     Date(Date),
 }
 
-fn parse(input: &str) -> Result<Parsed, Error> {
+fn parse(input: &str, tz: &TimeZone) -> Result<Parsed, Error> {
     if input.contains(' ') {
         return Err(Error::Usage(Usage::TimeMustUseT));
     }
@@ -146,7 +155,7 @@ fn parse(input: &str) -> Result<Parsed, Error> {
             .and_then(|p| p.to_datetime())
             .map_err(|_| Error::Usage(Usage::InvalidTime(input.to_string())))?;
         let zoned = dt
-            .to_zoned(system_tz())
+            .to_zoned(tz.clone())
             .map_err(|e| Error::Usage(Usage::InvalidTime(e.to_string())))?;
         return Ok(Parsed::Instant(zoned.timestamp()));
     }
@@ -189,12 +198,8 @@ fn looks_like_hms(s: &str) -> bool {
         && s.bytes().all(|b| b == b':' || b.is_ascii_digit())
 }
 
-fn date_midnight(date: Date) -> Result<Timestamp, Error> {
-    date.to_zoned(system_tz())
+fn date_midnight(date: Date, tz: &TimeZone) -> Result<Timestamp, Error> {
+    date.to_zoned(tz.clone())
         .map(|z| z.timestamp())
         .map_err(|e| Error::Fail(Fail::Time(e.to_string())))
-}
-
-fn system_tz() -> TimeZone {
-    TimeZone::system()
 }

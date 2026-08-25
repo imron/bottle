@@ -2,6 +2,8 @@ pub mod cmd;
 mod error;
 mod tsv;
 
+use jiff::tz::TimeZone;
+
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, Clause, Entries, FieldInput, FieldValue, Get, GroupedLink, GroupedTime, Ignore,
@@ -24,7 +26,7 @@ pub struct Request {
     pub show_ignored: bool,
 }
 
-pub fn parse(cmd: Cmd) -> Result<Request, Error> {
+pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Request, Error> {
     let style = match &cmd {
         Cmd::SchemaShow(cmd::SchemaShow { yaml: true, .. }) => Style::Yaml,
         _ => Style::Tsv,
@@ -38,35 +40,31 @@ pub fn parse(cmd: Cmd) -> Result<Request, Error> {
             })
     );
     Ok(Request {
-        op: Op::try_from(cmd)?,
+        op: op_from_cmd(cmd, tz)?,
         style,
         show_ignored,
     })
 }
 
-impl TryFrom<Cmd> for Op {
-    type Error = Error;
-
-    fn try_from(cmd: Cmd) -> Result<Self, Error> {
-        Ok(match cmd {
-            Cmd::Help(_) => return Err(Error::Fail(Fail::HelpNotAnOp)),
-            Cmd::SchemaList => Op::SchemaList,
-            Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.try_into()?),
-            Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.try_into()?),
-            Cmd::SchemaAddField(cmd) => Op::SchemaAddField(cmd.try_into()?),
-            Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(cmd.try_into()?),
-            Cmd::SchemaRetire(cmd) => Op::SchemaRetire(cmd.try_into()?),
-            Cmd::SchemaDrop(cmd) => Op::SchemaDrop(cmd.try_into()?),
-            Cmd::Log(cmd) => Op::Log(cmd.try_into()?),
-            Cmd::Ls(cmd) => Op::List(cmd.try_into()?),
-            Cmd::Get(cmd) => Op::Get(cmd.try_into()?),
-            Cmd::Sum(cmd) => Op::Sum(cmd.try_into()?),
-            Cmd::Last(cmd) => Op::Last(cmd.try_into()?),
-            Cmd::Today(cmd) => Op::Today(cmd.try_into()?),
-            Cmd::Amend(cmd) => Op::Amend(cmd.try_into()?),
-            Cmd::Ignore(cmd) => Op::Ignore(cmd.try_into()?),
-        })
-    }
+fn op_from_cmd(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
+    Ok(match cmd {
+        Cmd::Help(_) => return Err(Error::Fail(Fail::HelpNotAnOp)),
+        Cmd::SchemaList => Op::SchemaList,
+        Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.try_into()?),
+        Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.try_into()?),
+        Cmd::SchemaAddField(cmd) => Op::SchemaAddField(cmd.try_into()?),
+        Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(cmd.try_into()?),
+        Cmd::SchemaRetire(cmd) => Op::SchemaRetire(cmd.try_into()?),
+        Cmd::SchemaDrop(cmd) => Op::SchemaDrop(cmd.try_into()?),
+        Cmd::Log(cmd) => Op::Log(log_from(cmd, tz)?),
+        Cmd::Ls(cmd) => Op::List(list_from(cmd, tz)?),
+        Cmd::Get(cmd) => Op::Get(cmd.try_into()?),
+        Cmd::Sum(cmd) => Op::Sum(sum_from(cmd, tz)?),
+        Cmd::Last(cmd) => Op::Last(cmd.try_into()?),
+        Cmd::Today(cmd) => Op::Today(cmd.try_into()?),
+        Cmd::Amend(cmd) => Op::Amend(amend_from(cmd, tz)?),
+        Cmd::Ignore(cmd) => Op::Ignore(cmd.try_into()?),
+    })
 }
 
 impl TryFrom<cmd::SchemaShow> for SchemaShow {
@@ -137,32 +135,28 @@ impl TryFrom<cmd::SchemaDrop> for SchemaDrop {
     }
 }
 
-impl TryFrom<cmd::Log> for Log {
-    type Error = Error;
-
-    fn try_from(cmd: cmd::Log) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            at: cmd.at.as_deref().map(time::parse_instant).transpose()?,
-            agent: cmd.agent.map(Agent::new),
-            links: parse_links(cmd.links)?,
-            fields: parse_fields(cmd.fields)?,
-        })
-    }
+fn log_from(cmd: cmd::Log, tz: &TimeZone) -> Result<Log, Error> {
+    Ok(Log {
+        schema: SchemaName::parse(&cmd.schema)?,
+        at: cmd
+            .at
+            .as_deref()
+            .map(|s| time::parse_instant(s, tz))
+            .transpose()?,
+        agent: cmd.agent.map(Agent::new),
+        links: parse_links(cmd.links)?,
+        fields: parse_fields(cmd.fields)?,
+    })
 }
 
-impl TryFrom<cmd::Ls> for List {
-    type Error = Error;
-
-    fn try_from(cmd: cmd::Ls) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref())?,
-            agent: cmd.agent.map(Agent::new),
-            filters: parse_clauses(cmd.wheres)?,
-            include_ignored: cmd.include_ignored,
-        })
-    }
+fn list_from(cmd: cmd::Ls, tz: &TimeZone) -> Result<List, Error> {
+    Ok(List {
+        schema: SchemaName::parse(&cmd.schema)?,
+        range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
+        agent: cmd.agent.map(Agent::new),
+        filters: parse_clauses(cmd.wheres)?,
+        include_ignored: cmd.include_ignored,
+    })
 }
 
 impl TryFrom<cmd::Get> for Get {
@@ -176,23 +170,19 @@ impl TryFrom<cmd::Get> for Get {
     }
 }
 
-impl TryFrom<cmd::Sum> for Sum {
-    type Error = Error;
-
-    fn try_from(cmd: cmd::Sum) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            field: FieldName::parse(&cmd.field)?,
-            range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref())?,
-            agent: cmd.agent.map(Agent::new),
-            filters: parse_clauses(cmd.wheres)?,
-            group: cmd
-                .group
-                .as_deref()
-                .map(crate::spec::Group::parse)
-                .transpose()?,
-        })
-    }
+fn sum_from(cmd: cmd::Sum, tz: &TimeZone) -> Result<Sum, Error> {
+    Ok(Sum {
+        schema: SchemaName::parse(&cmd.schema)?,
+        field: FieldName::parse(&cmd.field)?,
+        range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
+        agent: cmd.agent.map(Agent::new),
+        filters: parse_clauses(cmd.wheres)?,
+        group: cmd
+            .group
+            .as_deref()
+            .map(crate::spec::Group::parse)
+            .transpose()?,
+    })
 }
 
 impl TryFrom<cmd::Last> for Last {
@@ -219,20 +209,20 @@ impl TryFrom<cmd::Today> for Today {
     }
 }
 
-impl TryFrom<cmd::Amend> for Amend {
-    type Error = Error;
-
-    fn try_from(cmd: cmd::Amend) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            id: cmd.id,
-            at: cmd.at.as_deref().map(time::parse_instant).transpose()?,
-            agent: cmd.agent.map(Agent::new),
-            links: parse_links(cmd.links)?,
-            unlinks: parse_unlinks(cmd.unlinks)?,
-            fields: parse_fields(cmd.fields)?,
-        })
-    }
+fn amend_from(cmd: cmd::Amend, tz: &TimeZone) -> Result<Amend, Error> {
+    Ok(Amend {
+        schema: SchemaName::parse(&cmd.schema)?,
+        id: cmd.id,
+        at: cmd
+            .at
+            .as_deref()
+            .map(|s| time::parse_instant(s, tz))
+            .transpose()?,
+        agent: cmd.agent.map(Agent::new),
+        links: parse_links(cmd.links)?,
+        unlinks: parse_unlinks(cmd.unlinks)?,
+        fields: parse_fields(cmd.fields)?,
+    })
 }
 
 impl TryFrom<cmd::Ignore> for Ignore {
@@ -246,7 +236,12 @@ impl TryFrom<cmd::Ignore> for Ignore {
     }
 }
 
-pub fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Result<String, Error> {
+pub fn render(
+    style: Style,
+    show_ignored: bool,
+    outcome: &Outcome,
+    tz: &TimeZone,
+) -> Result<String, Error> {
     match outcome {
         Outcome::Empty => Ok(String::new()),
         Outcome::Schemas(Schemas { schemas }) => {
@@ -260,16 +255,18 @@ pub fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Result<Str
             Style::Yaml => spec.to_yaml(),
             Style::Tsv => render_spec(spec),
         },
-        Outcome::Entries(Entries { spec, entries }) => render_entries(spec, entries, show_ignored),
+        Outcome::Entries(Entries { spec, entries }) => {
+            render_entries(spec, entries, show_ignored, tz)
+        }
         Outcome::Posted(Posted { id, at, links }) => {
-            let at = time::display_local(*at)?;
+            let at = time::display_local(*at, tz)?;
             Ok(tsv::table(
                 &["id", "at", "links"],
                 &[vec![id.to_string(), at, render_links(links)]],
             ))
         }
         Outcome::Stamp(Stamp { id, at }) => {
-            let at = time::display_local(*at)?;
+            let at = time::display_local(*at, tz)?;
             Ok(tsv::table(&["id", "at"], &[vec![id.to_string(), at]]))
         }
         Outcome::Total(Total { field, value }) => Ok(tsv::table(
@@ -372,6 +369,7 @@ fn render_entries(
     spec: &Spec,
     entries: &[crate::ledger::Entry],
     show_ignored: bool,
+    tz: &TimeZone,
 ) -> Result<String, Error> {
     let mut headers = vec!["id".to_string(), "at".to_string(), "links".to_string()];
     for field in &spec.fields {
@@ -386,7 +384,7 @@ fn render_entries(
     for entry in entries {
         let mut cells = vec![
             entry.id.to_string(),
-            time::display_local(entry.at)?,
+            time::display_local(entry.at, tz)?,
             render_links(&entry.links),
         ];
         for field in &spec.fields {

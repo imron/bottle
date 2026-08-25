@@ -63,6 +63,7 @@ pub enum Fail {
     CorruptLinkSchema(String),
     CorruptStoredTime(String),
     HomeNotSet,
+    UnknownTimeZone(String),
     DbPathRequired,
     HelpNotAnOp,
     Store(String),

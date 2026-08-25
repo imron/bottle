@@ -193,7 +193,7 @@ fn unset_agent_defaults_to_bottle() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
     let db = h.dir.path().join("bottle.db");
-    let mut bottle = Bottle::open(&db, None).unwrap();
+    let mut bottle = Bottle::open(&db, None, Some(crate::common::TZ)).unwrap();
     bottle::execute(
         &mut bottle,
         Cmd::Log(cmd::Log {

@@ -69,6 +69,7 @@ fn fail_message(err: &Fail) -> String {
         Fail::CorruptLinkSchema(name) => format!("corrupt link schema: {name}"),
         Fail::CorruptStoredTime(raw) => format!("corrupt stored time: {raw}"),
         Fail::HomeNotSet => "HOME is not set".into(),
+        Fail::UnknownTimeZone(name) => format!("unknown timezone: {name}"),
         Fail::DbPathRequired => "db path required".into(),
         Fail::HelpNotAnOp => "help is not a ledger operation".into(),
     }

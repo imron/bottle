@@ -1,10 +1,9 @@
 use std::path::PathBuf;
-use std::sync::Once;
 
 use bottle::{Bottle, Cmd, Error, cmd};
 use tempfile::TempDir;
 
-static PIN_TZ: Once = Once::new();
+pub const TZ: &str = "Australia/Sydney";
 
 pub struct Harness {
     pub dir: TempDir,
@@ -12,15 +11,9 @@ pub struct Harness {
 }
 
 pub fn harness() -> Harness {
-    PIN_TZ.call_once(|| {
-        // Safety: set once before any jiff system-zone read in these tests.
-        unsafe {
-            std::env::set_var("TZ", "Australia/Sydney");
-        }
-    });
     let dir = TempDir::new().unwrap();
     let db = dir.path().join("bottle.db");
-    let bottle = Bottle::open(&db, Some("test".into())).unwrap();
+    let bottle = Bottle::open(&db, Some("test".into()), Some(TZ)).unwrap();
     Harness { dir, bottle }
 }
 
