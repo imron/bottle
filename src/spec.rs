@@ -151,12 +151,6 @@ impl SchemaName {
 
 string_newtype!(SchemaName, from_str);
 
-impl AsRef<str> for SchemaName {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FieldName(String);
 
@@ -174,12 +168,6 @@ impl FieldName {
 
 string_newtype!(FieldName, from_str);
 
-impl AsRef<str> for FieldName {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LinkName(String);
 
@@ -196,12 +184,6 @@ impl LinkName {
 }
 
 string_newtype!(LinkName, from_str);
-
-impl AsRef<str> for LinkName {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EnumValue(String);

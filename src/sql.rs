@@ -32,12 +32,6 @@ impl SqlVal {
     }
 }
 
-impl rusqlite::ToSql for SqlVal {
-    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(self.as_param())
-    }
-}
-
 pub(crate) fn sql_type(t: FieldType) -> &'static str {
     match t {
         FieldType::Number | FieldType::Text | FieldType::Enum => "TEXT",
