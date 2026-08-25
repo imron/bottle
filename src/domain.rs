@@ -2,67 +2,68 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use rust_decimal::Decimal;
 
+use crate::db::{Db, Tx};
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, Clause, Entries, Entry, FieldInput, FieldValue, Filter, Get, GroupedLink,
     GroupedTime, Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField,
     SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
-use crate::mutable_store::Tx;
+use crate::mutable_store;
 use crate::spec::{
     EntryRef, Field, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec, fold_enum,
     fold_enum_values, parse_number,
 };
-use crate::store::{Find, Store};
+use crate::store::{self, Find};
 use crate::time::{self, Instant, Period, Range};
 
-pub(crate) fn execute(store: &mut Store, agent: &Agent, op: Op) -> Result<Outcome, Error> {
+pub(crate) fn execute(db: &mut Db, agent: &Agent, op: Op) -> Result<Outcome, Error> {
     match op {
         Op::SchemaList => Ok(Outcome::Schemas(Schemas {
-            schemas: store.list_schemas()?,
+            schemas: store::list_schemas(db)?,
         })),
-        Op::SchemaShow(op) => show_schema(store, op),
+        Op::SchemaShow(op) => show_schema(db, op),
         Op::SchemaAdd(op) => {
-            add_schema(store, op)?;
+            add_schema(db, op)?;
             Ok(Outcome::Empty)
         }
         Op::SchemaAddField(op) => {
-            add_field(store, op)?;
+            add_field(db, op)?;
             Ok(Outcome::Empty)
         }
         Op::SchemaAddValue(op) => {
-            add_value(store, op)?;
+            add_value(db, op)?;
             Ok(Outcome::Empty)
         }
-        Op::SchemaRetire(op) => store.transaction(|tx| {
+        Op::SchemaRetire(op) => db.transaction(|tx| {
             retire(tx, &op)?;
             Ok(Outcome::Empty)
         }),
-        Op::SchemaDrop(op) => store.transaction(|tx| {
+        Op::SchemaDrop(op) => db.transaction(|tx| {
             drop_schema(tx, &op)?;
             Ok(Outcome::Empty)
         }),
-        Op::Log(op) => log(store, agent, op),
-        Op::List(op) => list(store, op),
-        Op::Get(op) => get(store, op),
-        Op::Sum(op) => sum(store, op),
-        Op::Last(op) => last(store, op),
-        Op::Today(op) => today(store, op),
-        Op::Amend(op) => amend(store, op),
-        Op::Ignore(op) => ignore(store, op),
+        Op::Log(op) => log(db, agent, op),
+        Op::List(op) => list(db, op),
+        Op::Get(op) => get(db, op),
+        Op::Sum(op) => sum(db, op),
+        Op::Last(op) => last(db, op),
+        Op::Today(op) => today(db, op),
+        Op::Amend(op) => amend(db, op),
+        Op::Ignore(op) => ignore(db, op),
     }
 }
 
-fn show_schema(store: &Store, op: SchemaShow) -> Result<Outcome, Error> {
-    Ok(Outcome::Spec(store.load_schema(&op.name)?.spec))
+fn show_schema(db: &Db, op: SchemaShow) -> Result<Outcome, Error> {
+    Ok(Outcome::Spec(store::load_schema(db, &op.name)?.spec))
 }
 
-fn add_schema(store: &mut Store, op: SchemaAdd) -> Result<(), Error> {
-    store.transaction(|tx| tx.insert_schema(&op.name, &op.spec))
+fn add_schema(db: &mut Db, op: SchemaAdd) -> Result<(), Error> {
+    db.transaction(|tx| mutable_store::insert_schema(tx, &op.name, &op.spec))
 }
 
-fn add_field(store: &mut Store, op: SchemaAddField) -> Result<(), Error> {
-    let mut kind = store.load_schema(&op.schema)?;
+fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
+    let mut kind = store::load_schema(db, &op.schema)?;
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
@@ -89,15 +90,15 @@ fn add_field(store: &mut Store, op: SchemaAddField) -> Result<(), Error> {
         required,
         values,
     };
-    store.transaction(|tx| {
-        tx.add_column(&op.schema, &field, op.default.as_deref())?;
+    db.transaction(|tx| {
+        mutable_store::add_column(tx, &op.schema, &field, op.default.as_deref())?;
         kind.spec.fields.push(field);
-        tx.save_spec(&op.schema, &kind.spec)
+        mutable_store::save_spec(tx, &op.schema, &kind.spec)
     })
 }
 
-fn add_value(store: &mut Store, op: SchemaAddValue) -> Result<(), Error> {
-    let mut kind = store.load_schema(&op.schema)?;
+fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
+    let mut kind = store::load_schema(db, &op.schema)?;
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
@@ -113,38 +114,39 @@ fn add_value(store: &mut Store, op: SchemaAddValue) -> Result<(), Error> {
         return Err(Error::Fail(Fail::EnumValueExists(folded)));
     }
     values.push(folded);
-    store.transaction(|tx| tx.save_spec(&op.schema, &kind.spec))
+    db.transaction(|tx| mutable_store::save_spec(tx, &op.schema, &kind.spec))
 }
 
 fn retire(tx: &mut Tx<'_>, op: &SchemaRetire) -> Result<(), Error> {
-    if tx.retire(&op.name)? == 0 {
+    if mutable_store::retire(tx, &op.name)? == 0 {
         return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
     }
     Ok(())
 }
 
 fn drop_schema(tx: &mut Tx<'_>, op: &SchemaDrop) -> Result<(), Error> {
-    if !tx.schema_exists(&op.name)? {
+    if !mutable_store::schema_exists(tx, &op.name)? {
         return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
     }
-    if tx.inbound_link_count(&op.name)? > 0 {
+    if mutable_store::inbound_link_count(tx, &op.name)? > 0 {
         return Err(Error::Fail(Fail::SchemaHasInboundLinks(op.name.clone())));
     }
-    tx.drop_schema(&op.name)
+    mutable_store::drop_schema(tx, &op.name)
 }
 
-fn log(store: &mut Store, agent: &Agent, mut op: Log) -> Result<Outcome, Error> {
-    let kind = store.load_schema(&op.schema)?;
+fn log(db: &mut Db, agent: &Agent, mut op: Log) -> Result<Outcome, Error> {
+    let kind = store::load_schema(db, &op.schema)?;
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
     let agent = op.agent.as_ref().unwrap_or(agent);
     let at = op.at.unwrap_or_else(Instant::now);
     let values = prepare_fields(&kind.spec, &op.fields, false)?;
-    ensure_links(store, &kind.spec, &op.links)?;
+    ensure_links(db, &kind.spec, &op.links)?;
     op.links.sort_by(|a, b| a.name.cmp(&b.name));
-    let id = store.transaction(|tx| {
-        tx.insert_entry(
+    let id = db.transaction(|tx| {
+        mutable_store::insert_entry(
+            tx,
             &op.schema,
             &kind.spec,
             at,
@@ -160,7 +162,7 @@ fn log(store: &mut Store, agent: &Agent, mut op: Log) -> Result<Outcome, Error> 
     }))
 }
 
-fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
+fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
     if op.at.is_none()
         && op.agent.is_none()
         && op.links.is_empty()
@@ -169,8 +171,8 @@ fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
     {
         return Err(Error::Usage(Usage::AmendEmpty));
     }
-    let kind = store.load_schema(&op.schema)?;
-    if store.get_entry(&op.schema, &kind.spec, op.id)?.is_none() {
+    let kind = store::load_schema(db, &op.schema)?;
+    if store::get_entry(db, &op.schema, &kind.spec, op.id)?.is_none() {
         return Err(Error::Fail(Fail::EntryNotFound {
             schema: op.schema.clone(),
             id: op.id,
@@ -186,9 +188,10 @@ fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
         }
     }
     let values = prepare_fields(&kind.spec, &op.fields, true)?;
-    ensure_links(store, &kind.spec, &op.links)?;
-    store.transaction(|tx| {
-        tx.update_entry(
+    ensure_links(db, &kind.spec, &op.links)?;
+    db.transaction(|tx| {
+        mutable_store::update_entry(
+            tx,
             &op.schema,
             op.id,
             op.at,
@@ -196,15 +199,14 @@ fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
             &values,
         )?;
         for name in &op.unlinks {
-            tx.delete_link(&op.schema, op.id, name)?;
+            mutable_store::delete_link(tx, &op.schema, op.id, name)?;
         }
         op.links.sort_by(|a, b| a.name.cmp(&b.name));
         for link in &op.links {
-            tx.upsert_link(&op.schema, op.id, link)?;
+            mutable_store::upsert_link(tx, &op.schema, op.id, link)?;
         }
-        let entry = tx
-            .get_entry(&op.schema, &kind.spec, op.id)?
-            .ok_or_else(|| {
+        let entry =
+            mutable_store::get_entry(tx, &op.schema, &kind.spec, op.id)?.ok_or_else(|| {
                 Error::Fail(Fail::EntryNotFound {
                     schema: op.schema.clone(),
                     id: op.id,
@@ -218,24 +220,24 @@ fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
     })
 }
 
-fn ignore(store: &mut Store, op: Ignore) -> Result<Outcome, Error> {
-    let spec = store.load_schema(&op.schema)?.spec;
-    let Some(entry) = store.get_entry(&op.schema, &spec, op.id)? else {
+fn ignore(db: &mut Db, op: Ignore) -> Result<Outcome, Error> {
+    let spec = store::load_schema(db, &op.schema)?.spec;
+    let Some(entry) = store::get_entry(db, &op.schema, &spec, op.id)? else {
         return Err(Error::Fail(Fail::EntryNotFound {
             schema: op.schema.clone(),
             id: op.id,
         }));
     };
-    store.transaction(|tx| tx.set_ignored(&op.schema, op.id))?;
+    db.transaction(|tx| mutable_store::set_ignored(tx, &op.schema, op.id))?;
     Ok(Outcome::Stamp(Stamp {
         id: op.id,
         at: entry.at,
     }))
 }
 
-fn get(store: &Store, op: Get) -> Result<Outcome, Error> {
-    let spec = store.load_schema(&op.schema)?.spec;
-    let Some(entry) = store.get_entry(&op.schema, &spec, op.id)? else {
+fn get(db: &Db, op: Get) -> Result<Outcome, Error> {
+    let spec = store::load_schema(db, &op.schema)?.spec;
+    let Some(entry) = store::get_entry(db, &op.schema, &spec, op.id)? else {
         return Err(Error::Fail(Fail::EntryNotFound {
             schema: op.schema.clone(),
             id: op.id,
@@ -247,9 +249,9 @@ fn get(store: &Store, op: Get) -> Result<Outcome, Error> {
     }))
 }
 
-fn last(store: &Store, op: Last) -> Result<Outcome, Error> {
+fn last(db: &Db, op: Last) -> Result<Outcome, Error> {
     let outcome = find_entries(
-        store,
+        db,
         Query {
             schema: &op.schema,
             range: Range::default(),
@@ -268,9 +270,9 @@ fn last(store: &Store, op: Last) -> Result<Outcome, Error> {
     }
 }
 
-fn today(store: &Store, op: Today) -> Result<Outcome, Error> {
+fn today(db: &Db, op: Today) -> Result<Outcome, Error> {
     find_entries(
-        store,
+        db,
         Query {
             schema: &op.schema,
             range: Range::today()?,
@@ -283,9 +285,9 @@ fn today(store: &Store, op: Today) -> Result<Outcome, Error> {
     )
 }
 
-fn list(store: &Store, op: List) -> Result<Outcome, Error> {
+fn list(db: &Db, op: List) -> Result<Outcome, Error> {
     find_entries(
-        store,
+        db,
         Query {
             schema: &op.schema,
             range: op.range,
@@ -308,24 +310,27 @@ struct Query<'a> {
     limit: Option<usize>,
 }
 
-fn find_entries(store: &Store, q: Query<'_>) -> Result<Outcome, Error> {
-    let spec = store.load_schema(q.schema)?.spec;
+fn find_entries(db: &Db, q: Query<'_>) -> Result<Outcome, Error> {
+    let spec = store::load_schema(db, q.schema)?.spec;
     let resolved = resolve_filters(&spec, q.filters)?;
-    let entries = store.find(Find {
-        schema: q.schema,
-        spec: &spec,
-        range: q.range,
-        agent: q.agent,
-        include_ignored: q.include_ignored,
-        filters: &resolved,
-        order: q.order,
-        limit: q.limit,
-    })?;
+    let entries = store::find(
+        db,
+        Find {
+            schema: q.schema,
+            spec: &spec,
+            range: q.range,
+            agent: q.agent,
+            include_ignored: q.include_ignored,
+            filters: &resolved,
+            order: q.order,
+            limit: q.limit,
+        },
+    )?;
     Ok(Outcome::Entries(Entries { spec, entries }))
 }
 
-fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
-    let spec = store.load_schema(&op.schema)?.spec;
+fn sum(db: &Db, op: Sum) -> Result<Outcome, Error> {
+    let spec = store::load_schema(db, &op.schema)?.spec;
     let Some(f) = spec.field(&op.field) else {
         return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
     };
@@ -333,16 +338,19 @@ fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
         return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
     }
     let resolved = resolve_filters(&spec, &op.filters)?;
-    let entries = store.find(Find {
-        schema: &op.schema,
-        spec: &spec,
-        range: op.range,
-        agent: op.agent.as_ref().map(Agent::as_str),
-        include_ignored: false,
-        filters: &resolved,
-        order: Order::Oldest,
-        limit: None,
-    })?;
+    let entries = store::find(
+        db,
+        Find {
+            schema: &op.schema,
+            spec: &spec,
+            range: op.range,
+            agent: op.agent.as_ref().map(Agent::as_str),
+            include_ignored: false,
+            filters: &resolved,
+            order: Order::Oldest,
+            limit: None,
+        },
+    )?;
     match op.group {
         None => {
             let total: Decimal = entries.iter().filter_map(|e| e.number(&op.field)).sum();
@@ -427,7 +435,7 @@ fn field_named(spec: &Spec, name: &LinkName) -> bool {
         .is_some_and(|n| spec.field(&n).is_some())
 }
 
-fn ensure_links(store: &Store, spec: &Spec, links: &[Link]) -> Result<(), Error> {
+fn ensure_links(db: &Db, spec: &Spec, links: &[Link]) -> Result<(), Error> {
     let mut seen = HashSet::new();
     for link in links {
         if !seen.insert(&link.name) {
@@ -438,11 +446,8 @@ fn ensure_links(store: &Store, spec: &Spec, links: &[Link]) -> Result<(), Error>
                 link.name.clone(),
             )));
         }
-        let target = store.load_schema(&link.to.schema)?;
-        if store
-            .get_entry(&link.to.schema, &target.spec, link.to.id)?
-            .is_none()
-        {
+        let target = store::load_schema(db, &link.to.schema)?;
+        if store::get_entry(db, &link.to.schema, &target.spec, link.to.id)?.is_none() {
             return Err(Error::Fail(Fail::LinkTargetMissing(link.to.clone())));
         }
     }

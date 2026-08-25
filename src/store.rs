@@ -1,17 +1,13 @@
 use std::collections::HashMap;
-use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params};
 
+use crate::db::Db;
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
 use crate::spec::{EntryRef, FieldName, FieldType, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident, table_name};
 use crate::time::{Range, ToBound};
-
-pub struct Store {
-    conn: Connection,
-}
 
 pub(crate) struct Find<'a> {
     pub schema: &'a SchemaName,
@@ -24,50 +20,28 @@ pub(crate) struct Find<'a> {
     pub limit: Option<usize>,
 }
 
-impl Store {
-    pub fn open(path: &Path) -> Result<Self, Error> {
-        Ok(Self {
-            conn: crate::db::open(path)?,
-        })
-    }
-
-    pub(crate) fn transaction<T>(
-        &mut self,
-        f: impl FnOnce(&mut crate::mutable_store::Tx<'_>) -> Result<T, Error>,
-    ) -> Result<T, Error> {
-        let mut tx = crate::mutable_store::Tx::begin(&mut self.conn)?;
-        match f(&mut tx) {
-            Ok(value) => {
-                tx.commit()?;
-                Ok(value)
-            }
-            Err(err) => Err(err),
-        }
-    }
-
-    pub(crate) fn list_schemas(&self) -> Result<Vec<SchemaInfo>, Error> {
-        list_schemas(&self.conn)
-    }
-
-    pub(crate) fn load_schema(&self, name: &SchemaName) -> Result<Schema, Error> {
-        load_schema(&self.conn, name)
-    }
-
-    pub(crate) fn get_entry(
-        &self,
-        schema: &SchemaName,
-        spec: &Spec,
-        id: i64,
-    ) -> Result<Option<Entry>, Error> {
-        load_entry(&self.conn, schema, spec, id)
-    }
-
-    pub(crate) fn find(&self, q: Find<'_>) -> Result<Vec<Entry>, Error> {
-        execute_select(&self.conn, &q)
-    }
+pub(crate) fn list_schemas(db: &Db) -> Result<Vec<SchemaInfo>, Error> {
+    list_schemas_on(db.conn())
 }
 
-pub(crate) fn list_schemas(conn: &Connection) -> Result<Vec<SchemaInfo>, Error> {
+pub(crate) fn load_schema(db: &Db, name: &SchemaName) -> Result<Schema, Error> {
+    load_schema_on(db.conn(), name)
+}
+
+pub(crate) fn get_entry(
+    db: &Db,
+    schema: &SchemaName,
+    spec: &Spec,
+    id: i64,
+) -> Result<Option<Entry>, Error> {
+    load_entry(db.conn(), schema, spec, id)
+}
+
+pub(crate) fn find(db: &Db, q: Find<'_>) -> Result<Vec<Entry>, Error> {
+    execute_select(db.conn(), &q)
+}
+
+fn list_schemas_on(conn: &Connection) -> Result<Vec<SchemaInfo>, Error> {
     let mut stmt = conn.prepare("SELECT name, retired FROM schemas ORDER BY name")?;
     let rows = stmt.query_map([], |row| {
         let name: String = row.get(0)?;
@@ -87,7 +61,7 @@ pub(crate) fn list_schemas(conn: &Connection) -> Result<Vec<SchemaInfo>, Error> 
     Ok(out)
 }
 
-pub(crate) fn load_schema(conn: &Connection, name: &SchemaName) -> Result<Schema, Error> {
+fn load_schema_on(conn: &Connection, name: &SchemaName) -> Result<Schema, Error> {
     let row = conn
         .query_row(
             "SELECT spec, retired FROM schemas WHERE name = ?1",

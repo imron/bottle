@@ -20,14 +20,14 @@ pub use ledger::Agent;
 pub use spec::FieldType;
 
 pub struct Bottle {
-    store: store::Store,
+    db: db::Db,
     agent: Agent,
 }
 
 impl Bottle {
     pub fn open(path: &Path, agent: Option<String>) -> Result<Self, Error> {
         Ok(Self {
-            store: store::Store::open(path)?,
+            db: db::Db::open(path)?,
             agent: agent.map(Agent::new).unwrap_or_else(Agent::bottle),
         })
     }
@@ -47,6 +47,6 @@ pub fn execute(bottle: &mut Bottle, cmd: Cmd) -> Result<String, Error> {
         return help::page(help.topic.as_deref());
     }
     let request = input::parse(cmd)?;
-    let outcome = domain::execute(&mut bottle.store, &bottle.agent, request.op)?;
+    let outcome = domain::execute(&mut bottle.db, &bottle.agent, request.op)?;
     input::render(request.style, request.show_ignored, &outcome)
 }

@@ -1,11 +1,83 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use rusqlite::Connection;
 use rusqlite::functions::FunctionFlags;
+use rusqlite::{Connection, TransactionBehavior};
 use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
+
+pub struct Db {
+    conn: Connection,
+}
+
+pub struct Tx<'a> {
+    inner: rusqlite::Transaction<'a>,
+}
+
+impl Db {
+    pub fn open(path: &Path) -> Result<Self, Error> {
+        if let Some(parent) = path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            std::fs::create_dir_all(parent)?;
+        }
+        let conn = Connection::open(path)?;
+        conn.busy_timeout(Duration::from_millis(5000))?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS schemas (
+                name    TEXT PRIMARY KEY,
+                spec    TEXT NOT NULL,
+                retired INTEGER NOT NULL DEFAULT 0
+             );
+             CREATE TABLE IF NOT EXISTS links (
+                from_schema TEXT NOT NULL,
+                from_id     INTEGER NOT NULL,
+                name        TEXT NOT NULL,
+                to_schema   TEXT NOT NULL,
+                to_id       INTEGER NOT NULL,
+                PRIMARY KEY (from_schema, from_id, name)
+             );",
+        )?;
+        register_functions(&conn)?;
+        Ok(Self { conn })
+    }
+
+    pub(crate) fn transaction<T>(
+        &mut self,
+        f: impl FnOnce(&mut Tx<'_>) -> Result<T, Error>,
+    ) -> Result<T, Error> {
+        let mut tx = Tx::begin(&mut self.conn)?;
+        match f(&mut tx) {
+            Ok(value) => {
+                tx.commit()?;
+                Ok(value)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    pub(crate) fn conn(&self) -> &Connection {
+        &self.conn
+    }
+}
+
+impl<'a> Tx<'a> {
+    fn begin(conn: &'a mut Connection) -> Result<Self, Error> {
+        Ok(Self {
+            inner: conn.transaction_with_behavior(TransactionBehavior::Immediate)?,
+        })
+    }
+
+    fn commit(self) -> Result<(), Error> {
+        self.inner.commit().map_err(Error::from)
+    }
+
+    pub(crate) fn conn(&self) -> &Connection {
+        &self.inner
+    }
+}
 
 pub fn default_db_path() -> Result<PathBuf, Error> {
     if let Some(path) = std::env::var_os("BOTTLE_DB") {
@@ -23,34 +95,6 @@ pub fn default_db_path() -> Result<PathBuf, Error> {
     }
     let home = home_dir()?;
     Ok(home.join(".local/share/bottle/bottle.db"))
-}
-
-pub fn open(path: &Path) -> Result<Connection, Error> {
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        std::fs::create_dir_all(parent)?;
-    }
-    let conn = Connection::open(path)?;
-    conn.busy_timeout(Duration::from_millis(5000))?;
-    conn.pragma_update(None, "journal_mode", "WAL")?;
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS schemas (
-            name    TEXT PRIMARY KEY,
-            spec    TEXT NOT NULL,
-            retired INTEGER NOT NULL DEFAULT 0
-         );
-         CREATE TABLE IF NOT EXISTS links (
-            from_schema TEXT NOT NULL,
-            from_id     INTEGER NOT NULL,
-            name        TEXT NOT NULL,
-            to_schema   TEXT NOT NULL,
-            to_id       INTEGER NOT NULL,
-            PRIMARY KEY (from_schema, from_id, name)
-         );",
-    )?;
-    register_functions(&conn)?;
-    Ok(conn)
 }
 
 fn register_functions(conn: &Connection) -> Result<(), Error> {
