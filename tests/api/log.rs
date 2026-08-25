@@ -223,3 +223,176 @@ fn unset_agent_defaults_to_bottle() {
     let agent_idx = lines[0].iter().position(|c| *c == "agent").unwrap();
     assert_eq!(lines[1][agent_idx], "bottle");
 }
+
+fn meal_fields() -> Vec<(String, String)> {
+    vec![
+        ("when".into(), "breakfast".into()),
+        ("what".into(), "eggs".into()),
+        ("kcal".into(), "1".into()),
+        ("protein".into(), "1".into()),
+        ("carbs".into(), "0".into()),
+    ]
+}
+
+#[test]
+fn duplicate_field_and_link_name() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: None,
+            links: vec![],
+            fields: {
+                let mut f = meal_fields();
+                f.push(("when".into(), "lunch".into()));
+                f
+            },
+        }))
+        .unwrap_err();
+    assert_usage(err, "duplicate field");
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "1"),
+            ("protein", "1"),
+            ("carbs", "0"),
+        ],
+        &[],
+        Some("2026-08-22T08:14:00Z"),
+    );
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T09:00:00Z".into()),
+            agent: None,
+            links: vec![
+                ("ref".into(), "nutrition.meal/1".into()),
+                ("ref".into(), "nutrition.meal/1".into()),
+            ],
+            fields: meal_fields(),
+        }))
+        .unwrap_err();
+    assert_usage(err, "duplicate link name");
+}
+
+#[test]
+fn link_name_collides_with_field() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "1"),
+            ("protein", "1"),
+            ("carbs", "0"),
+        ],
+        &[],
+        Some("2026-08-22T08:14:00Z"),
+    );
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T09:00:00Z".into()),
+            agent: None,
+            links: vec![("what".into(), "nutrition.meal/1".into())],
+            fields: meal_fields(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "collides with field");
+}
+
+#[test]
+fn invalid_link_targets() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    for target in ["noshift", "nutrition.meal/0", "nutrition.meal/x"] {
+        let err = h
+            .run(Cmd::Log(cmd::Log {
+                schema: "nutrition.meal".into(),
+                at: Some("2026-08-22T08:14:00Z".into()),
+                agent: None,
+                links: vec![("ref".into(), target.into())],
+                fields: meal_fields(),
+            }))
+            .unwrap_err();
+        assert_usage(err, "invalid link target");
+    }
+}
+
+#[test]
+fn time_parse_variants() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22 08:14:00".into()),
+            agent: None,
+            links: vec![],
+            fields: meal_fields(),
+        }))
+        .unwrap_err();
+    assert_usage(err, "time must use T");
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00+1000".into()),
+            agent: None,
+            links: vec![],
+            fields: meal_fields(),
+        }))
+        .unwrap_err();
+    assert_usage(err, "colon");
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "local"),
+            ("kcal", "1"),
+            ("protein", "1"),
+            ("carbs", "0"),
+        ],
+        &[],
+        Some("2026-08-22T08:14:00"),
+    );
+}
+
+#[test]
+fn newline_and_bad_enum() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: None,
+            links: vec![],
+            fields: {
+                let mut f = meal_fields();
+                f[1] = ("what".into(), "a\nb".into());
+                f
+            },
+        }))
+        .unwrap_err();
+    assert_fail(err, "tab or newline");
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: None,
+            links: vec![],
+            fields: {
+                let mut f = meal_fields();
+                f[0] = ("when".into(), "not-a-meal".into());
+                f
+            },
+        }))
+        .unwrap_err();
+    assert_fail(err, "invalid");
+}

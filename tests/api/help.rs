@@ -54,3 +54,21 @@ fn unknown_topic_is_usage() {
 fn help_does_not_need_a_db() {
     run(None, None, Cmd::Help(cmd::Help { topic: None })).unwrap();
 }
+
+#[test]
+fn other_commands_need_a_db() {
+    let err = run(None, None, Cmd::SchemaList).unwrap_err();
+    common::assert_fail(err, "db path required");
+}
+
+#[test]
+fn bottle_db_env_sets_default_path() {
+    unsafe {
+        std::env::set_var("BOTTLE_DB", "/tmp/bottle-cov.db");
+    }
+    let path = bottle::default_db_path().unwrap();
+    unsafe {
+        std::env::remove_var("BOTTLE_DB");
+    }
+    assert_eq!(path, std::path::PathBuf::from("/tmp/bottle-cov.db"));
+}

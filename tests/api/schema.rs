@@ -1,6 +1,6 @@
 use bottle::{Cmd, FieldType, cmd};
 
-use crate::common::{MEAL, SESSION, SET, assert_fail, harness, tsv_lines};
+use crate::common::{MEAL, SESSION, SET, assert_fail, assert_usage, harness, tsv_lines};
 
 #[test]
 fn list_empty() {
@@ -210,6 +210,186 @@ fn show_missing() {
         .run(Cmd::SchemaShow(cmd::SchemaShow {
             name: "no.such".into(),
             yaml: false,
+        }))
+        .unwrap_err();
+    assert_fail(err, "unknown schema");
+}
+
+#[test]
+fn add_field_enum_requires_values() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "mood".into(),
+            type_: FieldType::Enum,
+            values: None,
+            default: None,
+        }))
+        .unwrap_err();
+    assert_usage(err, "--values is required");
+}
+
+#[test]
+fn add_field_values_only_for_enum() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "fiber".into(),
+            type_: FieldType::Number,
+            values: Some(vec!["1".into()]),
+            default: None,
+        }))
+        .unwrap_err();
+    assert_usage(err, "--values is only valid");
+}
+
+#[test]
+fn add_field_duplicate_and_retired() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "kcal".into(),
+            type_: FieldType::Number,
+            values: None,
+            default: None,
+        }))
+        .unwrap_err();
+    assert_fail(err, "field exists");
+    h.run_ok(Cmd::SchemaRetire(cmd::SchemaRetire {
+        name: "nutrition.meal".into(),
+    }));
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "fiber".into(),
+            type_: FieldType::Number,
+            values: None,
+            default: None,
+        }))
+        .unwrap_err();
+    assert_fail(err, "retired");
+}
+
+#[test]
+fn add_field_with_default() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.run_ok(Cmd::SchemaAddField(cmd::SchemaAddField {
+        schema: "nutrition.meal".into(),
+        name: "note".into(),
+        type_: FieldType::Text,
+        values: None,
+        default: Some("O'Brien".into()),
+    }));
+    let show = h.run_ok(Cmd::SchemaShow(cmd::SchemaShow {
+        name: "nutrition.meal".into(),
+        yaml: false,
+    }));
+    assert!(show.contains("note\ttext\ttrue\t"));
+}
+
+#[test]
+fn add_field_reserved_name() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "id".into(),
+            type_: FieldType::Text,
+            values: None,
+            default: None,
+        }))
+        .unwrap_err();
+    assert_fail(err, "reserved field name");
+}
+
+#[test]
+fn add_value_not_enum_or_unknown() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::SchemaAddValue(cmd::SchemaAddValue {
+            schema: "nutrition.meal".into(),
+            field: "kcal".into(),
+            value: "1".into(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "not enum");
+    let err = h
+        .run(Cmd::SchemaAddValue(cmd::SchemaAddValue {
+            schema: "nutrition.meal".into(),
+            field: "nope".into(),
+            value: "x".into(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "unknown field");
+    h.run_ok(Cmd::SchemaRetire(cmd::SchemaRetire {
+        name: "nutrition.meal".into(),
+    }));
+    let err = h
+        .run(Cmd::SchemaAddValue(cmd::SchemaAddValue {
+            schema: "nutrition.meal".into(),
+            field: "when".into(),
+            value: "brunch".into(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "retired");
+}
+
+#[test]
+fn yaml_canonicalize_rejects() {
+    let mut h = harness();
+    for (name, yaml, needle) in [
+        (
+            "dup",
+            "fields:\n  - name: title\n    type: text\n    required: false\n  - name: title\n    type: text\n    required: false\n",
+            "duplicate field",
+        ),
+        (
+            "enum_none",
+            "fields:\n  - name: when\n    type: enum\n    required: true\n",
+            "needs values",
+        ),
+        (
+            "enum_dup",
+            "fields:\n  - name: when\n    type: enum\n    required: true\n    values: [A, a]\n",
+            "duplicate enum value",
+        ),
+        (
+            "text_values",
+            "fields:\n  - name: what\n    type: text\n    required: false\n    values: [x]\n",
+            "only apply to enum",
+        ),
+        (
+            "empty_enum",
+            "fields:\n  - name: when\n    type: enum\n    required: true\n    values: ['']\n",
+            "empty enum value",
+        ),
+    ] {
+        let file = h.yaml_file(&format!("{name}.yaml"), yaml);
+        let err = h
+            .run(Cmd::SchemaAdd(cmd::SchemaAdd {
+                name: name.into(),
+                file,
+            }))
+            .unwrap_err();
+        assert_fail(err, needle);
+    }
+}
+
+#[test]
+fn drop_unknown() {
+    let mut h = harness();
+    let err = h
+        .run(Cmd::SchemaDrop(cmd::SchemaDrop {
+            name: "no.such".into(),
         }))
         .unwrap_err();
     assert_fail(err, "unknown schema");

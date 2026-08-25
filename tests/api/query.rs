@@ -501,3 +501,141 @@ fn today_is_civil_day() {
     }));
     assert!(out.contains("now"));
 }
+
+#[test]
+fn amend_empty_and_missing() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Amend(cmd::Amend {
+            schema: "nutrition.meal".into(),
+            id: 1,
+            at: None,
+            agent: None,
+            links: vec![],
+            unlinks: vec![],
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_usage(err, "amend requires");
+    let err = h
+        .run(Cmd::Amend(cmd::Amend {
+            schema: "nutrition.meal".into(),
+            id: 99,
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: None,
+            links: vec![],
+            unlinks: vec![],
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_fail(err, "not found");
+}
+
+#[test]
+fn duplicate_unlink() {
+    let mut h = harness();
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.set",
+        &[("movement", "squat"), ("reps", "8")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    let err = h
+        .run(Cmd::Amend(cmd::Amend {
+            schema: "fitness.set".into(),
+            id: 1,
+            at: None,
+            agent: None,
+            links: vec![],
+            unlinks: vec!["session".into(), "session".into()],
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_usage(err, "duplicate --unlink");
+}
+
+#[test]
+fn ignore_missing() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Ignore(cmd::Ignore {
+            schema: "nutrition.meal".into(),
+            id: 99,
+        }))
+        .unwrap_err();
+    assert_fail(err, "not found");
+}
+
+#[test]
+fn amend_at_agent_and_link() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.session",
+        &[("title", "upper")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.log(
+        "fitness.session",
+        &[("title", "lower")],
+        &[],
+        Some("2026-08-22T09:00:00Z"),
+    );
+    h.log(
+        "fitness.set",
+        &[("movement", "squat"), ("reps", "8")],
+        &[("session", "fitness.session/1")],
+        Some("2026-08-22T08:01:00Z"),
+    );
+    let out = h.run_ok(Cmd::Amend(cmd::Amend {
+        schema: "fitness.set".into(),
+        id: 1,
+        at: Some("2026-08-22T08:05:00Z".into()),
+        agent: Some("coach".into()),
+        links: vec![("session".into(), "fitness.session/2".into())],
+        unlinks: vec![],
+        fields: vec![("load".into(), "".into()), ("reps".into(), "6".into())],
+    }));
+    assert!(out.contains("fitness.session/2"));
+}
+
+#[test]
+fn sum_group_week_month_year() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    for unit in ["week", "month", "year"] {
+        let out = h.run_ok(Cmd::Sum(cmd::Sum {
+            schema: "nutrition.meal".into(),
+            field: "protein".into(),
+            from: None,
+            to: None,
+            agent: None,
+            wheres: vec![],
+            group: Some(unit.into()),
+        }));
+        assert!(out.starts_with(&format!("{unit}\tvalue\n")), "{out}");
+        assert!(out.contains("59"), "{out}");
+    }
+}
+
+#[test]
+fn where_invalid_ident() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Ls(cmd::Ls {
+            schema: "nutrition.meal".into(),
+            from: None,
+            to: None,
+            agent: None,
+            wheres: vec![("When".into(), "breakfast".into())],
+            include_ignored: false,
+        }))
+        .unwrap_err();
+    assert_fail(err, "invalid name");
+}
