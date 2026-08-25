@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use rust_decimal::Decimal;
 
-use crate::db::{Db, Tx};
+use crate::db::Db;
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, Clause, Entries, Entry, FieldInput, FieldValue, Filter, Get, GroupedLink,
@@ -35,14 +35,14 @@ pub(crate) fn execute(db: &mut Db, agent: &Agent, op: Op) -> Result<Outcome, Err
             add_value(db, op)?;
             Ok(Outcome::Empty)
         }
-        Op::SchemaRetire(op) => db.transaction(|tx| {
-            retire(tx, &op)?;
+        Op::SchemaRetire(op) => {
+            retire(db, op)?;
             Ok(Outcome::Empty)
-        }),
-        Op::SchemaDrop(op) => db.transaction(|tx| {
-            drop_schema(tx, &op)?;
+        }
+        Op::SchemaDrop(op) => {
+            drop_schema(db, op)?;
             Ok(Outcome::Empty)
-        }),
+        }
         Op::Log(op) => log(db, agent, op),
         Op::List(op) => list(db, op),
         Op::Get(op) => get(db, op),
@@ -117,21 +117,25 @@ fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
     db.transaction(|tx| mutable_store::save_spec(tx, &op.schema, &kind.spec))
 }
 
-fn retire(tx: &mut Tx<'_>, op: &SchemaRetire) -> Result<(), Error> {
-    if mutable_store::retire(tx, &op.name)? == 0 {
-        return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
-    }
-    Ok(())
+fn retire(db: &mut Db, op: SchemaRetire) -> Result<(), Error> {
+    db.transaction(|tx| {
+        if mutable_store::retire(tx, &op.name)? == 0 {
+            return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
+        }
+        Ok(())
+    })
 }
 
-fn drop_schema(tx: &mut Tx<'_>, op: &SchemaDrop) -> Result<(), Error> {
-    if !mutable_store::schema_exists(tx, &op.name)? {
-        return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
-    }
-    if mutable_store::inbound_link_count(tx, &op.name)? > 0 {
-        return Err(Error::Fail(Fail::SchemaHasInboundLinks(op.name.clone())));
-    }
-    mutable_store::drop_schema(tx, &op.name)
+fn drop_schema(db: &mut Db, op: SchemaDrop) -> Result<(), Error> {
+    db.transaction(|tx| {
+        if !mutable_store::schema_exists(tx, &op.name)? {
+            return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
+        }
+        if mutable_store::inbound_link_count(tx, &op.name)? > 0 {
+            return Err(Error::Fail(Fail::SchemaHasInboundLinks(op.name.clone())));
+        }
+        mutable_store::drop_schema(tx, &op.name)
+    })
 }
 
 fn log(db: &mut Db, agent: &Agent, mut op: Log) -> Result<Outcome, Error> {
