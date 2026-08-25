@@ -13,18 +13,18 @@ use crate::time::{self, Period, Range};
 
 pub use cmd::Cmd;
 
-pub(crate) enum Style {
+pub enum Style {
     Tsv,
     Yaml,
 }
 
-pub(crate) struct Request {
+pub struct Request {
     pub op: Op,
     pub style: Style,
     pub show_ignored: bool,
 }
 
-pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
+pub fn parse(cmd: Cmd) -> Result<Request, Error> {
     let style = match &cmd {
         Cmd::SchemaShow(cmd::SchemaShow { yaml: true, .. }) => Style::Yaml,
         _ => Style::Tsv,
@@ -246,7 +246,7 @@ impl TryFrom<cmd::Ignore> for Ignore {
     }
 }
 
-pub(crate) fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Result<String, Error> {
+pub fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Result<String, Error> {
     match outcome {
         Outcome::Empty => Ok(String::new()),
         Outcome::Schemas(Schemas { schemas }) => {

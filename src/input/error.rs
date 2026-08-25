@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::error::{Error, Fail, Usage};
 
-pub(crate) fn cli_message(err: &Error) -> String {
+pub fn cli_message(err: &Error) -> String {
     match err {
         Error::Usage(err) => usage_message(err),
         Error::Fail(err) => fail_message(err),

@@ -10,7 +10,7 @@ use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, tab
 use crate::store::{inbound_link_count as inbound_on, load_entry};
 use crate::time::Instant;
 
-pub(crate) fn get_entry(
+pub fn get_entry(
     tx: &Tx<'_>,
     schema: &SchemaName,
     spec: &Spec,
@@ -19,11 +19,11 @@ pub(crate) fn get_entry(
     load_entry(tx.conn(), schema, spec, id)
 }
 
-pub(crate) fn inbound_link_count(tx: &Tx<'_>, name: &SchemaName) -> Result<i64, Error> {
+pub fn inbound_link_count(tx: &Tx<'_>, name: &SchemaName) -> Result<i64, Error> {
     inbound_on(tx.conn(), name)
 }
 
-pub(crate) fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
+pub fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
     let yaml = spec.to_yaml()?;
     let table = table_name(name);
     let cols = create_columns(spec);
@@ -38,7 +38,7 @@ pub(crate) fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> 
     Ok(())
 }
 
-pub(crate) fn add_column(
+pub fn add_column(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
     field: &Field,
@@ -64,7 +64,7 @@ pub(crate) fn add_column(
     Ok(())
 }
 
-pub(crate) fn save_spec(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
+pub fn save_spec(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
     let yaml = spec.to_yaml()?;
     tx.conn().execute(
         "UPDATE schemas SET spec = ?1 WHERE name = ?2",
@@ -73,7 +73,7 @@ pub(crate) fn save_spec(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Resu
     Ok(())
 }
 
-pub(crate) fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
+pub fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     let n = tx.conn().execute(
         "UPDATE schemas SET retired = 1 WHERE name = ?1",
         [name.as_str()],
@@ -84,7 +84,7 @@ pub(crate) fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
+pub fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     let n = tx
         .conn()
         .execute("DELETE FROM schemas WHERE name = ?1", [name.as_str()])?;
@@ -99,7 +99,7 @@ pub(crate) fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Erro
     Ok(())
 }
 
-pub(crate) fn insert_entry(
+pub fn insert_entry(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
     spec: &Spec,
@@ -149,7 +149,7 @@ pub(crate) fn insert_entry(
     Ok(id)
 }
 
-pub(crate) fn update_entry(
+pub fn update_entry(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
     id: i64,
@@ -193,7 +193,7 @@ pub(crate) fn update_entry(
     Ok(())
 }
 
-pub(crate) fn delete_link(
+pub fn delete_link(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
     id: i64,
@@ -206,7 +206,7 @@ pub(crate) fn delete_link(
     Ok(())
 }
 
-pub(crate) fn upsert_link(
+pub fn upsert_link(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
     id: i64,
@@ -229,7 +229,7 @@ pub(crate) fn upsert_link(
     Ok(())
 }
 
-pub(crate) fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<(), Error> {
+pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<(), Error> {
     let table = table_name(schema);
     tx.conn().execute(
         &format!(

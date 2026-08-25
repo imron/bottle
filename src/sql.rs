@@ -7,14 +7,14 @@ use jiff::tz::TimeZone;
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 
 #[derive(Clone)]
-pub(crate) enum SqlVal {
+pub enum SqlVal {
     Null,
     Int(i64),
     Text(String),
 }
 
 impl SqlVal {
-    pub(crate) fn as_param(&self) -> ToSqlOutput<'_> {
+    pub fn as_param(&self) -> ToSqlOutput<'_> {
         match self {
             SqlVal::Null => ToSqlOutput::Borrowed(ValueRef::Null),
             SqlVal::Int(n) => ToSqlOutput::Owned(Value::Integer(*n)),
@@ -22,7 +22,7 @@ impl SqlVal {
         }
     }
 
-    pub(crate) fn from_field(value: &FieldValue) -> Self {
+    pub fn from_field(value: &FieldValue) -> Self {
         match value {
             FieldValue::Empty => SqlVal::Null,
             FieldValue::Text(s) => SqlVal::Text(s.clone()),
@@ -32,34 +32,34 @@ impl SqlVal {
     }
 }
 
-pub(crate) fn sql_type(t: FieldType) -> &'static str {
+pub fn sql_type(t: FieldType) -> &'static str {
     match t {
         FieldType::Number | FieldType::Text | FieldType::Enum => "TEXT",
     }
 }
 
-pub(crate) fn table_name(schema: &SchemaName) -> String {
+pub fn table_name(schema: &SchemaName) -> String {
     schema.as_str().replace('.', "_")
 }
 
-pub(crate) fn quote_ident(name: &str) -> String {
+pub fn quote_ident(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
 
-pub(crate) fn instant_to_sql(at: Instant) -> Result<String, Error> {
+pub fn instant_to_sql(at: Instant) -> Result<String, Error> {
     let zoned = at.timestamp().to_zoned(TimeZone::UTC);
     strtime::format("%Y-%m-%dT%H:%M:%SZ", &zoned)
         .map_err(|e| Error::Fail(Fail::Time(e.to_string())))
 }
 
-pub(crate) fn instant_from_sql(raw: String) -> Result<Instant, Error> {
+pub fn instant_from_sql(raw: String) -> Result<Instant, Error> {
     let ts = raw
         .parse()
         .map_err(|_| Error::Fail(Fail::CorruptStoredTime(raw.clone())))?;
     Ok(Instant::from_timestamp(ts))
 }
 
-pub(crate) fn sql_default(type_: FieldType, def: &str) -> String {
+pub fn sql_default(type_: FieldType, def: &str) -> String {
     match type_ {
         FieldType::Number | FieldType::Text | FieldType::Enum => {
             format!("'{}'", def.replace('\'', "''"))

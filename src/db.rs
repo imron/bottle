@@ -44,7 +44,7 @@ impl Db {
         Ok(Self { conn })
     }
 
-    pub(crate) fn transaction<T>(
+    pub fn transaction<T>(
         &mut self,
         f: impl FnOnce(&mut Tx<'_>) -> Result<T, Error>,
     ) -> Result<T, Error> {
@@ -58,7 +58,7 @@ impl Db {
         }
     }
 
-    pub(crate) fn conn(&self) -> &Connection {
+    pub fn conn(&self) -> &Connection {
         &self.conn
     }
 }
@@ -75,7 +75,7 @@ impl<'a> Tx<'a> {
         Ok(())
     }
 
-    pub(crate) fn conn(&self) -> &Connection {
+    pub fn conn(&self) -> &Connection {
         &self.inner
     }
 }

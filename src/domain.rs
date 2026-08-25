@@ -17,7 +17,7 @@ use crate::spec::{
 use crate::store::{self, Find};
 use crate::time::{self, Instant, Period, Range};
 
-pub(crate) fn execute(db: &mut Db, agent: &Agent, op: Op) -> Result<Outcome, Error> {
+pub fn execute(db: &mut Db, agent: &Agent, op: Op) -> Result<Outcome, Error> {
     match op {
         Op::SchemaList => Ok(Outcome::Schemas(Schemas {
             schemas: store::list_schemas(db)?,

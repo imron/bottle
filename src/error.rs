@@ -85,7 +85,7 @@ impl Error {
 
 impl std::error::Error for Error {}
 
-pub(crate) trait UniqueConstraint<T> {
+pub trait UniqueConstraint<T> {
     fn unique(self, err: Fail) -> Result<T, Error>;
 }
 

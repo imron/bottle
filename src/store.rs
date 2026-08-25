@@ -9,7 +9,7 @@ use crate::spec::{EntryRef, FieldName, FieldType, Link, LinkName, SchemaName, Sp
 use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident, table_name};
 use crate::time::{Range, ToBound};
 
-pub(crate) struct Find<'a> {
+pub struct Find<'a> {
     pub schema: &'a SchemaName,
     pub spec: &'a Spec,
     pub range: Range,
@@ -20,15 +20,15 @@ pub(crate) struct Find<'a> {
     pub limit: Option<usize>,
 }
 
-pub(crate) fn list_schemas(db: &Db) -> Result<Vec<SchemaInfo>, Error> {
+pub fn list_schemas(db: &Db) -> Result<Vec<SchemaInfo>, Error> {
     list_schemas_on(db.conn())
 }
 
-pub(crate) fn load_schema(db: &Db, name: &SchemaName) -> Result<Schema, Error> {
+pub fn load_schema(db: &Db, name: &SchemaName) -> Result<Schema, Error> {
     load_schema_on(db.conn(), name)
 }
 
-pub(crate) fn get_entry(
+pub fn get_entry(
     db: &Db,
     schema: &SchemaName,
     spec: &Spec,
@@ -37,7 +37,7 @@ pub(crate) fn get_entry(
     load_entry(db.conn(), schema, spec, id)
 }
 
-pub(crate) fn find(db: &Db, q: Find<'_>) -> Result<Vec<Entry>, Error> {
+pub fn find(db: &Db, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     execute_select(db.conn(), &q)
 }
 
@@ -82,7 +82,7 @@ fn load_schema_on(conn: &Connection, name: &SchemaName) -> Result<Schema, Error>
     })
 }
 
-pub(crate) fn inbound_link_count(conn: &Connection, name: &SchemaName) -> Result<i64, Error> {
+pub fn inbound_link_count(conn: &Connection, name: &SchemaName) -> Result<i64, Error> {
     let n: i64 = conn.query_row(
         "SELECT COUNT(*) FROM links WHERE to_schema = ?1",
         [name.as_str()],
@@ -91,7 +91,7 @@ pub(crate) fn inbound_link_count(conn: &Connection, name: &SchemaName) -> Result
     Ok(n)
 }
 
-pub(crate) fn load_entry(
+pub fn load_entry(
     conn: &Connection,
     schema: &SchemaName,
     spec: &Spec,
@@ -271,11 +271,7 @@ fn read_entry(
     })
 }
 
-pub(crate) fn load_links(
-    conn: &Connection,
-    schema: &SchemaName,
-    id: i64,
-) -> Result<Vec<Link>, Error> {
+pub fn load_links(conn: &Connection, schema: &SchemaName, id: i64) -> Result<Vec<Link>, Error> {
     let mut stmt = conn.prepare(
         "SELECT name, to_schema, to_id FROM links
          WHERE from_schema = ?1 AND from_id = ?2
