@@ -84,3 +84,29 @@ fn home_dir() -> Result<PathBuf, Error> {
         .map(PathBuf::from)
         .ok_or(Error::Fail(Fail::HomeNotSet))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn none_or_empty_is_not_equal() {
+        assert!(!dec_eq(None, None).unwrap());
+        assert!(!dec_eq(None, Some("1")).unwrap());
+        assert!(!dec_eq(Some("1"), None).unwrap());
+        assert!(!dec_eq(Some(""), Some("1")).unwrap());
+        assert!(!dec_eq(Some("1"), Some("")).unwrap());
+        assert!(!dec_eq(Some(""), Some("")).unwrap());
+    }
+
+    #[test]
+    fn compares_decimal_values() {
+        assert!(dec_eq(Some("39.6"), Some("39.60")).unwrap());
+        assert!(!dec_eq(Some("39.6"), Some("39.61")).unwrap());
+    }
+
+    #[test]
+    fn rejects_invalid_number() {
+        assert!(dec_eq(Some("nope"), Some("1")).is_err());
+    }
+}

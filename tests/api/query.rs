@@ -95,6 +95,23 @@ fn ls_keeps_logged_number_scale() {
 }
 
 #[test]
+fn ls_from_instant() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let out = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: Some("2026-08-23T12:00:00Z".into()),
+        to: None,
+        agent: None,
+        wheres: vec![],
+        include_ignored: false,
+    }));
+    let lines = tsv_lines(&out);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[1][4], "rice");
+}
+
+#[test]
 fn ls_instant_to_is_inclusive() {
     let mut h = harness();
     seed_meals(&mut h);
@@ -280,6 +297,25 @@ fn sum_and_group_day() {
         group: Some("day".into()),
     }));
     assert!(grouped.starts_with("day\tvalue\n"));
+}
+
+#[test]
+fn sum_skips_empty_number() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let total = h.run_ok(Cmd::Sum(cmd::Sum {
+        schema: "nutrition.meal".into(),
+        field: "fat".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        group: None,
+    }));
+    assert_eq!(
+        tsv_lines(&total),
+        vec![vec!["field", "value"], vec!["fat", "39.6"]]
+    );
 }
 
 #[test]
@@ -621,6 +657,76 @@ fn sum_group_week_month_year() {
         assert!(out.starts_with(&format!("{unit}\tvalue\n")), "{out}");
         assert!(out.contains("59"), "{out}");
     }
+}
+
+#[test]
+fn ls_where_number_skips_null() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let out = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![("fat".into(), "39.6".into())],
+        include_ignored: false,
+    }));
+    let lines = tsv_lines(&out);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[1][4], "eggs");
+}
+
+#[test]
+fn sum_unknown_field() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Sum(cmd::Sum {
+            schema: "nutrition.meal".into(),
+            field: "fiber".into(),
+            from: None,
+            to: None,
+            agent: None,
+            wheres: vec![],
+            group: None,
+        }))
+        .unwrap_err();
+    assert_fail(err, "unknown field");
+}
+
+#[test]
+fn sum_group_collides_with_field() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Sum(cmd::Sum {
+            schema: "nutrition.meal".into(),
+            field: "protein".into(),
+            from: None,
+            to: None,
+            agent: None,
+            wheres: vec![],
+            group: Some("kcal".into()),
+        }))
+        .unwrap_err();
+    assert_fail(err, "collides with field");
+}
+
+#[test]
+fn invalid_date_bound() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Ls(cmd::Ls {
+            schema: "nutrition.meal".into(),
+            from: Some("2026-13-01".into()),
+            to: None,
+            agent: None,
+            wheres: vec![],
+            include_ignored: false,
+        }))
+        .unwrap_err();
+    assert_usage(err, "invalid date");
 }
 
 #[test]

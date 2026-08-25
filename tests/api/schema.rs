@@ -394,3 +394,102 @@ fn drop_unknown() {
         .unwrap_err();
     assert_fail(err, "unknown schema");
 }
+
+#[test]
+fn retire_unknown() {
+    let mut h = harness();
+    let err = h
+        .run(Cmd::SchemaRetire(cmd::SchemaRetire {
+            name: "no.such".into(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "unknown schema");
+}
+
+#[test]
+fn add_field_enum_and_bad_values() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.run_ok(Cmd::SchemaAddField(cmd::SchemaAddField {
+        schema: "nutrition.meal".into(),
+        name: "mood".into(),
+        type_: FieldType::Enum,
+        values: Some(vec!["Happy".into(), "sad".into()]),
+        default: None,
+    }));
+    let show = h.run_ok(Cmd::SchemaShow(cmd::SchemaShow {
+        name: "nutrition.meal".into(),
+        yaml: false,
+    }));
+    assert!(show.contains("mood\tenum\tfalse\thappy,sad"));
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "size".into(),
+            type_: FieldType::Enum,
+            values: Some(vec!["A".into(), "a".into()]),
+            default: None,
+        }))
+        .unwrap_err();
+    assert_fail(err, "duplicate enum value");
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "size".into(),
+            type_: FieldType::Enum,
+            values: Some(vec!["".into()]),
+            default: None,
+        }))
+        .unwrap_err();
+    assert_fail(err, "empty enum value");
+}
+
+#[test]
+fn add_field_invalid_name() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "When".into(),
+            type_: FieldType::Text,
+            values: None,
+            default: None,
+        }))
+        .unwrap_err();
+    assert_fail(err, "invalid field name");
+}
+
+#[test]
+fn yaml_missing_and_invalid() {
+    let mut h = harness();
+    let err = h
+        .run(Cmd::SchemaAdd(cmd::SchemaAdd {
+            name: "nope".into(),
+            file: h.dir.path().join("missing.yaml"),
+        }))
+        .unwrap_err();
+    assert_fail(err, "No such file");
+    let file = h.yaml_file("bad.yaml", "fields: [");
+    let err = h
+        .run(Cmd::SchemaAdd(cmd::SchemaAdd {
+            name: "nope".into(),
+            file,
+        }))
+        .unwrap_err();
+    assert_fail(err, "invalid spec");
+}
+
+#[test]
+fn add_value_empty() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::SchemaAddValue(cmd::SchemaAddValue {
+            schema: "nutrition.meal".into(),
+            field: "when".into(),
+            value: "".into(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "empty enum value");
+}

@@ -1,6 +1,6 @@
 use bottle::{Bottle, Cmd, cmd};
 
-use crate::common::{MEAL, assert_fail, assert_usage, harness, tsv_lines};
+use crate::common::{MEAL, SESSION, SET, assert_fail, assert_usage, harness, tsv_lines};
 
 #[test]
 fn log_prints_id_at_links() {
@@ -349,6 +349,24 @@ fn time_parse_variants() {
         }))
         .unwrap_err();
     assert_usage(err, "colon");
+    for at in [
+        "nope",
+        "2026-08-22Tnotime1",
+        "2026-08-22T08:14:00.5Z",
+        "2026-08-22T08:14:00x",
+        "2026-08-22T08:14:00.0+10:00",
+    ] {
+        let err = h
+            .run(Cmd::Log(cmd::Log {
+                schema: "nutrition.meal".into(),
+                at: Some(at.into()),
+                agent: None,
+                links: vec![],
+                fields: meal_fields(),
+            }))
+            .unwrap_err();
+        assert_usage(err, "invalid time");
+    }
     h.log(
         "nutrition.meal",
         &[
@@ -361,6 +379,106 @@ fn time_parse_variants() {
         &[],
         Some("2026-08-22T08:14:00"),
     );
+}
+
+#[test]
+fn empty_required_field() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: None,
+            links: vec![],
+            fields: {
+                let mut f = meal_fields();
+                f[1] = ("what".into(), "".into());
+                f
+            },
+        }))
+        .unwrap_err();
+    assert_fail(err, "missing required");
+}
+
+#[test]
+fn link_target_missing_entry() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "fitness.set".into(),
+            at: Some("2026-08-22T08:00:00Z".into()),
+            agent: None,
+            links: vec![("session".into(), "fitness.session/99".into())],
+            fields: vec![
+                ("movement".into(), "squat".into()),
+                ("reps".into(), "8".into()),
+            ],
+        }))
+        .unwrap_err();
+    assert_fail(err, "link target missing");
+}
+
+#[test]
+fn bad_link_names() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "1"),
+            ("protein", "1"),
+            ("carbs", "0"),
+        ],
+        &[],
+        Some("2026-08-22T08:14:00Z"),
+    );
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T09:00:00Z".into()),
+            agent: None,
+            links: vec![("Ref".into(), "nutrition.meal/1".into())],
+            fields: meal_fields(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "invalid link name");
+    for name in ["id", "day"] {
+        let err = h
+            .run(Cmd::Log(cmd::Log {
+                schema: "nutrition.meal".into(),
+                at: Some("2026-08-22T09:00:00Z".into()),
+                agent: None,
+                links: vec![(name.into(), "nutrition.meal/1".into())],
+                fields: meal_fields(),
+            }))
+            .unwrap_err();
+        assert_fail(err, "reserved link name");
+    }
+}
+
+#[test]
+fn invalid_plain_number() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: None,
+            links: vec![],
+            fields: {
+                let mut f = meal_fields();
+                f[2] = ("kcal".into(), "nope".into());
+                f
+            },
+        }))
+        .unwrap_err();
+    assert_fail(err, "invalid number");
 }
 
 #[test]

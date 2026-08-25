@@ -1,6 +1,6 @@
 use bottle::{Cmd, cmd, run};
 
-use crate::common;
+use crate::common::{self, harness};
 
 #[test]
 fn overview_is_prose_not_tsv() {
@@ -62,13 +62,51 @@ fn other_commands_need_a_db() {
 }
 
 #[test]
-fn bottle_db_env_sets_default_path() {
-    unsafe {
-        std::env::set_var("BOTTLE_DB", "/tmp/bottle-cov.db");
+fn run_opens_db_when_path_given() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let db = dir.path().join("bottle.db");
+    let out = run(Some(&db), None, Cmd::SchemaList).unwrap();
+    assert_eq!(out, "name\tretired\n");
+}
+
+#[test]
+fn execute_serves_help() {
+    let mut h = harness();
+    let out = h.run_ok(Cmd::Help(cmd::Help { topic: None }));
+    assert!(out.starts_with("# overview\n"));
+}
+
+#[test]
+fn all_topics() {
+    for topic in [
+        "overview",
+        "help",
+        "schema",
+        "schema list",
+        "schema show",
+        "schema add",
+        "schema add-field",
+        "schema add-value",
+        "schema retire",
+        "schema drop",
+        "log",
+        "ls",
+        "get",
+        "sum",
+        "last",
+        "today",
+        "amend",
+        "ignore",
+        "mcp",
+    ] {
+        let out = run(
+            None,
+            None,
+            Cmd::Help(cmd::Help {
+                topic: Some(topic.into()),
+            }),
+        )
+        .unwrap_or_else(|e| panic!("{topic}: {e}"));
+        assert!(out.starts_with(&format!("# {topic}\n")), "{topic}: {out:?}");
     }
-    let path = bottle::default_db_path().unwrap();
-    unsafe {
-        std::env::remove_var("BOTTLE_DB");
-    }
-    assert_eq!(path, std::path::PathBuf::from("/tmp/bottle-cov.db"));
 }
