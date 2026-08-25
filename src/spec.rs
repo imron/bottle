@@ -27,22 +27,31 @@ macro_rules! string_newtype {
             }
         }
 
-        impl TryFrom<String> for $name {
-            type Error = Error;
-            fn try_from(s: String) -> Result<Self, Error> {
-                s.parse()
+        impl Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(self.as_str())
             }
         }
 
-        impl From<$name> for String {
-            fn from(value: $name) -> String {
-                value.to_string()
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                deserialize_from_str(deserializer)
             }
         }
     };
 }
 
 pub(crate) use string_newtype;
+
+fn deserialize_from_str<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    let s = String::deserialize(deserializer)?;
+    s.parse().map_err(serde::de::Error::custom)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Spec {
@@ -148,8 +157,7 @@ impl AsRef<str> for SchemaName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(try_from = "String", into = "String")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FieldName(String);
 
 impl FieldName {
@@ -195,8 +203,7 @@ impl AsRef<str> for LinkName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(try_from = "String", into = "String")]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EnumValue(String);
 
 impl EnumValue {
