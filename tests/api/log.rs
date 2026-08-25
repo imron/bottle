@@ -160,7 +160,7 @@ fn scientific_notation_rejected() {
 }
 
 #[test]
-fn default_agent() {
+fn agent_from_open() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
     h.log(

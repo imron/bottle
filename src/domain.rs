@@ -16,11 +16,7 @@ use crate::spec::{
 use crate::store::{Find, Store};
 use crate::time::{self, Instant, Period, Range};
 
-pub(crate) fn execute(
-    store: &mut Store,
-    default_agent: Option<&Agent>,
-    op: Op,
-) -> Result<Outcome, Error> {
+pub(crate) fn execute(store: &mut Store, agent: &Agent, op: Op) -> Result<Outcome, Error> {
     match op {
         Op::SchemaList => Ok(Outcome::Schemas(Schemas {
             schemas: store.list_schemas()?,
@@ -46,7 +42,7 @@ pub(crate) fn execute(
             drop_schema(tx, &op)?;
             Ok(Outcome::Empty)
         }),
-        Op::Log(op) => log(store, default_agent, op),
+        Op::Log(op) => log(store, agent, op),
         Op::List(op) => list(store, op),
         Op::Get(op) => get(store, op),
         Op::Sum(op) => sum(store, op),
@@ -137,15 +133,12 @@ fn drop_schema(tx: &mut Tx<'_>, op: &SchemaDrop) -> Result<(), Error> {
     tx.drop_schema(&op.name)
 }
 
-fn log(store: &mut Store, default_agent: Option<&Agent>, mut op: Log) -> Result<Outcome, Error> {
+fn log(store: &mut Store, agent: &Agent, mut op: Log) -> Result<Outcome, Error> {
     let kind = store.load_schema(&op.schema)?;
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
-    let agent = op
-        .agent
-        .or_else(|| default_agent.cloned())
-        .or_else(|| Some(Agent::bottle()));
+    let agent = op.agent.as_ref().unwrap_or(agent);
     let at = op.at.unwrap_or_else(Instant::now);
     let values = prepare_fields(&kind.spec, &op.fields, false)?;
     ensure_links(store, &kind.spec, &op.links)?;
@@ -155,7 +148,7 @@ fn log(store: &mut Store, default_agent: Option<&Agent>, mut op: Log) -> Result<
             &op.schema,
             &kind.spec,
             at,
-            agent.as_ref().map(Agent::as_str),
+            Some(agent.as_str()),
             &values,
             &op.links,
         )
