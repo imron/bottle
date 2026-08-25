@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Once;
 
-use bottle::{Bottle, Cmd, Error};
+use bottle::{Bottle, Cmd, Error, cmd};
 use tempfile::TempDir;
 
 static PIN_TZ: Once = Once::new();
@@ -41,10 +41,10 @@ impl Harness {
 
     pub fn add_schema(&mut self, name: &str, yaml: &str) {
         let file = self.yaml_file(&format!("{name}.yaml"), yaml);
-        self.run_ok(Cmd::SchemaAdd {
+        self.run_ok(Cmd::SchemaAdd(cmd::SchemaAdd {
             name: name.into(),
             file,
-        });
+        }));
     }
 
     pub fn log(
@@ -54,7 +54,7 @@ impl Harness {
         links: &[(&str, &str)],
         at: Option<&str>,
     ) -> String {
-        self.run_ok(Cmd::Log {
+        self.run_ok(Cmd::Log(cmd::Log {
             schema: schema.into(),
             at: at.map(str::to_string),
             agent: None,
@@ -66,7 +66,7 @@ impl Harness {
                 .iter()
                 .map(|(n, v)| ((*n).to_string(), (*v).to_string()))
                 .collect(),
-        })
+        }))
     }
 }
 

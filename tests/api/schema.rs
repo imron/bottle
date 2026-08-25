@@ -1,4 +1,4 @@
-use bottle::{Cmd, FieldType};
+use bottle::{Cmd, FieldType, cmd};
 
 use crate::common::{MEAL, SESSION, SET, assert_fail, harness, tsv_lines};
 
@@ -18,10 +18,10 @@ fn add_show_list() {
         tsv_lines(&list),
         vec![vec!["name", "retired"], vec!["nutrition.meal", "false"]]
     );
-    let show = h.run_ok(Cmd::SchemaShow {
+    let show = h.run_ok(Cmd::SchemaShow(cmd::SchemaShow {
         name: "nutrition.meal".into(),
         yaml: false,
-    });
+    }));
     let lines = tsv_lines(&show);
     assert_eq!(lines[0], vec!["name", "type", "required", "values"]);
     assert_eq!(
@@ -35,10 +35,10 @@ fn add_show_list() {
 fn show_yaml_round_trip() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
-    let yaml = h.run_ok(Cmd::SchemaShow {
+    let yaml = h.run_ok(Cmd::SchemaShow(cmd::SchemaShow {
         name: "nutrition.meal".into(),
         yaml: true,
-    });
+    }));
     assert!(yaml.contains("name: when"));
     assert!(yaml.contains("type: enum"));
 }
@@ -48,10 +48,10 @@ fn add_rejects_bad_name() {
     let mut h = harness();
     let file = h.yaml_file("x.yaml", MEAL);
     let err = h
-        .run(Cmd::SchemaAdd {
+        .run(Cmd::SchemaAdd(cmd::SchemaAdd {
             name: "Meal".into(),
             file,
-        })
+        }))
         .unwrap_err();
     assert_fail(err, "invalid schema name");
 }
@@ -72,10 +72,10 @@ fn add_rejects_empty_segments() {
     for name in ["meal.", ".meal", "foo..bar"] {
         let file = h.yaml_file(&format!("{name}.yaml"), MEAL);
         let err = h
-            .run(Cmd::SchemaAdd {
+            .run(Cmd::SchemaAdd(cmd::SchemaAdd {
                 name: name.into(),
                 file,
-            })
+            }))
             .unwrap_err();
         assert_fail(err, "invalid schema name");
     }
@@ -87,10 +87,10 @@ fn add_rejects_duplicate() {
     h.add_schema("nutrition.meal", MEAL);
     let file = h.yaml_file("again.yaml", MEAL);
     let err = h
-        .run(Cmd::SchemaAdd {
+        .run(Cmd::SchemaAdd(cmd::SchemaAdd {
             name: "nutrition.meal".into(),
             file,
-        })
+        }))
         .unwrap_err();
     assert_fail(err, "exists");
 }
@@ -99,22 +99,22 @@ fn add_rejects_duplicate() {
 fn add_field_and_value() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
-    h.run_ok(Cmd::SchemaAddField {
+    h.run_ok(Cmd::SchemaAddField(cmd::SchemaAddField {
         schema: "nutrition.meal".into(),
         name: "fiber".into(),
         type_: FieldType::Number,
         values: None,
         default: None,
-    });
-    h.run_ok(Cmd::SchemaAddValue {
+    }));
+    h.run_ok(Cmd::SchemaAddValue(cmd::SchemaAddValue {
         schema: "nutrition.meal".into(),
         field: "when".into(),
         value: "Brunch".into(),
-    });
-    let show = h.run_ok(Cmd::SchemaShow {
+    }));
+    let show = h.run_ok(Cmd::SchemaShow(cmd::SchemaShow {
         name: "nutrition.meal".into(),
         yaml: false,
-    });
+    }));
     assert!(show.contains("fiber\tnumber\tfalse\t"));
     assert!(show.contains("brunch"));
 }
@@ -124,11 +124,11 @@ fn add_value_duplicate_after_fold() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
     let err = h
-        .run(Cmd::SchemaAddValue {
+        .run(Cmd::SchemaAddValue(cmd::SchemaAddValue {
             schema: "nutrition.meal".into(),
             field: "when".into(),
             value: "BREAKFAST".into(),
-        })
+        }))
         .unwrap_err();
     assert_fail(err, "exists");
 }
@@ -137,17 +137,17 @@ fn add_value_duplicate_after_fold() {
 fn retire_blocks_log_not_show() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
-    h.run_ok(Cmd::SchemaRetire {
+    h.run_ok(Cmd::SchemaRetire(cmd::SchemaRetire {
         name: "nutrition.meal".into(),
-    });
+    }));
     let list = h.run_ok(Cmd::SchemaList);
     assert!(list.contains("nutrition.meal\ttrue"));
-    h.run_ok(Cmd::SchemaShow {
+    h.run_ok(Cmd::SchemaShow(cmd::SchemaShow {
         name: "nutrition.meal".into(),
         yaml: false,
-    });
+    }));
     let err = h
-        .run(Cmd::Log {
+        .run(Cmd::Log(cmd::Log {
             schema: "nutrition.meal".into(),
             at: None,
             agent: None,
@@ -159,7 +159,7 @@ fn retire_blocks_log_not_show() {
                 ("protein".into(), "1".into()),
                 ("carbs".into(), "0".into()),
             ],
-        })
+        }))
         .unwrap_err();
     assert_fail(err, "retired");
 }
@@ -182,12 +182,12 @@ fn drop_blocked_by_inbound_link() {
         Some("2026-08-22T08:01:00Z"),
     );
     let err = h
-        .run(Cmd::SchemaDrop {
+        .run(Cmd::SchemaDrop(cmd::SchemaDrop {
             name: "fitness.session".into(),
-        })
+        }))
         .unwrap_err();
     assert_fail(err, "inbound");
-    h.run_ok(Cmd::Amend {
+    h.run_ok(Cmd::Amend(cmd::Amend {
         schema: "fitness.set".into(),
         id: 1,
         at: None,
@@ -195,10 +195,10 @@ fn drop_blocked_by_inbound_link() {
         links: vec![],
         unlinks: vec!["session".into()],
         fields: vec![],
-    });
-    h.run_ok(Cmd::SchemaDrop {
+    }));
+    h.run_ok(Cmd::SchemaDrop(cmd::SchemaDrop {
         name: "fitness.session".into(),
-    });
+    }));
     let list = h.run_ok(Cmd::SchemaList);
     assert!(!list.contains("fitness.session"));
 }
@@ -207,10 +207,10 @@ fn drop_blocked_by_inbound_link() {
 fn show_missing() {
     let mut h = harness();
     let err = h
-        .run(Cmd::SchemaShow {
+        .run(Cmd::SchemaShow(cmd::SchemaShow {
             name: "no.such".into(),
             yaml: false,
-        })
+        }))
         .unwrap_err();
     assert_fail(err, "unknown schema");
 }

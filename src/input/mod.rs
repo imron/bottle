@@ -1,4 +1,4 @@
-mod cmd;
+pub mod cmd;
 mod error;
 mod tsv;
 
@@ -25,16 +25,16 @@ pub(crate) struct Request {
 
 pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
     let style = match &cmd {
-        Cmd::SchemaShow { yaml: true, .. } => Style::Yaml,
+        Cmd::SchemaShow(cmd::SchemaShow { yaml: true, .. }) => Style::Yaml,
         _ => Style::Tsv,
     };
     let show_ignored = matches!(
         &cmd,
-        Cmd::Get { .. }
-            | Cmd::Ls {
+        Cmd::Get(_)
+            | Cmd::Ls(cmd::Ls {
                 include_ignored: true,
                 ..
-            }
+            })
     );
     Ok(Request {
         op: Op::try_from(cmd)?,
@@ -48,135 +48,199 @@ impl TryFrom<Cmd> for Op {
 
     fn try_from(cmd: Cmd) -> Result<Self, Error> {
         Ok(match cmd {
-            Cmd::Help { .. } => return Err(Error::Fail(Fail::HelpNotAnOp)),
+            Cmd::Help(_) => return Err(Error::Fail(Fail::HelpNotAnOp)),
             Cmd::SchemaList => Op::SchemaList,
-            Cmd::SchemaShow { name, yaml: _ } => Op::SchemaShow(SchemaShow {
-                name: SchemaName::parse(&name)?,
-            }),
-            Cmd::SchemaAdd { name, file } => {
-                let raw = std::fs::read_to_string(&file)?;
-                Op::SchemaAdd(SchemaAdd {
-                    name: SchemaName::parse(&name)?,
-                    spec: Spec::parse_yaml(&raw)?,
-                })
-            }
-            Cmd::SchemaAddField {
-                schema,
-                name,
-                type_,
-                values,
-                default,
-            } => Op::SchemaAddField(SchemaAddField {
-                schema: SchemaName::parse(&schema)?,
-                name: FieldName::parse(&name)?,
-                type_,
-                values,
-                default,
-            }),
-            Cmd::SchemaAddValue {
-                schema,
-                field,
-                value,
-            } => Op::SchemaAddValue(SchemaAddValue {
-                schema: SchemaName::parse(&schema)?,
-                field: FieldName::parse(&field)?,
-                value,
-            }),
-            Cmd::SchemaRetire { name } => Op::SchemaRetire(SchemaRetire {
-                name: SchemaName::parse(&name)?,
-            }),
-            Cmd::SchemaDrop { name } => Op::SchemaDrop(SchemaDrop {
-                name: SchemaName::parse(&name)?,
-            }),
-            Cmd::Log {
-                schema,
-                at,
-                agent,
-                links,
-                fields,
-            } => Op::Log(Log {
-                schema: SchemaName::parse(&schema)?,
-                at: at.as_deref().map(time::parse_instant).transpose()?,
-                agent: agent.map(Agent::new),
-                links: parse_links(links)?,
-                fields: parse_fields(fields)?,
-            }),
-            Cmd::Ls {
-                schema,
-                from,
-                to,
-                agent,
-                wheres,
-                include_ignored,
-            } => Op::List(List {
-                schema: SchemaName::parse(&schema)?,
-                range: Range::parse(from.as_deref(), to.as_deref())?,
-                agent: agent.map(Agent::new),
-                filters: parse_clauses(wheres)?,
-                include_ignored,
-            }),
-            Cmd::Get { schema, id } => Op::Get(Get {
-                schema: SchemaName::parse(&schema)?,
-                id,
-            }),
-            Cmd::Sum {
-                schema,
-                field,
-                from,
-                to,
-                agent,
-                wheres,
-                group,
-            } => Op::Sum(Sum {
-                schema: SchemaName::parse(&schema)?,
-                field: FieldName::parse(&field)?,
-                range: Range::parse(from.as_deref(), to.as_deref())?,
-                agent: agent.map(Agent::new),
-                filters: parse_clauses(wheres)?,
-                group: group
-                    .as_deref()
-                    .map(crate::spec::Group::parse)
-                    .transpose()?,
-            }),
-            Cmd::Last {
-                schema,
-                agent,
-                wheres,
-            } => Op::Last(Last {
-                schema: SchemaName::parse(&schema)?,
-                agent: agent.map(Agent::new),
-                filters: parse_clauses(wheres)?,
-            }),
-            Cmd::Today {
-                schema,
-                agent,
-                wheres,
-            } => Op::Today(Today {
-                schema: SchemaName::parse(&schema)?,
-                agent: agent.map(Agent::new),
-                filters: parse_clauses(wheres)?,
-            }),
-            Cmd::Amend {
-                schema,
-                id,
-                at,
-                agent,
-                links,
-                unlinks,
-                fields,
-            } => Op::Amend(Amend {
-                schema: SchemaName::parse(&schema)?,
-                id,
-                at: at.as_deref().map(time::parse_instant).transpose()?,
-                agent: agent.map(Agent::new),
-                links: parse_links(links)?,
-                unlinks: parse_unlinks(unlinks)?,
-                fields: parse_fields(fields)?,
-            }),
-            Cmd::Ignore { schema, id } => Op::Ignore(Ignore {
-                schema: SchemaName::parse(&schema)?,
-                id,
-            }),
+            Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.try_into()?),
+            Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.try_into()?),
+            Cmd::SchemaAddField(cmd) => Op::SchemaAddField(cmd.try_into()?),
+            Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(cmd.try_into()?),
+            Cmd::SchemaRetire(cmd) => Op::SchemaRetire(cmd.try_into()?),
+            Cmd::SchemaDrop(cmd) => Op::SchemaDrop(cmd.try_into()?),
+            Cmd::Log(cmd) => Op::Log(cmd.try_into()?),
+            Cmd::Ls(cmd) => Op::List(cmd.try_into()?),
+            Cmd::Get(cmd) => Op::Get(cmd.try_into()?),
+            Cmd::Sum(cmd) => Op::Sum(cmd.try_into()?),
+            Cmd::Last(cmd) => Op::Last(cmd.try_into()?),
+            Cmd::Today(cmd) => Op::Today(cmd.try_into()?),
+            Cmd::Amend(cmd) => Op::Amend(cmd.try_into()?),
+            Cmd::Ignore(cmd) => Op::Ignore(cmd.try_into()?),
+        })
+    }
+}
+
+impl TryFrom<cmd::SchemaShow> for SchemaShow {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::SchemaShow) -> Result<Self, Error> {
+        Ok(Self {
+            name: SchemaName::parse(&cmd.name)?,
+        })
+    }
+}
+
+impl TryFrom<cmd::SchemaAdd> for SchemaAdd {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::SchemaAdd) -> Result<Self, Error> {
+        let raw = std::fs::read_to_string(&cmd.file)?;
+        Ok(Self {
+            name: SchemaName::parse(&cmd.name)?,
+            spec: Spec::parse_yaml(&raw)?,
+        })
+    }
+}
+
+impl TryFrom<cmd::SchemaAddField> for SchemaAddField {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::SchemaAddField) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            name: FieldName::parse(&cmd.name)?,
+            type_: cmd.type_,
+            values: cmd.values,
+            default: cmd.default,
+        })
+    }
+}
+
+impl TryFrom<cmd::SchemaAddValue> for SchemaAddValue {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::SchemaAddValue) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            field: FieldName::parse(&cmd.field)?,
+            value: cmd.value,
+        })
+    }
+}
+
+impl TryFrom<cmd::SchemaRetire> for SchemaRetire {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::SchemaRetire) -> Result<Self, Error> {
+        Ok(Self {
+            name: SchemaName::parse(&cmd.name)?,
+        })
+    }
+}
+
+impl TryFrom<cmd::SchemaDrop> for SchemaDrop {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::SchemaDrop) -> Result<Self, Error> {
+        Ok(Self {
+            name: SchemaName::parse(&cmd.name)?,
+        })
+    }
+}
+
+impl TryFrom<cmd::Log> for Log {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::Log) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            at: cmd.at.as_deref().map(time::parse_instant).transpose()?,
+            agent: cmd.agent.map(Agent::new),
+            links: parse_links(cmd.links)?,
+            fields: parse_fields(cmd.fields)?,
+        })
+    }
+}
+
+impl TryFrom<cmd::Ls> for List {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::Ls) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref())?,
+            agent: cmd.agent.map(Agent::new),
+            filters: parse_clauses(cmd.wheres)?,
+            include_ignored: cmd.include_ignored,
+        })
+    }
+}
+
+impl TryFrom<cmd::Get> for Get {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::Get) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            id: cmd.id,
+        })
+    }
+}
+
+impl TryFrom<cmd::Sum> for Sum {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::Sum) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            field: FieldName::parse(&cmd.field)?,
+            range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref())?,
+            agent: cmd.agent.map(Agent::new),
+            filters: parse_clauses(cmd.wheres)?,
+            group: cmd
+                .group
+                .as_deref()
+                .map(crate::spec::Group::parse)
+                .transpose()?,
+        })
+    }
+}
+
+impl TryFrom<cmd::Last> for Last {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::Last) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            agent: cmd.agent.map(Agent::new),
+            filters: parse_clauses(cmd.wheres)?,
+        })
+    }
+}
+
+impl TryFrom<cmd::Today> for Today {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::Today) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            agent: cmd.agent.map(Agent::new),
+            filters: parse_clauses(cmd.wheres)?,
+        })
+    }
+}
+
+impl TryFrom<cmd::Amend> for Amend {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::Amend) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            id: cmd.id,
+            at: cmd.at.as_deref().map(time::parse_instant).transpose()?,
+            agent: cmd.agent.map(Agent::new),
+            links: parse_links(cmd.links)?,
+            unlinks: parse_unlinks(cmd.unlinks)?,
+            fields: parse_fields(cmd.fields)?,
+        })
+    }
+}
+
+impl TryFrom<cmd::Ignore> for Ignore {
+    type Error = Error;
+
+    fn try_from(cmd: cmd::Ignore) -> Result<Self, Error> {
+        Ok(Self {
+            schema: SchemaName::parse(&cmd.schema)?,
+            id: cmd.id,
         })
     }
 }

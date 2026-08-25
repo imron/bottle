@@ -3,86 +3,131 @@ use std::path::PathBuf;
 use crate::spec::FieldType;
 
 #[derive(Debug, Clone)]
+pub struct Help {
+    pub topic: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaShow {
+    pub name: String,
+    pub yaml: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaAdd {
+    pub name: String,
+    pub file: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaAddField {
+    pub schema: String,
+    pub name: String,
+    pub type_: FieldType,
+    pub values: Option<Vec<String>>,
+    pub default: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaAddValue {
+    pub schema: String,
+    pub field: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaRetire {
+    pub name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaDrop {
+    pub name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Log {
+    pub schema: String,
+    pub at: Option<String>,
+    pub agent: Option<String>,
+    pub links: Vec<(String, String)>,
+    pub fields: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Ls {
+    pub schema: String,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub agent: Option<String>,
+    pub wheres: Vec<(String, String)>,
+    pub include_ignored: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct Get {
+    pub schema: String,
+    pub id: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct Sum {
+    pub schema: String,
+    pub field: String,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub agent: Option<String>,
+    pub wheres: Vec<(String, String)>,
+    pub group: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Last {
+    pub schema: String,
+    pub agent: Option<String>,
+    pub wheres: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Today {
+    pub schema: String,
+    pub agent: Option<String>,
+    pub wheres: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Amend {
+    pub schema: String,
+    pub id: i64,
+    pub at: Option<String>,
+    pub agent: Option<String>,
+    pub links: Vec<(String, String)>,
+    pub unlinks: Vec<String>,
+    pub fields: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Ignore {
+    pub schema: String,
+    pub id: i64,
+}
+
+#[derive(Debug, Clone)]
 pub enum Cmd {
-    Help {
-        topic: Option<String>,
-    },
+    Help(Help),
     SchemaList,
-    SchemaShow {
-        name: String,
-        yaml: bool,
-    },
-    SchemaAdd {
-        name: String,
-        file: PathBuf,
-    },
-    SchemaAddField {
-        schema: String,
-        name: String,
-        type_: FieldType,
-        values: Option<Vec<String>>,
-        default: Option<String>,
-    },
-    SchemaAddValue {
-        schema: String,
-        field: String,
-        value: String,
-    },
-    SchemaRetire {
-        name: String,
-    },
-    SchemaDrop {
-        name: String,
-    },
-    Log {
-        schema: String,
-        at: Option<String>,
-        agent: Option<String>,
-        links: Vec<(String, String)>,
-        fields: Vec<(String, String)>,
-    },
-    Ls {
-        schema: String,
-        from: Option<String>,
-        to: Option<String>,
-        agent: Option<String>,
-        wheres: Vec<(String, String)>,
-        include_ignored: bool,
-    },
-    Get {
-        schema: String,
-        id: i64,
-    },
-    Sum {
-        schema: String,
-        field: String,
-        from: Option<String>,
-        to: Option<String>,
-        agent: Option<String>,
-        wheres: Vec<(String, String)>,
-        group: Option<String>,
-    },
-    Last {
-        schema: String,
-        agent: Option<String>,
-        wheres: Vec<(String, String)>,
-    },
-    Today {
-        schema: String,
-        agent: Option<String>,
-        wheres: Vec<(String, String)>,
-    },
-    Amend {
-        schema: String,
-        id: i64,
-        at: Option<String>,
-        agent: Option<String>,
-        links: Vec<(String, String)>,
-        unlinks: Vec<String>,
-        fields: Vec<(String, String)>,
-    },
-    Ignore {
-        schema: String,
-        id: i64,
-    },
+    SchemaShow(SchemaShow),
+    SchemaAdd(SchemaAdd),
+    SchemaAddField(SchemaAddField),
+    SchemaAddValue(SchemaAddValue),
+    SchemaRetire(SchemaRetire),
+    SchemaDrop(SchemaDrop),
+    Log(Log),
+    Ls(Ls),
+    Get(Get),
+    Sum(Sum),
+    Last(Last),
+    Today(Today),
+    Amend(Amend),
+    Ignore(Ignore),
 }
