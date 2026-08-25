@@ -36,144 +36,149 @@ pub(crate) fn parse(cmd: Cmd) -> Result<Request, Error> {
                 ..
             }
     );
-    let op = match cmd {
-        Cmd::Help { .. } => {
-            return Err(Error::Fail(Fail::HelpNotAnOp));
-        }
-        Cmd::SchemaList => Op::SchemaList,
-        Cmd::SchemaShow { name, yaml: _ } => Op::SchemaShow(SchemaShow {
-            name: SchemaName::parse(&name)?,
-        }),
-        Cmd::SchemaAdd { name, file } => {
-            let raw = std::fs::read_to_string(&file)?;
-            Op::SchemaAdd(SchemaAdd {
-                name: SchemaName::parse(&name)?,
-                spec: Spec::parse_yaml(&raw)?,
-            })
-        }
-        Cmd::SchemaAddField {
-            schema,
-            name,
-            type_,
-            values,
-            default,
-        } => Op::SchemaAddField(SchemaAddField {
-            schema: SchemaName::parse(&schema)?,
-            name: FieldName::parse(&name)?,
-            type_,
-            values,
-            default,
-        }),
-        Cmd::SchemaAddValue {
-            schema,
-            field,
-            value,
-        } => Op::SchemaAddValue(SchemaAddValue {
-            schema: SchemaName::parse(&schema)?,
-            field: FieldName::parse(&field)?,
-            value,
-        }),
-        Cmd::SchemaRetire { name } => Op::SchemaRetire(SchemaRetire {
-            name: SchemaName::parse(&name)?,
-        }),
-        Cmd::SchemaDrop { name } => Op::SchemaDrop(SchemaDrop {
-            name: SchemaName::parse(&name)?,
-        }),
-        Cmd::Log {
-            schema,
-            at,
-            agent,
-            links,
-            fields,
-        } => Op::Log(Log {
-            schema: SchemaName::parse(&schema)?,
-            at: at.as_deref().map(time::parse_instant).transpose()?,
-            agent: agent.map(Agent::new),
-            links: parse_links(links)?,
-            fields: parse_fields(fields)?,
-        }),
-        Cmd::Ls {
-            schema,
-            from,
-            to,
-            agent,
-            wheres,
-            include_ignored,
-        } => Op::List(List {
-            schema: SchemaName::parse(&schema)?,
-            range: Range::parse(from.as_deref(), to.as_deref())?,
-            agent: agent.map(Agent::new),
-            filters: parse_clauses(wheres)?,
-            include_ignored,
-        }),
-        Cmd::Get { schema, id } => Op::Get(Get {
-            schema: SchemaName::parse(&schema)?,
-            id,
-        }),
-        Cmd::Sum {
-            schema,
-            field,
-            from,
-            to,
-            agent,
-            wheres,
-            group,
-        } => Op::Sum(Sum {
-            schema: SchemaName::parse(&schema)?,
-            field: FieldName::parse(&field)?,
-            range: Range::parse(from.as_deref(), to.as_deref())?,
-            agent: agent.map(Agent::new),
-            filters: parse_clauses(wheres)?,
-            group: group
-                .as_deref()
-                .map(crate::spec::Group::parse)
-                .transpose()?,
-        }),
-        Cmd::Last {
-            schema,
-            agent,
-            wheres,
-        } => Op::Last(Last {
-            schema: SchemaName::parse(&schema)?,
-            agent: agent.map(Agent::new),
-            filters: parse_clauses(wheres)?,
-        }),
-        Cmd::Today {
-            schema,
-            agent,
-            wheres,
-        } => Op::Today(Today {
-            schema: SchemaName::parse(&schema)?,
-            agent: agent.map(Agent::new),
-            filters: parse_clauses(wheres)?,
-        }),
-        Cmd::Amend {
-            schema,
-            id,
-            at,
-            agent,
-            links,
-            unlinks,
-            fields,
-        } => Op::Amend(Amend {
-            schema: SchemaName::parse(&schema)?,
-            id,
-            at: at.as_deref().map(time::parse_instant).transpose()?,
-            agent: agent.map(Agent::new),
-            links: parse_links(links)?,
-            unlinks: parse_unlinks(unlinks)?,
-            fields: parse_fields(fields)?,
-        }),
-        Cmd::Ignore { schema, id } => Op::Ignore(Ignore {
-            schema: SchemaName::parse(&schema)?,
-            id,
-        }),
-    };
     Ok(Request {
-        op,
+        op: Op::try_from(cmd)?,
         style,
         show_ignored,
     })
+}
+
+impl TryFrom<Cmd> for Op {
+    type Error = Error;
+
+    fn try_from(cmd: Cmd) -> Result<Self, Error> {
+        Ok(match cmd {
+            Cmd::Help { .. } => return Err(Error::Fail(Fail::HelpNotAnOp)),
+            Cmd::SchemaList => Op::SchemaList,
+            Cmd::SchemaShow { name, yaml: _ } => Op::SchemaShow(SchemaShow {
+                name: SchemaName::parse(&name)?,
+            }),
+            Cmd::SchemaAdd { name, file } => {
+                let raw = std::fs::read_to_string(&file)?;
+                Op::SchemaAdd(SchemaAdd {
+                    name: SchemaName::parse(&name)?,
+                    spec: Spec::parse_yaml(&raw)?,
+                })
+            }
+            Cmd::SchemaAddField {
+                schema,
+                name,
+                type_,
+                values,
+                default,
+            } => Op::SchemaAddField(SchemaAddField {
+                schema: SchemaName::parse(&schema)?,
+                name: FieldName::parse(&name)?,
+                type_,
+                values,
+                default,
+            }),
+            Cmd::SchemaAddValue {
+                schema,
+                field,
+                value,
+            } => Op::SchemaAddValue(SchemaAddValue {
+                schema: SchemaName::parse(&schema)?,
+                field: FieldName::parse(&field)?,
+                value,
+            }),
+            Cmd::SchemaRetire { name } => Op::SchemaRetire(SchemaRetire {
+                name: SchemaName::parse(&name)?,
+            }),
+            Cmd::SchemaDrop { name } => Op::SchemaDrop(SchemaDrop {
+                name: SchemaName::parse(&name)?,
+            }),
+            Cmd::Log {
+                schema,
+                at,
+                agent,
+                links,
+                fields,
+            } => Op::Log(Log {
+                schema: SchemaName::parse(&schema)?,
+                at: at.as_deref().map(time::parse_instant).transpose()?,
+                agent: agent.map(Agent::new),
+                links: parse_links(links)?,
+                fields: parse_fields(fields)?,
+            }),
+            Cmd::Ls {
+                schema,
+                from,
+                to,
+                agent,
+                wheres,
+                include_ignored,
+            } => Op::List(List {
+                schema: SchemaName::parse(&schema)?,
+                range: Range::parse(from.as_deref(), to.as_deref())?,
+                agent: agent.map(Agent::new),
+                filters: parse_clauses(wheres)?,
+                include_ignored,
+            }),
+            Cmd::Get { schema, id } => Op::Get(Get {
+                schema: SchemaName::parse(&schema)?,
+                id,
+            }),
+            Cmd::Sum {
+                schema,
+                field,
+                from,
+                to,
+                agent,
+                wheres,
+                group,
+            } => Op::Sum(Sum {
+                schema: SchemaName::parse(&schema)?,
+                field: FieldName::parse(&field)?,
+                range: Range::parse(from.as_deref(), to.as_deref())?,
+                agent: agent.map(Agent::new),
+                filters: parse_clauses(wheres)?,
+                group: group
+                    .as_deref()
+                    .map(crate::spec::Group::parse)
+                    .transpose()?,
+            }),
+            Cmd::Last {
+                schema,
+                agent,
+                wheres,
+            } => Op::Last(Last {
+                schema: SchemaName::parse(&schema)?,
+                agent: agent.map(Agent::new),
+                filters: parse_clauses(wheres)?,
+            }),
+            Cmd::Today {
+                schema,
+                agent,
+                wheres,
+            } => Op::Today(Today {
+                schema: SchemaName::parse(&schema)?,
+                agent: agent.map(Agent::new),
+                filters: parse_clauses(wheres)?,
+            }),
+            Cmd::Amend {
+                schema,
+                id,
+                at,
+                agent,
+                links,
+                unlinks,
+                fields,
+            } => Op::Amend(Amend {
+                schema: SchemaName::parse(&schema)?,
+                id,
+                at: at.as_deref().map(time::parse_instant).transpose()?,
+                agent: agent.map(Agent::new),
+                links: parse_links(links)?,
+                unlinks: parse_unlinks(unlinks)?,
+                fields: parse_fields(fields)?,
+            }),
+            Cmd::Ignore { schema, id } => Op::Ignore(Ignore {
+                schema: SchemaName::parse(&schema)?,
+                id,
+            }),
+        })
+    }
 }
 
 pub(crate) fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Result<String, Error> {
