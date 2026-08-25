@@ -4,9 +4,9 @@ use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
-    Agent, Amend, Clause, Entry, FieldInput, FieldValue, Filter, Get, Ignore, Last, List, Log, Op,
-    Order, Outcome, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire,
-    SchemaShow, Sum, Today,
+    Agent, Amend, Clause, Entries, Entry, FieldInput, FieldValue, Filter, Get, GroupedLink,
+    GroupedTime, Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField,
+    SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
 use crate::mutable_store::Tx;
 use crate::spec::{
@@ -22,7 +22,9 @@ pub(crate) fn execute(
     op: Op,
 ) -> Result<Outcome, Error> {
     match op {
-        Op::SchemaList => Ok(Outcome::Schemas(store.list_schemas()?)),
+        Op::SchemaList => Ok(Outcome::Schemas(Schemas {
+            schemas: store.list_schemas()?,
+        })),
         Op::SchemaShow(op) => show_schema(store, op),
         Op::SchemaAdd(op) => {
             add_schema(store, op)?;
@@ -158,11 +160,11 @@ fn log(store: &mut Store, default_agent: Option<&Agent>, mut op: Log) -> Result<
             &op.links,
         )
     })?;
-    Ok(Outcome::Posted {
+    Ok(Outcome::Posted(Posted {
         id,
         at,
         links: op.links,
-    })
+    }))
 }
 
 fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
@@ -215,11 +217,11 @@ fn amend(store: &mut Store, mut op: Amend) -> Result<Outcome, Error> {
                     id: op.id,
                 })
             })?;
-        Ok(Outcome::Posted {
+        Ok(Outcome::Posted(Posted {
             id: op.id,
             at: entry.at,
             links: entry.links,
-        })
+        }))
     })
 }
 
@@ -232,10 +234,10 @@ fn ignore(store: &mut Store, op: Ignore) -> Result<Outcome, Error> {
         }));
     };
     store.transaction(|tx| tx.set_ignored(&op.schema, op.id))?;
-    Ok(Outcome::Stamp {
+    Ok(Outcome::Stamp(Stamp {
         id: op.id,
         at: entry.at,
-    })
+    }))
 }
 
 fn get(store: &Store, op: Get) -> Result<Outcome, Error> {
@@ -246,10 +248,10 @@ fn get(store: &Store, op: Get) -> Result<Outcome, Error> {
             id: op.id,
         }));
     };
-    Ok(Outcome::Entries {
+    Ok(Outcome::Entries(Entries {
         spec,
         entries: vec![entry],
-    })
+    }))
 }
 
 fn last(store: &Store, op: Last) -> Result<Outcome, Error> {
@@ -266,7 +268,9 @@ fn last(store: &Store, op: Last) -> Result<Outcome, Error> {
         },
     )?;
     match &outcome {
-        Outcome::Entries { entries, .. } if entries.is_empty() => Err(Error::Fail(Fail::NotFound)),
+        Outcome::Entries(Entries { entries, .. }) if entries.is_empty() => {
+            Err(Error::Fail(Fail::NotFound))
+        }
         _ => Ok(outcome),
     }
 }
@@ -324,7 +328,7 @@ fn find_entries(store: &Store, q: Query<'_>) -> Result<Outcome, Error> {
         order: q.order,
         limit: q.limit,
     })?;
-    Ok(Outcome::Entries { spec, entries })
+    Ok(Outcome::Entries(Entries { spec, entries }))
 }
 
 fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
@@ -349,10 +353,10 @@ fn sum(store: &Store, op: Sum) -> Result<Outcome, Error> {
     match op.group {
         None => {
             let total: Decimal = entries.iter().filter_map(|e| e.number(&op.field)).sum();
-            Ok(Outcome::Total {
+            Ok(Outcome::Total(Total {
                 field: op.field,
                 value: total,
-            })
+            }))
         }
         Some(Group::Time(unit)) => grouped_time(&entries, &op.field, unit),
         Some(Group::Link(name)) => {
@@ -374,10 +378,10 @@ fn grouped_time(
         let k = time::period(unit, entry.at);
         *buckets.entry(k).or_insert(Decimal::ZERO) += entry.number(field).unwrap_or(Decimal::ZERO);
     }
-    Ok(Outcome::GroupedTime {
+    Ok(Outcome::GroupedTime(GroupedTime {
         unit,
         buckets: buckets.into_iter().collect(),
-    })
+    }))
 }
 
 fn grouped_link(entries: &[Entry], field: &FieldName, name: LinkName) -> Result<Outcome, Error> {
@@ -391,10 +395,10 @@ fn grouped_link(entries: &[Entry], field: &FieldName, name: LinkName) -> Result<
         *buckets.entry(key).or_insert(Decimal::ZERO) +=
             entry.number(field).unwrap_or(Decimal::ZERO);
     }
-    Ok(Outcome::GroupedLink {
+    Ok(Outcome::GroupedLink(GroupedLink {
         name,
         buckets: buckets.into_iter().collect(),
-    })
+    }))
 }
 
 fn resolve_filters(spec: &Spec, filters: &[Clause]) -> Result<Vec<Filter>, Error> {

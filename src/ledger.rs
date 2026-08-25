@@ -208,33 +208,56 @@ pub enum Op {
 }
 
 #[derive(Debug, Clone)]
+pub struct Schemas {
+    pub schemas: Vec<SchemaInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Entries {
+    pub spec: Spec,
+    pub entries: Vec<Entry>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Posted {
+    pub id: i64,
+    pub at: Instant,
+    pub links: Vec<Link>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Stamp {
+    pub id: i64,
+    pub at: Instant,
+}
+
+#[derive(Debug, Clone)]
+pub struct Total {
+    pub field: FieldName,
+    pub value: Decimal,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupedTime {
+    pub unit: TimePeriod,
+    pub buckets: Vec<(Period, Decimal)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupedLink {
+    pub name: LinkName,
+    pub buckets: Vec<(Option<EntryRef>, Decimal)>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Outcome {
     Empty,
-    Schemas(Vec<SchemaInfo>),
+    Schemas(Schemas),
     Spec(Spec),
-    Entries {
-        spec: Spec,
-        entries: Vec<Entry>,
-    },
-    Posted {
-        id: i64,
-        at: Instant,
-        links: Vec<Link>,
-    },
-    Stamp {
-        id: i64,
-        at: Instant,
-    },
-    Total {
-        field: FieldName,
-        value: Decimal,
-    },
-    GroupedTime {
-        unit: TimePeriod,
-        buckets: Vec<(Period, Decimal)>,
-    },
-    GroupedLink {
-        name: LinkName,
-        buckets: Vec<(Option<EntryRef>, Decimal)>,
-    },
+    Entries(Entries),
+    Posted(Posted),
+    Stamp(Stamp),
+    Total(Total),
+    GroupedTime(GroupedTime),
+    GroupedLink(GroupedLink),
 }

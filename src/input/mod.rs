@@ -4,8 +4,9 @@ mod tsv;
 
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
-    Agent, Amend, Clause, FieldInput, FieldValue, Get, Ignore, Last, List, Log, Op, Outcome,
-    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Sum, Today,
+    Agent, Amend, Clause, Entries, FieldInput, FieldValue, Get, GroupedLink, GroupedTime, Ignore,
+    Last, List, Log, Op, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop,
+    SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
 use crate::spec::{FieldName, Identifier, Link, LinkName, SchemaName, Spec, is_reserved};
 use crate::time::{self, Period, Range};
@@ -248,8 +249,8 @@ impl TryFrom<cmd::Ignore> for Ignore {
 pub(crate) fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Result<String, Error> {
     match outcome {
         Outcome::Empty => Ok(String::new()),
-        Outcome::Schemas(list) => {
-            let rows: Vec<Vec<String>> = list
+        Outcome::Schemas(Schemas { schemas }) => {
+            let rows: Vec<Vec<String>> = schemas
                 .iter()
                 .map(|s| vec![s.name.to_string(), tsv::bool_cell(s.retired).to_string()])
                 .collect();
@@ -259,30 +260,30 @@ pub(crate) fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Res
             Style::Yaml => spec.to_yaml(),
             Style::Tsv => render_spec(spec),
         },
-        Outcome::Entries { spec, entries } => render_entries(spec, entries, show_ignored),
-        Outcome::Posted { id, at, links } => {
+        Outcome::Entries(Entries { spec, entries }) => render_entries(spec, entries, show_ignored),
+        Outcome::Posted(Posted { id, at, links }) => {
             let at = time::display_local(*at)?;
             Ok(tsv::table(
                 &["id", "at", "links"],
                 &[vec![id.to_string(), at, render_links(links)]],
             ))
         }
-        Outcome::Stamp { id, at } => {
+        Outcome::Stamp(Stamp { id, at }) => {
             let at = time::display_local(*at)?;
             Ok(tsv::table(&["id", "at"], &[vec![id.to_string(), at]]))
         }
-        Outcome::Total { field, value } => Ok(tsv::table(
+        Outcome::Total(Total { field, value }) => Ok(tsv::table(
             &["field", "value"],
             &[vec![field.to_string(), tsv::number(*value)]],
         )),
-        Outcome::GroupedTime { unit, buckets } => {
+        Outcome::GroupedTime(GroupedTime { unit, buckets }) => {
             let rows: Vec<Vec<String>> = buckets
                 .iter()
                 .map(|(k, v)| vec![render_period(*k), tsv::number(*v)])
                 .collect();
             Ok(tsv::table(&[unit.as_str(), "value"], &rows))
         }
-        Outcome::GroupedLink { name, buckets } => {
+        Outcome::GroupedLink(GroupedLink { name, buckets }) => {
             let rows: Vec<Vec<String>> = buckets
                 .iter()
                 .map(|(k, v)| {
