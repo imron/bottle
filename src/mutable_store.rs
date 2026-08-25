@@ -7,12 +7,8 @@ use crate::error::{Error, Fail, UniqueConstraint};
 use crate::ledger::{Entry, FieldValue};
 use crate::spec::{Field, FieldName, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
-use crate::store::{inbound_link_count as inbound_on, load_entry, schema_exists as exists_on};
+use crate::store::{inbound_link_count as inbound_on, load_entry};
 use crate::time::Instant;
-
-pub(crate) fn schema_exists(tx: &Tx<'_>, name: &SchemaName) -> Result<bool, Error> {
-    exists_on(tx.conn(), name)
-}
 
 pub(crate) fn get_entry(
     tx: &Tx<'_>,
@@ -85,15 +81,19 @@ pub(crate) fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<u64, Error> {
     Ok(n as u64)
 }
 
-pub(crate) fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
+pub(crate) fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<u64, Error> {
+    let n = tx
+        .conn()
+        .execute("DELETE FROM schemas WHERE name = ?1", [name.as_str()])?;
+    if n == 0 {
+        return Ok(0);
+    }
     let table = table_name(name);
     tx.conn()
         .execute("DELETE FROM links WHERE from_schema = ?1", [name.as_str()])?;
     tx.conn()
         .execute_batch(&format!("DROP TABLE {}", quote_ident(&table)))?;
-    tx.conn()
-        .execute("DELETE FROM schemas WHERE name = ?1", [name.as_str()])?;
-    Ok(())
+    Ok(n as u64)
 }
 
 pub(crate) fn insert_entry(

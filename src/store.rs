@@ -82,15 +82,6 @@ fn load_schema_on(conn: &Connection, name: &SchemaName) -> Result<Schema, Error>
     })
 }
 
-pub(crate) fn schema_exists(conn: &Connection, name: &SchemaName) -> Result<bool, Error> {
-    let n: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM schemas WHERE name = ?1",
-        [name.as_str()],
-        |row| row.get(0),
-    )?;
-    Ok(n > 0)
-}
-
 pub(crate) fn inbound_link_count(conn: &Connection, name: &SchemaName) -> Result<i64, Error> {
     let n: i64 = conn.query_row(
         "SELECT COUNT(*) FROM links WHERE to_schema = ?1",

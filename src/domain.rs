@@ -128,13 +128,13 @@ fn retire(db: &mut Db, op: SchemaRetire) -> Result<(), Error> {
 
 fn drop_schema(db: &mut Db, op: SchemaDrop) -> Result<(), Error> {
     db.transaction(|tx| {
-        if !mutable_store::schema_exists(tx, &op.name)? {
-            return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
-        }
         if mutable_store::inbound_link_count(tx, &op.name)? > 0 {
             return Err(Error::Fail(Fail::SchemaHasInboundLinks(op.name.clone())));
         }
-        mutable_store::drop_schema(tx, &op.name)
+        if mutable_store::drop_schema(tx, &op.name)? == 0 {
+            return Err(Error::Fail(Fail::UnknownSchema(op.name.clone())));
+        }
+        Ok(())
     })
 }
 
