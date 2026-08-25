@@ -3,6 +3,47 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Fail, Usage};
 
+macro_rules! string_newtype {
+    ($name:ident) => {
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(&self.0)
+            }
+        }
+    };
+    ($name:ident, from_str) => {
+        string_newtype!($name);
+
+        impl std::str::FromStr for $name {
+            type Err = Error;
+            fn from_str(s: &str) -> Result<Self, Error> {
+                Self::parse(s)
+            }
+        }
+
+        impl TryFrom<String> for $name {
+            type Error = Error;
+            fn try_from(s: String) -> Result<Self, Error> {
+                s.parse()
+            }
+        }
+
+        impl From<$name> for String {
+            fn from(value: $name) -> String {
+                value.to_string()
+            }
+        }
+    };
+}
+
+pub(crate) use string_newtype;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Spec {
     pub fields: Vec<Field>,
@@ -82,17 +123,9 @@ impl Identifier {
             Err(Error::Fail(Fail::InvalidIdentifier(s.to_string())))
         }
     }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
-impl std::fmt::Display for Identifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
+string_newtype!(Identifier, from_str);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SchemaName(String);
@@ -105,17 +138,9 @@ impl SchemaName {
             Err(Error::Fail(Fail::InvalidSchemaName(s.to_string())))
         }
     }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
-impl std::fmt::Display for SchemaName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
+string_newtype!(SchemaName, from_str);
 
 impl AsRef<str> for SchemaName {
     fn as_ref(&self) -> &str {
@@ -123,7 +148,8 @@ impl AsRef<str> for SchemaName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct FieldName(String);
 
 impl FieldName {
@@ -136,34 +162,13 @@ impl FieldName {
         }
         Ok(Self(s.to_string()))
     }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
-impl std::fmt::Display for FieldName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
+string_newtype!(FieldName, from_str);
 
 impl AsRef<str> for FieldName {
     fn as_ref(&self) -> &str {
         &self.0
-    }
-}
-
-impl Serialize for FieldName {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for FieldName {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let raw = String::deserialize(deserializer)?;
-        FieldName::parse(&raw).map_err(serde::de::Error::custom)
     }
 }
 
@@ -180,17 +185,9 @@ impl LinkName {
         }
         Ok(Self(s.to_string()))
     }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
-impl std::fmt::Display for LinkName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
+string_newtype!(LinkName, from_str);
 
 impl AsRef<str> for LinkName {
     fn as_ref(&self) -> &str {
@@ -198,7 +195,8 @@ impl AsRef<str> for LinkName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct EnumValue(String);
 
 impl EnumValue {
@@ -209,30 +207,9 @@ impl EnumValue {
         }
         Ok(Self(folded))
     }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
-impl std::fmt::Display for EnumValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl Serialize for EnumValue {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for EnumValue {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let raw = String::deserialize(deserializer)?;
-        EnumValue::parse(&raw).map_err(serde::de::Error::custom)
-    }
-}
+string_newtype!(EnumValue, from_str);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimePeriod {

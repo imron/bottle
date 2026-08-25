@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use rust_decimal::Decimal;
 
 use crate::spec::{
-    EntryRef, EnumValue, FieldName, FieldType, Group, Identifier, Link, LinkName, SchemaName, Spec,
-    TimePeriod,
+    self, EntryRef, EnumValue, FieldName, FieldType, Group, Identifier, Link, LinkName, SchemaName,
+    Spec, TimePeriod,
 };
 use crate::time::{Instant, Period, Range};
 
@@ -27,17 +27,9 @@ impl Agent {
     pub fn bottle() -> Self {
         Self("bottle".to_string())
     }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
-impl std::fmt::Display for Agent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
+spec::string_newtype!(Agent);
 
 #[derive(Debug, Clone)]
 pub struct Entry {
