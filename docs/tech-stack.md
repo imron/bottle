@@ -29,13 +29,13 @@ Error types and logging can stay small with custom error types rather than
 ## Crate layout
 
 ```
-src/lib.rs     library: open db, run verbs, format output
-src/main.rs    clap, env, process I/O, exit codes
-tests/         integration tests, one file per command
+src/lib.rs         library: open db, run verbs, format output
+src/bin/bottle.rs  clap, env, process I/O, exit codes
+tests/             integration tests, one file per command
 ```
 
 The library's public entry is structured commands, not
-stringly argv. CLI and MCP both call that. `src/main.rs`
+stringly argv. CLI and MCP both call that. `src/bin/bottle.rs`
 does not open sqlite or format TSV.
 
 ## Database
