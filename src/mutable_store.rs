@@ -130,7 +130,7 @@ impl<'a> Tx<'a> {
             },
         ];
         for field in &spec.fields {
-            col_names.push(field.name.as_str().to_string());
+            col_names.push(field.name.to_string());
             placeholders.push(format!("?{}", bind.len() + 1));
             bind.push(
                 values

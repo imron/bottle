@@ -195,9 +195,9 @@ fn execute_select(conn: &Connection, q: &Find<'_>) -> Result<Vec<Entry>, Error> 
                 }
             }
             Filter::Link { name, to } => {
-                bind.push(SqlVal::Text(q.schema.as_str().to_string()));
-                bind.push(SqlVal::Text(name.as_str().to_string()));
-                bind.push(SqlVal::Text(to.schema.as_str().to_string()));
+                bind.push(SqlVal::Text(q.schema.to_string()));
+                bind.push(SqlVal::Text(name.to_string()));
+                bind.push(SqlVal::Text(to.schema.to_string()));
                 bind.push(SqlVal::Int(to.id));
                 let a = bind.len() - 3;
                 sql.push_str(&format!(

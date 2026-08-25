@@ -182,12 +182,7 @@ pub(crate) fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Res
         Outcome::Schemas(list) => {
             let rows: Vec<Vec<String>> = list
                 .iter()
-                .map(|s| {
-                    vec![
-                        s.name.as_str().to_string(),
-                        tsv::bool_cell(s.retired).to_string(),
-                    ]
-                })
+                .map(|s| vec![s.name.to_string(), tsv::bool_cell(s.retired).to_string()])
                 .collect();
             Ok(tsv::table(&["name", "retired"], &rows))
         }
@@ -209,7 +204,7 @@ pub(crate) fn render(style: Style, show_ignored: bool, outcome: &Outcome) -> Res
         }
         Outcome::Total { field, value } => Ok(tsv::table(
             &["field", "value"],
-            &[vec![field.as_str().to_string(), tsv::number(*value)]],
+            &[vec![field.to_string(), tsv::number(*value)]],
         )),
         Outcome::GroupedTime { unit, buckets } => {
             let rows: Vec<Vec<String>> = buckets
@@ -294,7 +289,7 @@ fn render_spec(spec: &Spec) -> Result<String, Error> {
             None => String::new(),
         };
         rows.push(vec![
-            field.name.as_str().to_string(),
+            field.name.to_string(),
             type_name(field.type_).to_string(),
             tsv::bool_cell(field.required).to_string(),
             values,
@@ -310,7 +305,7 @@ fn render_entries(
 ) -> Result<String, Error> {
     let mut headers = vec!["id".to_string(), "at".to_string(), "links".to_string()];
     for field in &spec.fields {
-        headers.push(field.name.as_str().to_string());
+        headers.push(field.name.to_string());
     }
     headers.push("agent".to_string());
     if show_ignored {
@@ -348,7 +343,7 @@ fn render_value(value: Option<&FieldValue>) -> String {
         None | Some(FieldValue::Empty) => String::new(),
         Some(FieldValue::Text(s)) => s.clone(),
         Some(FieldValue::Number(n)) => tsv::number(*n),
-        Some(FieldValue::Enum(v)) => v.as_str().to_string(),
+        Some(FieldValue::Enum(v)) => v.to_string(),
     }
 }
 
