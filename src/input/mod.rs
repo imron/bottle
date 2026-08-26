@@ -14,8 +14,8 @@ use crate::ledger::{
     SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
 use crate::spec::{
-    EnumValue, Field, FieldKind, FieldName, FieldType, Group, Identifier, Link, LinkName,
-    SchemaName, Spec, fold_enum_values, is_reserved,
+    EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier, Link,
+    LinkName, SchemaName, Spec, is_reserved,
 };
 use crate::time::{self, Period, Range};
 
@@ -115,29 +115,21 @@ fn schema_add_field(cmd: cmd::SchemaAddField) -> Result<SchemaAddField, Error> {
 }
 
 fn field_kind(type_: FieldType, values: Option<Vec<String>>) -> Result<FieldKind, Error> {
-    match type_ {
-        FieldType::Enum => {
-            let Some(values) = values else {
-                return Err(Error::Usage(Usage::EnumValuesRequired));
-            };
-            if values.is_empty() {
-                return Err(Error::Usage(Usage::EnumValuesRequired));
-            }
-            Ok(FieldKind::Enum(fold_enum_values(values)?))
-        }
-        FieldType::Text => {
-            if values.is_some() {
-                return Err(Error::Usage(Usage::EnumValuesNotAllowed));
-            }
-            Ok(FieldKind::Text)
-        }
-        FieldType::Number => {
-            if values.is_some() {
-                return Err(Error::Usage(Usage::EnumValuesNotAllowed));
-            }
-            Ok(FieldKind::Number)
-        }
-    }
+    let values = match (type_, values) {
+        (FieldType::Enum, Some(raw)) => Some(
+            raw.into_iter()
+                .map(|s| EnumValue::parse(&s))
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        (FieldType::Enum, None) => None,
+        (_, None) => None,
+        (_, Some(_)) => return Err(Error::Usage(Usage::EnumValuesNotAllowed)),
+    };
+    FieldKind::from_type(type_, values).map_err(|e| match e {
+        FromTypeErr::ValuesRequired => Error::Usage(Usage::EnumValuesRequired),
+        FromTypeErr::ValuesNotAllowed => Error::Usage(Usage::EnumValuesNotAllowed),
+        FromTypeErr::Duplicate(v) => Error::Fail(Fail::DuplicateEnumValue(v)),
+    })
 }
 
 fn schema_add_value(cmd: cmd::SchemaAddValue) -> Result<SchemaAddValue, Error> {

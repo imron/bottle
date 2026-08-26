@@ -74,6 +74,36 @@ pub enum FieldKind {
     Enum(Vec<EnumValue>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FromTypeErr {
+    ValuesRequired,
+    ValuesNotAllowed,
+    Duplicate(EnumValue),
+}
+
+impl FieldKind {
+    pub fn from_type(
+        type_: FieldType,
+        values: Option<Vec<EnumValue>>,
+    ) -> Result<Self, FromTypeErr> {
+        match (type_, values) {
+            (FieldType::Text, None) => Ok(Self::Text),
+            (FieldType::Number, None) => Ok(Self::Number),
+            (FieldType::Enum, Some(values)) if !values.is_empty() => {
+                let mut seen = HashSet::new();
+                for value in &values {
+                    if !seen.insert(value.clone()) {
+                        return Err(FromTypeErr::Duplicate(value.clone()));
+                    }
+                }
+                Ok(Self::Enum(values))
+            }
+            (FieldType::Enum, _) => Err(FromTypeErr::ValuesRequired),
+            (FieldType::Text | FieldType::Number, Some(_)) => Err(FromTypeErr::ValuesNotAllowed),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FieldType {
@@ -134,35 +164,11 @@ impl Spec {
 
 impl Field {
     fn from_doc(doc: FieldDoc) -> Result<Self, Error> {
-        let kind = match doc.type_ {
-            FieldType::Text => {
-                if doc.values.is_some() {
-                    return Err(Error::Fail(Fail::ValuesOnlyForEnum(doc.name)));
-                }
-                FieldKind::Text
-            }
-            FieldType::Number => {
-                if doc.values.is_some() {
-                    return Err(Error::Fail(Fail::ValuesOnlyForEnum(doc.name)));
-                }
-                FieldKind::Number
-            }
-            FieldType::Enum => {
-                let Some(values) = doc.values else {
-                    return Err(Error::Fail(Fail::EnumNeedsValues(doc.name)));
-                };
-                if values.is_empty() {
-                    return Err(Error::Fail(Fail::EnumNeedsValues(doc.name)));
-                }
-                let mut seen = HashSet::new();
-                for value in &values {
-                    if !seen.insert(value.clone()) {
-                        return Err(Error::Fail(Fail::DuplicateEnumValue(value.clone())));
-                    }
-                }
-                FieldKind::Enum(values)
-            }
-        };
+        let kind = FieldKind::from_type(doc.type_, doc.values).map_err(|e| match e {
+            FromTypeErr::ValuesRequired => Error::Fail(Fail::EnumNeedsValues(doc.name.clone())),
+            FromTypeErr::ValuesNotAllowed => Error::Fail(Fail::ValuesOnlyForEnum(doc.name.clone())),
+            FromTypeErr::Duplicate(v) => Error::Fail(Fail::DuplicateEnumValue(v)),
+        })?;
         Ok(Self {
             name: doc.name,
             kind,
@@ -370,19 +376,6 @@ pub fn is_reserved(s: &str) -> bool {
 
 pub fn is_time_group(s: &str) -> bool {
     matches!(s, "day" | "week" | "month" | "year")
-}
-
-pub fn fold_enum_values(values: Vec<String>) -> Result<Vec<EnumValue>, Error> {
-    let mut out = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    for value in values {
-        let folded = EnumValue::parse(&value)?;
-        if !seen.insert(folded.clone()) {
-            return Err(Error::Fail(Fail::DuplicateEnumValue(folded)));
-        }
-        out.push(folded);
-    }
-    Ok(out)
 }
 
 pub fn parse_number(raw: &str) -> Result<Decimal, Error> {
