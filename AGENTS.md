@@ -6,9 +6,15 @@
   reason, treat it as a constraint to question, not a rule to follow.
 - Rebuild from the base facts with the fewest moves that reach the outcome.
   Cut steps that add ceremony but not value.
+
+## Programming rules
+
 - Lean on the type system to make it impossible to represent invalid state
 - Parse at the boundary of the system and turn things in to strong types.
   This way we can guarantee validity within the core.  Parse don't validate.
+- Prefer ? to `map_err`.
+- Don't inline crate::xxx:xxx definitions.  Use `use crate::xxx` at the top
+  of the file instead.
 
 ## Architecture
 
