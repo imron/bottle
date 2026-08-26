@@ -7,7 +7,7 @@ use crate::db::Connection;
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
 use crate::spec::{
-    EntryRef, EnumValue, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec, TimePeriod,
+    EntryRef, EnumValue, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec, TimePeriod,
 };
 use crate::sql::{
     SqlVal, StoredAgent, StoredEnum, StoredLinkName, StoredLinkSchema, StoredNumber,
@@ -336,8 +336,8 @@ fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<En
                 };
                 if let Some(field) = spec.field(&field_name) {
                     let name = field.name.clone();
-                    match field.type_ {
-                        FieldType::Number => {
+                    match &field.kind {
+                        FieldKind::Number => {
                             let v: Option<String> = r.get(i)?;
                             values.insert(
                                 name,
@@ -349,7 +349,7 @@ fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<En
                                 },
                             );
                         }
-                        FieldType::Enum => {
+                        FieldKind::Enum(_) => {
                             let v: Option<String> = r.get(i)?;
                             values.insert(
                                 name,
@@ -361,7 +361,7 @@ fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<En
                                 },
                             );
                         }
-                        FieldType::Text => {
+                        FieldKind::Text => {
                             let v: Option<String> = r.get(i)?;
                             values.insert(
                                 name,

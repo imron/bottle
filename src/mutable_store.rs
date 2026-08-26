@@ -30,7 +30,7 @@ pub fn add_column(
     default: Option<&FieldValue>,
 ) -> Result<(), Error> {
     let table = quote_ident(&table_name(schema));
-    let col_type = sql_type(field.type_);
+    let col_type = sql_type(&field.kind);
     let alter = if let Some(def) = default {
         let sql_def = sql_default(def);
         format!(
@@ -248,7 +248,7 @@ fn create_columns(spec: &Spec) -> String {
         let mut col = format!(
             "{} {}",
             quote_ident(field.name.as_str()),
-            sql_type(field.type_)
+            sql_type(&field.kind)
         );
         if field.required {
             col.push_str(" NOT NULL");

@@ -4,8 +4,8 @@ use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
 use crate::spec::{
-    self, EntryRef, EnumValue, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec,
-    TimePeriod,
+    self, EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName,
+    Spec, TimePeriod, parse_number,
 };
 use crate::time::{Instant, Period, Range};
 
@@ -15,6 +15,30 @@ pub enum FieldValue {
     Text(String),
     Number(Decimal),
     Enum(EnumValue),
+}
+
+impl FieldValue {
+    pub fn parse(field: &Field, raw: &str) -> Result<Self, Error> {
+        match &field.kind {
+            FieldKind::Text => {
+                if raw.contains('\t') || raw.contains('\n') {
+                    return Err(Error::Fail(Fail::TextHasTabOrNewline(field.name.clone())));
+                }
+                Ok(Self::Text(raw.to_string()))
+            }
+            FieldKind::Number => Ok(Self::Number(parse_number(raw)?)),
+            FieldKind::Enum(values) => {
+                let folded = EnumValue::parse(raw)?;
+                if !values.iter().any(|v| v == &folded) {
+                    return Err(Error::Fail(Fail::InvalidEnumValue {
+                        field: field.name.clone(),
+                        value: raw.to_string(),
+                    }));
+                }
+                Ok(Self::Enum(folded))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,10 +118,8 @@ pub struct SchemaAdd {
 #[derive(Debug, Clone)]
 pub struct SchemaAddField {
     pub schema: SchemaName,
-    pub name: FieldName,
-    pub type_: FieldType,
-    pub values: Option<Vec<String>>,
-    pub default: Option<String>,
+    pub field: Field,
+    pub default: Option<FieldValue>,
 }
 
 #[derive(Debug, Clone)]

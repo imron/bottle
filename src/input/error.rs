@@ -52,7 +52,6 @@ fn fail_message(err: &Fail) -> String {
             "enum value may not contain tab, newline, or comma".into()
         }
         Fail::AgentHasTabOrNewline => "agent may not contain tab or newline".into(),
-        Fail::EnumHasNoValues(name) => format!("enum {name} has no values"),
         Fail::InvalidEnumValue { field, value } => format!("invalid {field} value: {value}"),
         Fail::InvalidSpec(e) => format!("invalid spec: {e}"),
         Fail::Yaml(e) => format!("yaml error: {e}"),

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
@@ -53,19 +55,23 @@ where
     s.parse().map_err(serde::de::Error::custom)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Spec {
     pub fields: Vec<Field>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Field {
     pub name: FieldName,
-    #[serde(rename = "type")]
-    pub type_: FieldType,
+    pub kind: FieldKind,
     pub required: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub values: Option<Vec<EnumValue>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FieldKind {
+    Text,
+    Number,
+    Enum(Vec<EnumValue>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -76,16 +82,33 @@ pub enum FieldType {
     Enum,
 }
 
+#[derive(Serialize, Deserialize)]
+struct SpecDoc {
+    fields: Vec<FieldDoc>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct FieldDoc {
+    name: FieldName,
+    #[serde(rename = "type")]
+    type_: FieldType,
+    required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    values: Option<Vec<EnumValue>>,
+}
+
 impl Spec {
     pub fn parse_yaml(raw: &str) -> Result<Self, Error> {
-        let mut spec: Spec =
+        let doc: SpecDoc =
             serde_yaml::from_str(raw).map_err(|e| Error::Fail(Fail::InvalidSpec(e.to_string())))?;
-        spec.canonicalize()?;
-        Ok(spec)
+        Self::from_doc(doc)
     }
 
     pub fn to_yaml(&self) -> Result<String, Error> {
-        match serde_yaml::to_string(self) {
+        let doc = SpecDoc {
+            fields: self.fields.iter().map(Field::to_doc).collect(),
+        };
+        match serde_yaml::to_string(&doc) {
             Ok(yaml) => Ok(yaml),
             Err(err) => Err(Error::Fail(Fail::Yaml(err.to_string()))),
         }
@@ -95,32 +118,70 @@ impl Spec {
         self.fields.iter().find(|f| &f.name == name)
     }
 
-    fn canonicalize(&mut self) -> Result<(), Error> {
-        let mut seen = std::collections::HashSet::new();
-        for field in &mut self.fields {
+    fn from_doc(doc: SpecDoc) -> Result<Self, Error> {
+        let mut seen = HashSet::new();
+        let mut fields = Vec::new();
+        for field in doc.fields {
+            let field = Field::from_doc(field)?;
             if !seen.insert(field.name.clone()) {
-                return Err(Error::Fail(Fail::DuplicateSpecField(field.name.clone())));
+                return Err(Error::Fail(Fail::DuplicateSpecField(field.name)));
             }
-            match field.type_ {
-                FieldType::Enum => {
-                    let Some(values) = field.values.as_mut() else {
-                        return Err(Error::Fail(Fail::EnumNeedsValues(field.name.clone())));
-                    };
-                    let mut seen_values = std::collections::HashSet::new();
-                    for value in values.iter() {
-                        if !seen_values.insert(value.clone()) {
-                            return Err(Error::Fail(Fail::DuplicateEnumValue(value.clone())));
-                        }
-                    }
-                }
-                _ => {
-                    if field.values.is_some() {
-                        return Err(Error::Fail(Fail::ValuesOnlyForEnum(field.name.clone())));
-                    }
-                }
-            }
+            fields.push(field);
         }
-        Ok(())
+        Ok(Self { fields })
+    }
+}
+
+impl Field {
+    fn from_doc(doc: FieldDoc) -> Result<Self, Error> {
+        let kind = match doc.type_ {
+            FieldType::Text => {
+                if doc.values.is_some() {
+                    return Err(Error::Fail(Fail::ValuesOnlyForEnum(doc.name)));
+                }
+                FieldKind::Text
+            }
+            FieldType::Number => {
+                if doc.values.is_some() {
+                    return Err(Error::Fail(Fail::ValuesOnlyForEnum(doc.name)));
+                }
+                FieldKind::Number
+            }
+            FieldType::Enum => {
+                let Some(values) = doc.values else {
+                    return Err(Error::Fail(Fail::EnumNeedsValues(doc.name)));
+                };
+                if values.is_empty() {
+                    return Err(Error::Fail(Fail::EnumNeedsValues(doc.name)));
+                }
+                let mut seen = HashSet::new();
+                for value in &values {
+                    if !seen.insert(value.clone()) {
+                        return Err(Error::Fail(Fail::DuplicateEnumValue(value.clone())));
+                    }
+                }
+                FieldKind::Enum(values)
+            }
+        };
+        Ok(Self {
+            name: doc.name,
+            kind,
+            required: doc.required,
+        })
+    }
+
+    fn to_doc(&self) -> FieldDoc {
+        let (type_, values) = match &self.kind {
+            FieldKind::Text => (FieldType::Text, None),
+            FieldKind::Number => (FieldType::Number, None),
+            FieldKind::Enum(values) => (FieldType::Enum, Some(values.clone())),
+        };
+        FieldDoc {
+            name: self.name.clone(),
+            type_,
+            required: self.required,
+            values,
+        }
     }
 }
 
@@ -309,10 +370,6 @@ pub fn is_reserved(s: &str) -> bool {
 
 pub fn is_time_group(s: &str) -> bool {
     matches!(s, "day" | "week" | "month" | "year")
-}
-
-pub fn fold_enum(value: &str) -> Result<EnumValue, Error> {
-    EnumValue::parse(value)
 }
 
 pub fn fold_enum_values(values: Vec<String>) -> Result<Vec<EnumValue>, Error> {

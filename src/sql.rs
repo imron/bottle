@@ -1,6 +1,6 @@
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, FieldValue};
-use crate::spec::{EnumValue, FieldType, LinkName, SchemaName};
+use crate::spec::{EnumValue, FieldKind, LinkName, SchemaName};
 use crate::time::Instant;
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
@@ -33,9 +33,9 @@ impl SqlVal {
     }
 }
 
-pub fn sql_type(t: FieldType) -> &'static str {
-    match t {
-        FieldType::Number | FieldType::Text | FieldType::Enum => "TEXT",
+pub fn sql_type(kind: &FieldKind) -> &'static str {
+    match kind {
+        FieldKind::Number | FieldKind::Text | FieldKind::Enum(_) => "TEXT",
     }
 }
 

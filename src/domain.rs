@@ -8,10 +8,7 @@ use crate::ledger::{
     SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
 use crate::mutable_store;
-use crate::spec::{
-    Field, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec, fold_enum,
-    fold_enum_values, parse_number,
-};
+use crate::spec::{EnumValue, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
 use crate::store::{self, Find};
 use crate::time::{Instant, Range};
 use jiff::tz::TimeZone;
@@ -62,44 +59,22 @@ fn add_schema(db: &mut Db, op: SchemaAdd) -> Result<(), Error> {
 }
 
 fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
-    let values = if op.type_ == FieldType::Enum {
-        let Some(vals) = op.values else {
-            return Err(Error::Usage(Usage::EnumValuesRequired));
-        };
-        Some(fold_enum_values(vals)?)
-    } else if op.values.is_some() {
-        return Err(Error::Usage(Usage::EnumValuesNotAllowed));
-    } else {
-        None
-    };
-    let required = op.default.is_some();
-    let default = op
-        .default
-        .as_deref()
-        .map(|def| parse_field_value_parts(&op.name, op.type_, values.as_deref(), def))
-        .transpose()?;
     db.transaction(|tx| {
         let mut kind = store::load_schema(tx, &op.schema)?;
         if kind.retired {
             return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
         }
-        if kind.spec.field(&op.name).is_some() {
-            return Err(Error::Fail(Fail::FieldExists(op.name.clone())));
+        if kind.spec.field(&op.field.name).is_some() {
+            return Err(Error::Fail(Fail::FieldExists(op.field.name.clone())));
         }
-        let field = Field {
-            name: op.name.clone(),
-            type_: op.type_,
-            required,
-            values,
-        };
-        mutable_store::add_column(tx, &op.schema, &field, default.as_ref())?;
-        kind.spec.fields.push(field);
+        mutable_store::add_column(tx, &op.schema, &op.field, op.default.as_ref())?;
+        kind.spec.fields.push(op.field);
         mutable_store::save_spec(tx, &op.schema, &kind.spec)
     })
 }
 
 fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
-    let folded = fold_enum(&op.value)?;
+    let folded = EnumValue::parse(&op.value)?;
     db.transaction(|tx| {
         let mut kind = store::load_schema(tx, &op.schema)?;
         if kind.retired {
@@ -108,10 +83,9 @@ fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
         let Some(f) = kind.spec.fields.iter_mut().find(|f| f.name == op.field) else {
             return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
         };
-        if f.type_ != FieldType::Enum {
+        let FieldKind::Enum(values) = &mut f.kind else {
             return Err(Error::Fail(Fail::FieldNotEnum(op.field.clone())));
-        }
-        let values = f.values.get_or_insert_with(Vec::new);
+        };
         if values.iter().any(|v| v == &folded) {
             return Err(Error::Fail(Fail::EnumValueExists(folded)));
         }
@@ -338,7 +312,7 @@ fn sum(db: &Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
     let Some(f) = spec.field(&op.field) else {
         return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
     };
-    if f.type_ != FieldType::Number {
+    if !matches!(f.kind, FieldKind::Number) {
         return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
     }
     let resolved = resolve_filters(&spec, &op.fields, &op.links)?;
@@ -387,7 +361,7 @@ fn resolve_filters(
         };
         out.push(Filter::Field {
             name: spec_field.name.clone(),
-            value: parse_field_value(spec_field, &field.value)?,
+            value: FieldValue::parse(spec_field, &field.value)?,
         });
     }
     let mut seen_links = HashSet::new();
@@ -456,7 +430,7 @@ fn prepare_fields(
         }
         out.insert(
             field.name.clone(),
-            parse_field_value(spec_field, &field.value)?,
+            FieldValue::parse(spec_field, &field.value)?,
         );
     }
     if !partial {
@@ -469,38 +443,4 @@ fn prepare_fields(
         }
     }
     Ok(out)
-}
-
-fn parse_field_value(field: &Field, value: &str) -> Result<FieldValue, Error> {
-    parse_field_value_parts(&field.name, field.type_, field.values.as_deref(), value)
-}
-
-fn parse_field_value_parts(
-    name: &FieldName,
-    type_: FieldType,
-    values: Option<&[crate::spec::EnumValue]>,
-    value: &str,
-) -> Result<FieldValue, Error> {
-    match type_ {
-        FieldType::Text => {
-            if value.contains('\t') || value.contains('\n') {
-                return Err(Error::Fail(Fail::TextHasTabOrNewline(name.clone())));
-            }
-            Ok(FieldValue::Text(value.to_string()))
-        }
-        FieldType::Number => Ok(FieldValue::Number(parse_number(value)?)),
-        FieldType::Enum => {
-            let folded = fold_enum(value)?;
-            let Some(values) = values else {
-                return Err(Error::Fail(Fail::EnumHasNoValues(name.clone())));
-            };
-            if !values.iter().any(|v| v == &folded) {
-                return Err(Error::Fail(Fail::InvalidEnumValue {
-                    field: name.clone(),
-                    value: value.to_string(),
-                }));
-            }
-            Ok(FieldValue::Enum(folded))
-        }
-    }
 }

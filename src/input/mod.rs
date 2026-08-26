@@ -11,7 +11,10 @@ use crate::ledger::{
     List, Log, Op, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop,
     SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
-use crate::spec::{FieldName, Identifier, Link, LinkName, SchemaName, Spec, is_reserved};
+use crate::spec::{
+    EnumValue, Field, FieldKind, FieldName, FieldType, Identifier, Link, LinkName, SchemaName,
+    Spec, fold_enum_values, is_reserved,
+};
 use crate::time::{self, Period, Range};
 
 pub use cmd::Cmd;
@@ -110,13 +113,49 @@ impl FromCmd for cmd::SchemaAddField {
     type Op = SchemaAddField;
 
     fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        let name = FieldName::parse(&self.name)?;
+        let kind = field_kind(self.type_, self.values)?;
+        let field = Field {
+            name,
+            kind,
+            required: self.default.is_some(),
+        };
+        let default = self
+            .default
+            .as_deref()
+            .map(|raw| FieldValue::parse(&field, raw))
+            .transpose()?;
         Ok(SchemaAddField {
             schema: SchemaName::parse(&self.schema)?,
-            name: FieldName::parse(&self.name)?,
-            type_: self.type_,
-            values: self.values,
-            default: self.default,
+            field,
+            default,
         })
+    }
+}
+
+fn field_kind(type_: FieldType, values: Option<Vec<String>>) -> Result<FieldKind, Error> {
+    match type_ {
+        FieldType::Enum => {
+            let Some(values) = values else {
+                return Err(Error::Usage(Usage::EnumValuesRequired));
+            };
+            if values.is_empty() {
+                return Err(Error::Usage(Usage::EnumValuesRequired));
+            }
+            Ok(FieldKind::Enum(fold_enum_values(values)?))
+        }
+        FieldType::Text => {
+            if values.is_some() {
+                return Err(Error::Usage(Usage::EnumValuesNotAllowed));
+            }
+            Ok(FieldKind::Text)
+        }
+        FieldType::Number => {
+            if values.is_some() {
+                return Err(Error::Usage(Usage::EnumValuesNotAllowed));
+            }
+            Ok(FieldKind::Number)
+        }
     }
 }
 
@@ -388,17 +427,17 @@ fn render_period(period: Period) -> String {
 fn render_spec(spec: &Spec) -> Result<String, Error> {
     let mut rows = Vec::new();
     for field in &spec.fields {
-        let values = match &field.values {
-            Some(v) => v
+        let values = match &field.kind {
+            FieldKind::Enum(v) => v
                 .iter()
-                .map(crate::spec::EnumValue::as_str)
+                .map(EnumValue::as_str)
                 .collect::<Vec<_>>()
                 .join(","),
-            None => String::new(),
+            _ => String::new(),
         };
         rows.push(vec![
             field.name.to_string(),
-            type_name(field.type_).to_string(),
+            type_name(&field.kind).to_string(),
             tsv::bool_cell(field.required).to_string(),
             values,
         ]);
@@ -464,10 +503,10 @@ fn render_links(links: &[Link]) -> String {
         .join(" ")
 }
 
-fn type_name(t: crate::spec::FieldType) -> &'static str {
-    match t {
-        crate::spec::FieldType::Text => "text",
-        crate::spec::FieldType::Number => "number",
-        crate::spec::FieldType::Enum => "enum",
+fn type_name(kind: &FieldKind) -> &'static str {
+    match kind {
+        FieldKind::Text => "text",
+        FieldKind::Number => "number",
+        FieldKind::Enum(_) => "enum",
     }
 }
