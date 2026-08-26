@@ -330,6 +330,18 @@ fn add_field_duplicate_and_retired() {
 fn add_field_with_default() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "1"),
+            ("protein", "1"),
+            ("carbs", "0"),
+        ],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
     h.run_ok(Cmd::SchemaAddField(cmd::SchemaAddField {
         schema: "nutrition.meal".into(),
         name: "note".into(),
@@ -342,6 +354,63 @@ fn add_field_with_default() {
         yaml: false,
     }));
     assert!(show.contains("note\ttext\ttrue\t"));
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        include_ignored: false,
+    }));
+    let lines = tsv_lines(&ls);
+    let idx = lines[0].iter().position(|c| *c == "note").unwrap();
+    assert_eq!(lines[1][idx], "O'Brien");
+}
+
+#[test]
+fn add_field_enum_default_folds() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "1"),
+            ("protein", "1"),
+            ("carbs", "0"),
+        ],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.run_ok(Cmd::SchemaAddField(cmd::SchemaAddField {
+        schema: "nutrition.meal".into(),
+        name: "mood".into(),
+        type_: FieldType::Enum,
+        values: Some(vec!["happy".into(), "sad".into()]),
+        default: Some("Happy".into()),
+    }));
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        include_ignored: false,
+    }));
+    let lines = tsv_lines(&ls);
+    let idx = lines[0].iter().position(|c| *c == "mood").unwrap();
+    assert_eq!(lines[1][idx], "happy");
+    assert!(!ls.contains("Happy"));
+    let matched = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![("mood".into(), "happy".into())],
+        include_ignored: false,
+    }));
+    assert_eq!(tsv_lines(&matched).len(), 2);
 }
 
 #[test]

@@ -27,12 +27,12 @@ pub fn add_column(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
     field: &Field,
-    default: Option<&str>,
+    default: Option<&FieldValue>,
 ) -> Result<(), Error> {
     let table = quote_ident(schema.as_str());
     let col_type = sql_type(field.type_);
     let alter = if let Some(def) = default {
-        let sql_def = sql_default(field.type_, def);
+        let sql_def = sql_default(def);
         format!(
             "ALTER TABLE {table} ADD COLUMN {} {col_type} NOT NULL DEFAULT {sql_def}",
             quote_ident(field.name.as_str())

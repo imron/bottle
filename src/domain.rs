@@ -75,9 +75,11 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
         None
     };
     let required = op.default.is_some();
-    if let Some(ref def) = op.default {
-        parse_field_value_parts(&op.name, op.type_, values.as_deref(), def)?;
-    }
+    let default = op
+        .default
+        .as_deref()
+        .map(|def| parse_field_value_parts(&op.name, op.type_, values.as_deref(), def))
+        .transpose()?;
     db.transaction(|tx| {
         let mut kind = store::load_schema(tx, &op.schema)?;
         if kind.retired {
@@ -92,7 +94,7 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
             required,
             values,
         };
-        mutable_store::add_column(tx, &op.schema, &field, op.default.as_deref())?;
+        mutable_store::add_column(tx, &op.schema, &field, default.as_ref())?;
         kind.spec.fields.push(field);
         mutable_store::save_spec(tx, &op.schema, &kind.spec)
     })

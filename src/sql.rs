@@ -54,10 +54,12 @@ pub fn instant_from_sql(raw: String) -> Result<Instant, Error> {
     Ok(Instant::from_timestamp(ts))
 }
 
-pub fn sql_default(type_: FieldType, def: &str) -> String {
-    match type_ {
-        FieldType::Number | FieldType::Text | FieldType::Enum => {
-            format!("'{}'", def.replace('\'', "''"))
-        }
-    }
+pub fn sql_default(value: &FieldValue) -> String {
+    let raw = match value {
+        FieldValue::Empty => String::new(),
+        FieldValue::Text(s) => s.clone(),
+        FieldValue::Number(n) => n.to_string(),
+        FieldValue::Enum(v) => v.to_string(),
+    };
+    format!("'{}'", raw.replace('\'', "''"))
 }
