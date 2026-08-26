@@ -113,16 +113,14 @@ impl Connection for Db {}
 
 impl<'a> Tx<'a> {
     fn begin(conn: &'a mut Sqlite) -> Result<Self, Error> {
-        Self::open(conn, TransactionBehavior::Immediate)
+        Ok(Self {
+            inner: conn.transaction_with_behavior(TransactionBehavior::Immediate)?,
+        })
     }
 
     fn begin_deferred(conn: &'a mut Sqlite) -> Result<Self, Error> {
-        Self::open(conn, TransactionBehavior::Deferred)
-    }
-
-    fn open(conn: &'a mut Sqlite, behavior: TransactionBehavior) -> Result<Self, Error> {
         Ok(Self {
-            inner: conn.transaction_with_behavior(behavior)?,
+            inner: conn.transaction_with_behavior(TransactionBehavior::Deferred)?,
         })
     }
 
