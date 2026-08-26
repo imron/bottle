@@ -100,6 +100,29 @@ pub enum Order {
     Newest,
 }
 
+pub struct Find<'a> {
+    pub schema: &'a SchemaName,
+    pub spec: &'a Spec,
+    pub range: Range,
+    pub agent: Option<&'a str>,
+    pub include_ignored: bool,
+    pub filters: &'a [Filter],
+    pub order: Order,
+    pub limit: Option<usize>,
+}
+
+pub enum Summed {
+    Total(Decimal),
+    Time {
+        unit: TimePeriod,
+        buckets: Vec<(Period, Decimal)>,
+    },
+    Link {
+        name: LinkName,
+        buckets: Vec<(Option<EntryRef>, Decimal)>,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub struct SchemaShow {
     pub name: SchemaName,

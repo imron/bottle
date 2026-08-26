@@ -5,7 +5,7 @@ use rust_decimal::Decimal;
 
 use crate::db::Connection;
 use crate::error::{Error, Fail};
-use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
+use crate::ledger::{Agent, Entry, FieldValue, Filter, Find, Order, Schema, SchemaInfo, Summed};
 use crate::spec::{
     EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec,
     TimePeriod,
@@ -14,19 +14,8 @@ use crate::sql::{
     SqlVal, StoredAgent, StoredEnum, StoredLinkName, StoredLinkSchema, StoredNumber,
     StoredSchemaName, StoredTime, instant_to_sql, quote_ident, table_name,
 };
-use crate::time::{Instant, Period, Range, ToBound, period};
+use crate::time::{Instant, Period, ToBound, period};
 use jiff::tz::TimeZone;
-
-pub struct Find<'a> {
-    pub schema: &'a SchemaName,
-    pub spec: &'a Spec,
-    pub range: Range,
-    pub agent: Option<&'a str>,
-    pub include_ignored: bool,
-    pub filters: &'a [Filter],
-    pub order: Order,
-    pub limit: Option<usize>,
-}
 
 pub fn list_schemas(conn: &impl Connection) -> Result<Vec<SchemaInfo>, Error> {
     let mut stmt = conn
@@ -125,18 +114,6 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     };
     attach_links(conn, &q, &mut entries)?;
     Ok(entries)
-}
-
-pub enum Summed {
-    Total(Decimal),
-    Time {
-        unit: TimePeriod,
-        buckets: Vec<(Period, Decimal)>,
-    },
-    Link {
-        name: LinkName,
-        buckets: Vec<(Option<EntryRef>, Decimal)>,
-    },
 }
 
 pub fn sum(

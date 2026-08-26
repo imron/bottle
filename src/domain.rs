@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use crate::db::{Connection, Db};
 use crate::error::{Error, Fail};
 use crate::ledger::{
-    Agent, Amend, Entries, FieldInput, FieldValue, Filter, Get, GroupedLink, GroupedTime, Ignore,
-    Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue,
-    SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
+    Agent, Amend, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink, GroupedTime,
+    Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue,
+    SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Summed, Today, Total,
 };
 use crate::mutable_store;
 use crate::spec::{FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
-use crate::store::{self, Find};
+use crate::store;
 use crate::time::{Instant, Range};
 use jiff::tz::TimeZone;
 
@@ -319,16 +319,12 @@ fn sum(db: &mut Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
             return Err(Error::Fail(Fail::LinkNameCollidesWithField(name.clone())));
         }
         Ok(match store::sum(tx, q, &op.field, op.group, tz)? {
-            store::Summed::Total(value) => Outcome::Total(Total {
+            Summed::Total(value) => Outcome::Total(Total {
                 field: op.field,
                 value,
             }),
-            store::Summed::Time { unit, buckets } => {
-                Outcome::GroupedTime(GroupedTime { unit, buckets })
-            }
-            store::Summed::Link { name, buckets } => {
-                Outcome::GroupedLink(GroupedLink { name, buckets })
-            }
+            Summed::Time { unit, buckets } => Outcome::GroupedTime(GroupedTime { unit, buckets }),
+            Summed::Link { name, buckets } => Outcome::GroupedLink(GroupedLink { name, buckets }),
         })
     })
 }
