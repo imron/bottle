@@ -11,14 +11,14 @@ pub fn cli_message(err: &Error) -> String {
 
 fn usage_message(err: &Usage) -> String {
     match err {
-        Usage::EnumValuesRequired => "--values is required for enum".into(),
-        Usage::EnumValuesNotAllowed => "--values is only valid for enum".into(),
+        Usage::EnumValuesRequired => "values is required for enum".into(),
+        Usage::EnumValuesNotAllowed => "values is only valid for enum".into(),
         Usage::EmptyLog => "log requires at least one entry".into(),
         Usage::AmendEmpty => "amend requires at least one change".into(),
-        Usage::DuplicateUnlink(name) => format!("duplicate --unlink {name}"),
-        Usage::LinkAndUnlink(name) => format!("--link and --unlink of the same name: {name}"),
+        Usage::DuplicateUnlink(name) => format!("duplicate unlink {name}"),
+        Usage::LinkAndUnlink(name) => format!("cannot link and unlink {name}"),
         Usage::ReservedWhere(name) => {
-            format!("--where {name}= is reserved; use --agent, get, or --from/--to")
+            format!("{name} is reserved; use agent, get, or from/to")
         }
         Usage::DuplicateLinkName(name) => format!("duplicate link name: {name}"),
         Usage::DuplicateField(name) => format!("duplicate field: {name}"),

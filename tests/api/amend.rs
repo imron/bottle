@@ -62,7 +62,7 @@ fn amend_link_unlink_conflict() {
             fields: vec![],
         }))
         .unwrap_err();
-    assert_usage(err, "--link and --unlink");
+    assert_usage(err, "cannot link and unlink");
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn duplicate_unlink() {
             fields: vec![],
         }))
         .unwrap_err();
-    assert_usage(err, "duplicate --unlink");
+    assert_usage(err, "duplicate unlink");
 }
 
 #[test]

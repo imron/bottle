@@ -274,7 +274,7 @@ fn add_field_enum_requires_values() {
             default: None,
         })))
         .unwrap_err();
-    assert_usage(err, "--values is required");
+    assert_usage(err, "values is required");
     let err = h
         .run(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
             schema: "nutrition.meal".into(),
@@ -284,7 +284,7 @@ fn add_field_enum_requires_values() {
             default: None,
         })))
         .unwrap_err();
-    assert_usage(err, "--values is required");
+    assert_usage(err, "values is required");
 }
 
 #[test]
@@ -300,7 +300,7 @@ fn add_field_values_only_for_enum() {
             default: None,
         })))
         .unwrap_err();
-    assert_usage(err, "--values is only valid");
+    assert_usage(err, "values is only valid");
     let err = h
         .run(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
             schema: "nutrition.meal".into(),
@@ -310,7 +310,7 @@ fn add_field_values_only_for_enum() {
             default: None,
         })))
         .unwrap_err();
-    assert_usage(err, "--values is only valid");
+    assert_usage(err, "values is only valid");
 }
 
 #[test]
