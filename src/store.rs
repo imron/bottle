@@ -7,7 +7,7 @@ use crate::db::Connection;
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
 use crate::spec::{
-    EntryRef, EnumValue, FieldName, FieldType, Link, LinkName, SchemaName, Spec, TimePeriod,
+    EntryRef, EnumValue, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec, TimePeriod,
 };
 use crate::sql::{
     SqlVal, instant_from_sql, instant_to_sql, link_name_from_sql, link_schema_from_sql,
@@ -138,7 +138,33 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     Ok(entries)
 }
 
-pub fn sum_total(conn: &impl Connection, q: Find<'_>, field: &FieldName) -> Result<Decimal, Error> {
+pub enum Summed {
+    Total(Decimal),
+    Time {
+        unit: TimePeriod,
+        buckets: Vec<(Period, Decimal)>,
+    },
+    Link {
+        name: LinkName,
+        buckets: Vec<(Option<EntryRef>, Decimal)>,
+    },
+}
+
+pub fn sum(
+    conn: &impl Connection,
+    q: Find<'_>,
+    field: &FieldName,
+    group: Option<Group>,
+    tz: &TimeZone,
+) -> Result<Summed, Error> {
+    match group {
+        None => total(conn, q, field),
+        Some(Group::Time(unit)) => by_time(conn, q, field, unit, tz),
+        Some(Group::Link(name)) => by_link(conn, q, field, name),
+    }
+}
+
+fn total(conn: &impl Connection, q: Find<'_>, field: &FieldName) -> Result<Summed, Error> {
     let col = quote_ident(field.as_str());
     let mut sql = format!(
         "SELECT bottle_dec_sum({col}) FROM {} WHERE 1=1",
@@ -151,16 +177,16 @@ pub fn sum_total(conn: &impl Connection, q: Find<'_>, field: &FieldName) -> Resu
         rusqlite::params_from_iter(bind.iter().map(SqlVal::as_param)),
         |row| row.get(0),
     )?;
-    Ok(raw.parse()?)
+    Ok(Summed::Total(raw.parse()?))
 }
 
-pub fn sum_by_time(
+fn by_time(
     conn: &impl Connection,
     q: Find<'_>,
     field: &FieldName,
     unit: TimePeriod,
     tz: &TimeZone,
-) -> Result<Vec<(Period, Decimal)>, Error> {
+) -> Result<Summed, Error> {
     let col = quote_ident(field.as_str());
     let mut sql = format!(
         "SELECT at, {col} FROM {} WHERE 1=1",
@@ -181,15 +207,18 @@ pub fn sum_by_time(
         let k = period(unit, instant_from_sql(at_raw)?, tz);
         *buckets.entry(k).or_insert(Decimal::ZERO) += n;
     }
-    Ok(buckets.into_iter().collect())
+    Ok(Summed::Time {
+        unit,
+        buckets: buckets.into_iter().collect(),
+    })
 }
 
-pub fn sum_by_link(
+fn by_link(
     conn: &impl Connection,
     q: Find<'_>,
     field: &FieldName,
-    name: &LinkName,
-) -> Result<Vec<(Option<EntryRef>, Decimal)>, Error> {
+    name: LinkName,
+) -> Result<Summed, Error> {
     let col = quote_ident(field.as_str());
     let table = quote_ident(&table_name(q.schema));
     let mut inner = format!("SELECT id, {col} AS n FROM {table} WHERE 1=1");
@@ -223,7 +252,10 @@ pub fn sum_by_link(
         };
         buckets.insert(key, total.parse()?);
     }
-    Ok(buckets.into_iter().collect())
+    Ok(Summed::Link {
+        name,
+        buckets: buckets.into_iter().collect(),
+    })
 }
 
 fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) -> Result<(), Error> {

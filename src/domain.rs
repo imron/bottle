@@ -348,25 +348,23 @@ fn sum(db: &Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
         order: Order::Oldest,
         limit: None,
     };
-    match op.group {
-        None => Ok(Outcome::Total(Total {
-            value: store::sum_total(db, q, &op.field)?,
-            field: op.field,
-        })),
-        Some(Group::Time(unit)) => Ok(Outcome::GroupedTime(GroupedTime {
-            buckets: store::sum_by_time(db, q, &op.field, unit, tz)?,
-            unit,
-        })),
-        Some(Group::Link(name)) => {
-            if field_named(&spec, &name) {
-                return Err(Error::Fail(Fail::LinkNameCollidesWithField(name)));
-            }
-            Ok(Outcome::GroupedLink(GroupedLink {
-                buckets: store::sum_by_link(db, q, &op.field, &name)?,
-                name,
-            }))
-        }
+    if let Some(Group::Link(name)) = &op.group
+        && field_named(&spec, name)
+    {
+        return Err(Error::Fail(Fail::LinkNameCollidesWithField(name.clone())));
     }
+    Ok(match store::sum(db, q, &op.field, op.group, tz)? {
+        store::Summed::Total(value) => Outcome::Total(Total {
+            field: op.field,
+            value,
+        }),
+        store::Summed::Time { unit, buckets } => {
+            Outcome::GroupedTime(GroupedTime { unit, buckets })
+        }
+        store::Summed::Link { name, buckets } => {
+            Outcome::GroupedLink(GroupedLink { name, buckets })
+        }
+    })
 }
 
 fn resolve_filters(spec: &Spec, filters: &[Clause]) -> Result<Vec<Filter>, Error> {
