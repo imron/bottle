@@ -191,21 +191,23 @@ fn ignore(db: &mut Db, op: Ignore) -> Result<Outcome, Error> {
     })
 }
 
-fn get(db: &Db, op: Get) -> Result<Outcome, Error> {
-    let spec = store::load_schema(db, &op.schema)?.spec;
-    let Some(entry) = store::get_entry(db, &op.schema, &spec, op.id)? else {
-        return Err(Error::Fail(Fail::EntryNotFound {
-            schema: op.schema.clone(),
-            id: op.id,
-        }));
-    };
-    Ok(Outcome::Entries(Entries {
-        spec,
-        entries: vec![entry],
-    }))
+fn get(db: &mut Db, op: Get) -> Result<Outcome, Error> {
+    db.read(|tx| {
+        let spec = store::load_schema(tx, &op.schema)?.spec;
+        let Some(entry) = store::get_entry(tx, &op.schema, &spec, op.id)? else {
+            return Err(Error::Fail(Fail::EntryNotFound {
+                schema: op.schema.clone(),
+                id: op.id,
+            }));
+        };
+        Ok(Outcome::Entries(Entries {
+            spec,
+            entries: vec![entry],
+        }))
+    })
 }
 
-fn last(db: &Db, op: Last) -> Result<Outcome, Error> {
+fn last(db: &mut Db, op: Last) -> Result<Outcome, Error> {
     let outcome = find_entries(
         db,
         Query {
@@ -227,7 +229,7 @@ fn last(db: &Db, op: Last) -> Result<Outcome, Error> {
     }
 }
 
-fn today(db: &Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
+fn today(db: &mut Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
     find_entries(
         db,
         Query {
@@ -243,7 +245,7 @@ fn today(db: &Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
     )
 }
 
-fn list(db: &Db, op: List) -> Result<Outcome, Error> {
+fn list(db: &mut Db, op: List) -> Result<Outcome, Error> {
     find_entries(
         db,
         Query {
@@ -270,60 +272,64 @@ struct Query<'a> {
     limit: Option<usize>,
 }
 
-fn find_entries(db: &Db, q: Query<'_>) -> Result<Outcome, Error> {
-    let spec = store::load_schema(db, q.schema)?.spec;
-    let resolved = resolve_filters(&spec, q.fields, q.links)?;
-    let entries = store::find(
-        db,
-        Find {
-            schema: q.schema,
-            spec: &spec,
-            range: q.range,
-            agent: q.agent,
-            include_ignored: q.include_ignored,
-            filters: &resolved,
-            order: q.order,
-            limit: q.limit,
-        },
-    )?;
-    Ok(Outcome::Entries(Entries { spec, entries }))
+fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
+    db.read(|tx| {
+        let spec = store::load_schema(tx, q.schema)?.spec;
+        let resolved = resolve_filters(&spec, q.fields, q.links)?;
+        let entries = store::find(
+            tx,
+            Find {
+                schema: q.schema,
+                spec: &spec,
+                range: q.range,
+                agent: q.agent,
+                include_ignored: q.include_ignored,
+                filters: &resolved,
+                order: q.order,
+                limit: q.limit,
+            },
+        )?;
+        Ok(Outcome::Entries(Entries { spec, entries }))
+    })
 }
 
-fn sum(db: &Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
-    let spec = store::load_schema(db, &op.schema)?.spec;
-    let Some(f) = spec.field(&op.field) else {
-        return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
-    };
-    if !matches!(f.kind, FieldKind::Number) {
-        return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
-    }
-    let resolved = resolve_filters(&spec, &op.fields, &op.links)?;
-    let q = Find {
-        schema: &op.schema,
-        spec: &spec,
-        range: op.range,
-        agent: op.agent.as_ref().map(Agent::as_str),
-        include_ignored: false,
-        filters: &resolved,
-        order: Order::Oldest,
-        limit: None,
-    };
-    if let Some(Group::Link(name)) = &op.group
-        && field_named(&spec, name)
-    {
-        return Err(Error::Fail(Fail::LinkNameCollidesWithField(name.clone())));
-    }
-    Ok(match store::sum(db, q, &op.field, op.group, tz)? {
-        store::Summed::Total(value) => Outcome::Total(Total {
-            field: op.field,
-            value,
-        }),
-        store::Summed::Time { unit, buckets } => {
-            Outcome::GroupedTime(GroupedTime { unit, buckets })
+fn sum(db: &mut Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
+    db.read(|tx| {
+        let spec = store::load_schema(tx, &op.schema)?.spec;
+        let Some(f) = spec.field(&op.field) else {
+            return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
+        };
+        if !matches!(f.kind, FieldKind::Number) {
+            return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
         }
-        store::Summed::Link { name, buckets } => {
-            Outcome::GroupedLink(GroupedLink { name, buckets })
+        let resolved = resolve_filters(&spec, &op.fields, &op.links)?;
+        let q = Find {
+            schema: &op.schema,
+            spec: &spec,
+            range: op.range,
+            agent: op.agent.as_ref().map(Agent::as_str),
+            include_ignored: false,
+            filters: &resolved,
+            order: Order::Oldest,
+            limit: None,
+        };
+        if let Some(Group::Link(name)) = &op.group
+            && field_named(&spec, name)
+        {
+            return Err(Error::Fail(Fail::LinkNameCollidesWithField(name.clone())));
         }
+        Ok(match store::sum(tx, q, &op.field, op.group, tz)? {
+            store::Summed::Total(value) => Outcome::Total(Total {
+                field: op.field,
+                value,
+            }),
+            store::Summed::Time { unit, buckets } => {
+                Outcome::GroupedTime(GroupedTime { unit, buckets })
+            }
+            store::Summed::Link { name, buckets } => {
+                Outcome::GroupedLink(GroupedLink { name, buckets })
+            }
+        })
     })
 }
 

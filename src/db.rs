@@ -90,6 +90,17 @@ impl Db {
             Err(err) => Err(err),
         }
     }
+
+    pub fn read<T>(&mut self, f: impl FnOnce(&Tx<'_>) -> Result<T, Error>) -> Result<T, Error> {
+        let tx = Tx::begin_deferred(&mut self.conn)?;
+        match f(&tx) {
+            Ok(value) => {
+                tx.commit()?;
+                Ok(value)
+            }
+            Err(err) => Err(err),
+        }
+    }
 }
 
 impl AsRef<Sqlite> for Db {
@@ -102,8 +113,16 @@ impl Connection for Db {}
 
 impl<'a> Tx<'a> {
     fn begin(conn: &'a mut Sqlite) -> Result<Self, Error> {
+        Self::open(conn, TransactionBehavior::Immediate)
+    }
+
+    fn begin_deferred(conn: &'a mut Sqlite) -> Result<Self, Error> {
+        Self::open(conn, TransactionBehavior::Deferred)
+    }
+
+    fn open(conn: &'a mut Sqlite, behavior: TransactionBehavior) -> Result<Self, Error> {
         Ok(Self {
-            inner: conn.transaction_with_behavior(TransactionBehavior::Immediate)?,
+            inner: conn.transaction_with_behavior(behavior)?,
         })
     }
 
