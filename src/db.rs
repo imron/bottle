@@ -7,6 +7,7 @@ use rusqlite::functions::{Aggregate, FunctionFlags};
 use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
+use crate::sql::StoredNumber;
 
 pub trait UniqueConstraint<T> {
     fn unique(self, err: Fail) -> Result<T, Error>;
@@ -191,7 +192,7 @@ fn dec_add(acc: Decimal, raw: Option<&str>) -> Result<Decimal, Error> {
     if raw.is_empty() {
         return Ok(acc);
     }
-    Ok(acc + raw.parse::<Decimal>()?)
+    Ok(acc + Decimal::try_from(StoredNumber(raw.to_string()))?)
 }
 
 fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
@@ -201,8 +202,8 @@ fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
     if left.is_empty() || right.is_empty() {
         return Ok(false);
     }
-    let left: Decimal = left.parse()?;
-    let right: Decimal = right.parse()?;
+    let left = Decimal::try_from(StoredNumber(left.to_string()))?;
+    let right = Decimal::try_from(StoredNumber(right.to_string()))?;
     Ok(left == right)
 }
 

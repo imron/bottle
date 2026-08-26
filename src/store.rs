@@ -10,10 +10,10 @@ use crate::spec::{
     EntryRef, EnumValue, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec, TimePeriod,
 };
 use crate::sql::{
-    SqlVal, instant_from_sql, instant_to_sql, link_name_from_sql, link_schema_from_sql,
-    quote_ident, schema_from_sql, table_name,
+    SqlVal, StoredAgent, StoredEnum, StoredLinkName, StoredLinkSchema, StoredNumber,
+    StoredSchemaName, StoredTime, instant_to_sql, quote_ident, table_name,
 };
-use crate::time::{Period, Range, ToBound, period};
+use crate::time::{Instant, Period, Range, ToBound, period};
 use jiff::tz::TimeZone;
 
 pub struct Find<'a> {
@@ -39,7 +39,7 @@ pub fn list_schemas(conn: &impl Connection) -> Result<Vec<SchemaInfo>, Error> {
     let mut out = Vec::new();
     for row in rows {
         let (name, retired) = row?;
-        let name = schema_from_sql(name)?;
+        let name = SchemaName::try_from(StoredSchemaName(name))?;
         out.push(SchemaInfo {
             name,
             retired: retired != 0,
@@ -171,7 +171,7 @@ fn total(conn: &impl Connection, q: Find<'_>, field: &FieldName) -> Result<Summe
         rusqlite::params_from_iter(bind.iter().map(SqlVal::as_param)),
         |row| row.get(0),
     )?;
-    Ok(Summed::Total(raw.parse()?))
+    Ok(Summed::Total(Decimal::try_from(StoredNumber(raw))?))
 }
 
 fn by_time(
@@ -197,8 +197,8 @@ fn by_time(
     while let Some(r) = raw.next()? {
         let at_raw: String = r.get(0)?;
         let n_raw: String = r.get(1)?;
-        let n: Decimal = n_raw.parse()?;
-        let k = period(unit, instant_from_sql(at_raw)?, tz);
+        let n = Decimal::try_from(StoredNumber(n_raw))?;
+        let k = period(unit, Instant::try_from(StoredTime(at_raw))?, tz);
         *buckets.entry(k).or_insert(Decimal::ZERO) += n;
     }
     Ok(Summed::Time {
@@ -239,12 +239,12 @@ fn by_link(
         let total: String = r.get(2)?;
         let key = match (to_schema, to_id) {
             (Some(schema), Some(id)) => {
-                let schema = link_schema_from_sql(schema)?;
+                let schema = SchemaName::try_from(StoredLinkSchema(schema))?;
                 Some(EntryRef { schema, id })
             }
             _ => None,
         };
-        buckets.insert(key, total.parse()?);
+        buckets.insert(key, Decimal::try_from(StoredNumber(total))?);
     }
     Ok(Summed::Link {
         name,
@@ -342,7 +342,9 @@ fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<En
                             values.insert(
                                 name,
                                 match v {
-                                    Some(s) if !s.is_empty() => FieldValue::Number(s.parse()?),
+                                    Some(s) if !s.is_empty() => {
+                                        FieldValue::Number(Decimal::try_from(StoredNumber(s))?)
+                                    }
                                     _ => FieldValue::Empty,
                                 },
                             );
@@ -353,7 +355,7 @@ fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<En
                                 name,
                                 match v {
                                     Some(s) if !s.is_empty() => {
-                                        FieldValue::Enum(EnumValue::parse(&s)?)
+                                        FieldValue::Enum(EnumValue::try_from(StoredEnum(s))?)
                                     }
                                     _ => FieldValue::Empty,
                                 },
@@ -376,8 +378,8 @@ fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<En
     }
     Ok(Entry {
         id,
-        at: instant_from_sql(at_raw)?,
-        agent: agent.map(Agent::new),
+        at: Instant::try_from(StoredTime(at_raw))?,
+        agent: agent.map(StoredAgent).map(Agent::try_from).transpose()?,
         ignored,
         values,
         links: Vec::new(),
@@ -450,9 +452,9 @@ fn read_link(r: &rusqlite::Row<'_>) -> Result<(i64, Link), Error> {
     Ok((
         from_id,
         Link {
-            name: link_name_from_sql(name)?,
+            name: LinkName::try_from(StoredLinkName(name))?,
             to: EntryRef {
-                schema: link_schema_from_sql(to_schema)?,
+                schema: SchemaName::try_from(StoredLinkSchema(to_schema))?,
                 id: to_id,
             },
         },

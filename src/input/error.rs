@@ -76,6 +76,9 @@ fn fail_message(err: &Fail) -> String {
         Fail::CorruptLinkName(name) => format!("corrupt link name: {name}"),
         Fail::CorruptLinkSchema(name) => format!("corrupt link schema: {name}"),
         Fail::CorruptStoredTime(raw) => format!("corrupt stored time: {raw}"),
+        Fail::CorruptStoredNumber(raw) => format!("corrupt stored number: {raw}"),
+        Fail::CorruptStoredEnum(raw) => format!("corrupt stored enum: {raw}"),
+        Fail::CorruptStoredAgent(raw) => format!("corrupt stored agent: {raw}"),
         Fail::HomeNotSet => "HOME is not set".into(),
         Fail::DbPathRequired => "db path required".into(),
     }
