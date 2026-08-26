@@ -6,13 +6,13 @@ use crate::db::{Tx, UniqueConstraint};
 use crate::error::{Error, Fail};
 use crate::ledger::FieldValue;
 use crate::spec::{Field, FieldName, Link, LinkName, SchemaName, Spec};
-use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type};
+use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
 use crate::time::Instant;
 
 pub fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
     let yaml = spec.to_yaml()?;
     let cols = create_columns(spec);
-    let sql = format!("CREATE TABLE {} ({cols})", quote_ident(name.as_str()));
+    let sql = format!("CREATE TABLE {} ({cols})", quote_ident(&table_name(name)));
     tx.as_ref()
         .execute(
             "INSERT INTO schemas (name, spec, retired) VALUES (?1, ?2, 0)",
@@ -29,7 +29,7 @@ pub fn add_column(
     field: &Field,
     default: Option<&FieldValue>,
 ) -> Result<(), Error> {
-    let table = quote_ident(schema.as_str());
+    let table = quote_ident(&table_name(schema));
     let col_type = sql_type(field.type_);
     let alter = if let Some(def) = default {
         let sql_def = sql_default(def);
@@ -77,7 +77,7 @@ pub fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     tx.as_ref()
         .execute("DELETE FROM links WHERE from_schema = ?1", [name.as_str()])?;
     tx.as_ref()
-        .execute_batch(&format!("DROP TABLE {}", quote_ident(name.as_str())))?;
+        .execute_batch(&format!("DROP TABLE {}", quote_ident(&table_name(name))))?;
     Ok(())
 }
 
@@ -111,7 +111,7 @@ pub fn insert_entry(
     }
     let sql = format!(
         "INSERT INTO {} ({}) VALUES ({})",
-        quote_ident(schema.as_str()),
+        quote_ident(&table_name(schema)),
         col_names
             .iter()
             .map(|c| quote_ident(c))
@@ -162,7 +162,7 @@ pub fn update_entry(
     bind.push(SqlVal::Int(id));
     let sql = format!(
         "UPDATE {} SET {} WHERE id = ?{}",
-        quote_ident(schema.as_str()),
+        quote_ident(&table_name(schema)),
         sets.join(", "),
         bind.len()
     );
@@ -213,7 +213,7 @@ pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<(), 
     tx.as_ref().execute(
         &format!(
             "UPDATE {} SET ignored = 1 WHERE id = ?1",
-            quote_ident(schema.as_str())
+            quote_ident(&table_name(schema))
         ),
         [id],
     )?;

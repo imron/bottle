@@ -6,7 +6,7 @@ use crate::db::Connection;
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
 use crate::spec::{EntryRef, FieldName, FieldType, Link, LinkName, SchemaName, Spec};
-use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident};
+use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident, table_name};
 use crate::time::{Range, ToBound};
 
 pub struct Find<'a> {
@@ -81,7 +81,7 @@ pub fn get_entry(
 ) -> Result<Option<Entry>, Error> {
     let sql = format!(
         "SELECT * FROM {} WHERE id = ?1",
-        quote_ident(schema.as_str())
+        quote_ident(&table_name(schema))
     );
     let mut stmt = conn.as_ref().prepare(&sql)?;
     let col_count = stmt.column_count();
@@ -96,7 +96,10 @@ pub fn get_entry(
 }
 
 pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
-    let mut sql = format!("SELECT * FROM {} WHERE 1=1", quote_ident(q.schema.as_str()));
+    let mut sql = format!(
+        "SELECT * FROM {} WHERE 1=1",
+        quote_ident(&table_name(q.schema))
+    );
     let mut bind: Vec<SqlVal> = Vec::new();
     if !q.include_ignored {
         sql.push_str(" AND ignored = 0");

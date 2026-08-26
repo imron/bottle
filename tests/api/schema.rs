@@ -67,53 +67,18 @@ fn add_accepts_one_segment_and_many() {
 }
 
 #[test]
-fn dotted_and_underscore_names_are_distinct() {
+fn add_rejects_underscore_in_schema() {
     let mut h = harness();
-    h.add_schema("foo.bar", MEAL);
-    h.add_schema("foo_bar", SESSION);
-    let list = h.run_ok(Cmd::SchemaList);
-    assert!(list.contains("foo.bar\tfalse"));
-    assert!(list.contains("foo_bar\tfalse"));
-    h.log(
-        "foo.bar",
-        &[
-            ("when", "breakfast"),
-            ("what", "eggs"),
-            ("kcal", "1"),
-            ("protein", "1"),
-            ("carbs", "0"),
-        ],
-        &[],
-        Some("2026-08-22T08:00:00Z"),
-    );
-    h.log(
-        "foo_bar",
-        &[("title", "upper")],
-        &[],
-        Some("2026-08-22T08:00:00Z"),
-    );
-    let dotted = h.run_ok(Cmd::Ls(cmd::Ls {
-        schema: "foo.bar".into(),
-        from: None,
-        to: None,
-        agent: None,
-        wheres: vec![],
-        include_ignored: false,
-    }));
-    let underscored = h.run_ok(Cmd::Ls(cmd::Ls {
-        schema: "foo_bar".into(),
-        from: None,
-        to: None,
-        agent: None,
-        wheres: vec![],
-        include_ignored: false,
-    }));
-    let dotted_lines = tsv_lines(&dotted);
-    let underscored_lines = tsv_lines(&underscored);
-    assert!(dotted_lines[0].contains(&"kcal"));
-    assert_eq!(dotted_lines[1][4], "eggs");
-    assert!(underscored_lines[0].contains(&"title"));
-    assert_eq!(underscored_lines[1][3], "upper");
+    for name in ["foo_bar", "foo.bar_baz", "a_b"] {
+        let file = h.yaml_file(&format!("{name}.yaml"), MEAL);
+        let err = h
+            .run(Cmd::SchemaAdd(cmd::SchemaAdd {
+                name: name.into(),
+                file,
+            }))
+            .unwrap_err();
+        assert_fail(err, "invalid schema name");
+    }
 }
 
 #[test]
@@ -472,22 +437,22 @@ fn yaml_canonicalize_rejects() {
             "duplicate field",
         ),
         (
-            "enum_none",
+            "enumnone",
             "fields:\n  - name: when\n    type: enum\n    required: true\n",
             "needs values",
         ),
         (
-            "enum_dup",
+            "enumdup",
             "fields:\n  - name: when\n    type: enum\n    required: true\n    values: [A, a]\n",
             "duplicate enum value",
         ),
         (
-            "text_values",
+            "textvalues",
             "fields:\n  - name: what\n    type: text\n    required: false\n    values: [x]\n",
             "only apply to enum",
         ),
         (
-            "empty_enum",
+            "emptyenum",
             "fields:\n  - name: when\n    type: enum\n    required: true\n    values: ['']\n",
             "empty enum value",
         ),

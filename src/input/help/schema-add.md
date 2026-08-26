@@ -15,10 +15,12 @@ bottle schema add <name> --file spec.yaml
 Registers a new type. After this succeeds you can `log`
 entries of that type.
 
-`<name>` is one or more lowercase identifiers separated by
+`<name>` is one or more lowercase segments separated by
 dots, for example `meal`, `nutrition.meal`, or
-`fitness.strength.set`. Empty segments are not allowed
-(`meal.`, `.meal`, `foo..bar`). It must not already exist.
+`fitness.strength.set`. Each segment is
+`^[a-z][a-z0-9]*$` (no `_`). Empty segments are not
+allowed (`meal.`, `.meal`, `foo..bar`). It must not
+already exist.
 
 The YAML is a field list:
 

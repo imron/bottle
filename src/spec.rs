@@ -291,7 +291,9 @@ pub fn is_identifier(s: &str) -> bool {
 }
 
 pub fn is_schema_name(s: &str) -> bool {
-    !s.is_empty() && s.split('.').all(is_identifier)
+    !s.is_empty()
+        && s.split('.')
+            .all(|seg| is_identifier(seg) && !seg.contains('_'))
 }
 
 pub fn is_reserved(s: &str) -> bool {

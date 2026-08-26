@@ -7,8 +7,9 @@ type.
 ## One table per schema
 
 Each type has its own columns. `schema add nutrition.meal`
-creates a sqlite table named `nutrition.meal`. The name is
-quoted. `foo.bar` and `foo_bar` are different tables.
+creates `nutrition_meal`. Dots in the schema name become
+underscores in the table name. Schema segments may not
+contain `_`, so that mapping cannot collide.
 
 ```sql
 CREATE TABLE schemas (
@@ -37,7 +38,7 @@ fields from the spec, in spec order. Links are not columns.
 They live in a side table.
 
 ```sql
-CREATE TABLE "fitness.set" (
+CREATE TABLE fitness_set (
   id       INTEGER PRIMARY KEY,
   at       TEXT NOT NULL,
   agent    TEXT,
@@ -54,8 +55,8 @@ CREATE TABLE "fitness.set" (
 Numbers are `TEXT` decimals. Enums are `TEXT` checked on
 write.
 
-`id` is per table. `"fitness.set".id = 7` is not
-`"fitness.session".id = 7`.
+`id` is per table. `fitness_set.id = 7` is not
+`fitness_session.id = 7`.
 
 ## Links
 
@@ -142,10 +143,11 @@ Types: `text`, `number`, `enum`.
   after fold are rejected.
 - There is no date field type. Time is `at`.
 - Field names: `^[a-z][a-z0-9_]*$`.
-- Schema names: one or more field-name idents joined by
-  `.` (`meal`, `nutrition.meal`, `fitness.strength.set`).
-  Empty segments are rejected (`meal.`, `.meal`,
-  `foo..bar`). Dots are a namespace convention only.
+- Schema names: one or more segments joined by `.`
+  (`meal`, `nutrition.meal`, `fitness.strength.set`).
+  Each segment is `^[a-z][a-z0-9]*$` (no `_`). Empty
+  segments are rejected (`meal.`, `.meal`, `foo..bar`).
+  Dots are a namespace convention only.
 - Link names use the field-name regex. A link name may not
   be a field on that schema, and may not be reserved.
 - Reserved: `id`, `at`, `agent`, `ignored`, `links`.
