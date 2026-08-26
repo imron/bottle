@@ -220,7 +220,12 @@ pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<(), 
     Ok(())
 }
 
-fn insert_links(tx: &Tx<'_>, schema: &SchemaName, id: i64, links: &[Link]) -> Result<(), Error> {
+fn insert_links(
+    tx: &mut Tx<'_>,
+    schema: &SchemaName,
+    id: i64,
+    links: &[Link],
+) -> Result<(), Error> {
     for link in links {
         tx.as_ref().execute(
             "INSERT INTO links (from_schema, from_id, name, to_schema, to_id)
