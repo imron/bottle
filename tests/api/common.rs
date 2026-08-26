@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bottle::{Bottle, Cmd, Error, cmd};
 use tempfile::TempDir;
 
-pub const TZ: &str = "Australia/Sydney";
+pub const TZ: &str = "Australia/Melbourne";
 
 pub struct Harness {
     pub dir: TempDir,
