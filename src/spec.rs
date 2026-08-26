@@ -195,6 +195,9 @@ impl EnumValue {
         if folded.is_empty() {
             return Err(Error::Fail(Fail::EmptyEnumValue));
         }
+        if folded.contains('\t') || folded.contains('\n') || folded.contains(',') {
+            return Err(Error::Fail(Fail::EnumHasTabNewlineOrComma));
+        }
         Ok(Self(folded))
     }
 }

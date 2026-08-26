@@ -47,7 +47,8 @@ Types:
   number fields can be summed.
 - `enum` — one of the listed values. Values are stored
   lowercase (`Water` becomes `water`). Duplicates after
-  that fold are rejected.
+  that fold are rejected. Tab, newline, and comma are
+  rejected.
 
 Field names: `^[a-z][a-z0-9_]*$`. Reserved (you may not
 use them as fields): `id`, `at`, `agent`, `ignored`,

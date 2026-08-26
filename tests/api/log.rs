@@ -189,6 +189,28 @@ fn agent_from_open() {
 }
 
 #[test]
+fn agent_rejects_tab() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: Some("a\tb".into()),
+            links: vec![],
+            fields: meal_fields(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "agent may not contain tab or newline");
+    let db = h.dir.path().join("bottle.db");
+    let err = match Bottle::open(&db, Some("a\tb".into()), Some(common::TZ)) {
+        Ok(_) => panic!("expected fail"),
+        Err(e) => e,
+    };
+    assert_fail(err, "agent may not contain tab or newline");
+}
+
+#[test]
 fn unset_agent_defaults_to_bottle() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);

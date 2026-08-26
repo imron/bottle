@@ -155,7 +155,7 @@ impl FromCmd for cmd::Log {
                 .as_deref()
                 .map(|s| time::parse_instant(s, tz))
                 .transpose()?,
-            agent: self.agent.map(Agent::new),
+            agent: parse_agent(self.agent)?,
             links: parse_links(self.links)?,
             fields: parse_fields(self.fields)?,
         })
@@ -169,7 +169,7 @@ impl FromCmd for cmd::Ls {
         Ok(List {
             schema: SchemaName::parse(&self.schema)?,
             range: Range::parse(self.from.as_deref(), self.to.as_deref(), tz)?,
-            agent: self.agent.map(Agent::new),
+            agent: parse_agent(self.agent)?,
             filters: parse_clauses(self.wheres)?,
             include_ignored: self.include_ignored,
         })
@@ -195,7 +195,7 @@ impl FromCmd for cmd::Sum {
             schema: SchemaName::parse(&self.schema)?,
             field: FieldName::parse(&self.field)?,
             range: Range::parse(self.from.as_deref(), self.to.as_deref(), tz)?,
-            agent: self.agent.map(Agent::new),
+            agent: parse_agent(self.agent)?,
             filters: parse_clauses(self.wheres)?,
             group: self
                 .group
@@ -212,7 +212,7 @@ impl FromCmd for cmd::Last {
     fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(Last {
             schema: SchemaName::parse(&self.schema)?,
-            agent: self.agent.map(Agent::new),
+            agent: parse_agent(self.agent)?,
             filters: parse_clauses(self.wheres)?,
         })
     }
@@ -224,7 +224,7 @@ impl FromCmd for cmd::Today {
     fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(Today {
             schema: SchemaName::parse(&self.schema)?,
-            agent: self.agent.map(Agent::new),
+            agent: parse_agent(self.agent)?,
             filters: parse_clauses(self.wheres)?,
         })
     }
@@ -242,7 +242,7 @@ impl FromCmd for cmd::Amend {
                 .as_deref()
                 .map(|s| time::parse_instant(s, tz))
                 .transpose()?,
-            agent: self.agent.map(Agent::new),
+            agent: parse_agent(self.agent)?,
             links: parse_links(self.links)?,
             unlinks: parse_unlinks(self.unlinks)?,
             fields: parse_fields(self.fields)?,
@@ -318,6 +318,10 @@ pub fn render(
             Ok(tsv::table(&[name.as_str(), "value"], &rows))
         }
     }
+}
+
+fn parse_agent(agent: Option<String>) -> Result<Option<Agent>, Error> {
+    agent.as_deref().map(Agent::parse).transpose()
 }
 
 fn parse_links(links: Vec<(String, String)>) -> Result<Vec<Link>, Error> {

@@ -31,6 +31,7 @@ Field rules:
   infinity.
 - `enum` values are folded to lowercase and must match a
   declared value (`Breakfast` is stored as `breakfast`).
+  Tab, newline, and comma are rejected.
 
 ## Options
 
@@ -46,7 +47,8 @@ a colon (`+10:00`). Accepted instants:
 Printed times use this machine's timezone, with an offset.
 
 `--agent NAME` — who wrote the entry. Defaults to
-`BOTTLE_AGENT`, or `bottle` if that is unset.
+`BOTTLE_AGENT`, or `bottle` if that is unset. May not
+contain a tab or a newline.
 
 `--link name=SCHEMA/ID` — point this entry at another
 existing entry. The name is yours to choose (`session`,

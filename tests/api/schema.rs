@@ -484,6 +484,16 @@ fn yaml_canonicalize_rejects() {
             "fields:\n  - name: when\n    type: enum\n    required: true\n    values: ['']\n",
             "empty enum value",
         ),
+        (
+            "tab",
+            "fields:\n  - name: when\n    type: enum\n    required: true\n    values: [\"a\\tb\"]\n",
+            "tab, newline, or comma",
+        ),
+        (
+            "comma",
+            "fields:\n  - name: when\n    type: enum\n    required: true\n    values: ['a,b']\n",
+            "tab, newline, or comma",
+        ),
     ] {
         let file = h.yaml_file(&format!("{name}.yaml"), yaml);
         let err = h
@@ -604,4 +614,18 @@ fn add_value_empty() {
         }))
         .unwrap_err();
     assert_fail(err, "empty enum value");
+}
+
+#[test]
+fn add_value_rejects_comma() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::SchemaAddValue(cmd::SchemaAddValue {
+            schema: "nutrition.meal".into(),
+            field: "when".into(),
+            value: "a,b".into(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "tab, newline, or comma");
 }

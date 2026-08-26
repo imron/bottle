@@ -140,7 +140,8 @@ Types: `text`, `number`, `enum`.
   `--where`, `Water` becomes `water` and must match a
   declared value. Declared values are lowercased on
   `schema add` / `add-field` / `add-value`. Duplicates
-  after fold are rejected.
+  after fold are rejected. Tab, newline, and comma are
+  rejected.
 - There is no date field type. Time is `at`.
 - Field names: `^[a-z][a-z0-9_]*$`.
 - Schema names: one or more segments joined by `.`

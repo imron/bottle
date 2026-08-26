@@ -34,7 +34,8 @@ Cannot be reserved: `id`, `at`, `agent`, `ignored`,
 
 `--values a,b` — required for `enum`, invalid for `text`
 and `number`. Values are stored lowercase. Two values that
-fold to the same lowercase string are rejected.
+fold to the same lowercase string are rejected. Tab,
+newline, and comma are rejected.
 
 `--default N` — backfill existing entries and make the
 field required.

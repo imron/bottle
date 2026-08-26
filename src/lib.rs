@@ -30,7 +30,10 @@ impl Bottle {
     pub fn open(path: &Path, agent: Option<String>, tz: Option<&str>) -> Result<Self, Error> {
         Ok(Self {
             db: db::Db::open(path)?,
-            agent: agent.map(Agent::new).unwrap_or_else(Agent::bottle),
+            agent: match agent.as_deref() {
+                Some(s) => Agent::parse(s)?,
+                None => Agent::bottle(),
+            },
             tz: time::zone(tz)?,
         })
     }

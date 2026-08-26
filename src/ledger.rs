@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use rust_decimal::Decimal;
 
+use crate::error::{Error, Fail};
 use crate::spec::{
     self, EntryRef, EnumValue, FieldName, FieldType, Group, Identifier, Link, LinkName, SchemaName,
     Spec, TimePeriod,
@@ -22,6 +23,13 @@ pub struct Agent(String);
 impl Agent {
     pub fn new(s: impl Into<String>) -> Self {
         Self(s.into())
+    }
+
+    pub fn parse(s: &str) -> Result<Self, Error> {
+        if s.contains('\t') || s.contains('\n') {
+            return Err(Error::Fail(Fail::AgentHasTabOrNewline));
+        }
+        Ok(Self(s.to_string()))
     }
 
     pub fn bottle() -> Self {
