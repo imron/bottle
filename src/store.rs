@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use rusqlite::Connection as Sqlite;
 use rusqlite::{OptionalExtension, params};
 
 use crate::db::Connection;
@@ -22,28 +21,9 @@ pub struct Find<'a> {
 }
 
 pub fn list_schemas(conn: &impl Connection) -> Result<Vec<SchemaInfo>, Error> {
-    list_schemas_on(conn.as_ref())
-}
-
-pub fn load_schema(conn: &impl Connection, name: &SchemaName) -> Result<Schema, Error> {
-    load_schema_on(conn.as_ref(), name)
-}
-
-pub fn get_entry(
-    conn: &impl Connection,
-    schema: &SchemaName,
-    spec: &Spec,
-    id: i64,
-) -> Result<Option<Entry>, Error> {
-    load_entry(conn.as_ref(), schema, spec, id)
-}
-
-pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
-    execute_select(conn.as_ref(), &q)
-}
-
-fn list_schemas_on(conn: &Sqlite) -> Result<Vec<SchemaInfo>, Error> {
-    let mut stmt = conn.prepare("SELECT name, retired FROM schemas ORDER BY name")?;
+    let mut stmt = conn
+        .as_ref()
+        .prepare("SELECT name, retired FROM schemas ORDER BY name")?;
     let rows = stmt.query_map([], |row| {
         let name: String = row.get(0)?;
         let retired: i64 = row.get(1)?;
@@ -62,8 +42,9 @@ fn list_schemas_on(conn: &Sqlite) -> Result<Vec<SchemaInfo>, Error> {
     Ok(out)
 }
 
-fn load_schema_on(conn: &Sqlite, name: &SchemaName) -> Result<Schema, Error> {
+pub fn load_schema(conn: &impl Connection, name: &SchemaName) -> Result<Schema, Error> {
     let row = conn
+        .as_ref()
         .query_row(
             "SELECT spec, retired FROM schemas WHERE name = ?1",
             [name.as_str()],
@@ -92,8 +73,8 @@ pub fn inbound_link_count(conn: &impl Connection, name: &SchemaName) -> Result<i
     Ok(n)
 }
 
-fn load_entry(
-    conn: &Sqlite,
+pub fn get_entry(
+    conn: &impl Connection,
     schema: &SchemaName,
     spec: &Spec,
     id: i64,
@@ -102,7 +83,7 @@ fn load_entry(
         "SELECT * FROM {} WHERE id = ?1",
         quote_ident(schema.as_str())
     );
-    let mut stmt = conn.prepare(&sql)?;
+    let mut stmt = conn.as_ref().prepare(&sql)?;
     let col_count = stmt.column_count();
     let names: Vec<String> = (0..col_count)
         .map(|i| stmt.column_name(i).unwrap_or("").to_string())
@@ -114,7 +95,7 @@ fn load_entry(
     }
 }
 
-fn execute_select(conn: &Sqlite, q: &Find<'_>) -> Result<Vec<Entry>, Error> {
+pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     let mut sql = format!("SELECT * FROM {} WHERE 1=1", quote_ident(q.schema.as_str()));
     let mut bind: Vec<SqlVal> = Vec::new();
     if !q.include_ignored {
@@ -183,7 +164,7 @@ fn execute_select(conn: &Sqlite, q: &Find<'_>) -> Result<Vec<Entry>, Error> {
     if let Some(limit) = q.limit {
         sql.push_str(&format!(" LIMIT {limit}"));
     }
-    let mut stmt = conn.prepare(&sql)?;
+    let mut stmt = conn.as_ref().prepare(&sql)?;
     let col_count = stmt.column_count();
     let names: Vec<String> = (0..col_count)
         .map(|i| stmt.column_name(i).unwrap_or("").to_string())
@@ -199,7 +180,7 @@ fn execute_select(conn: &Sqlite, q: &Find<'_>) -> Result<Vec<Entry>, Error> {
 }
 
 fn read_entry(
-    conn: &Sqlite,
+    conn: &impl Connection,
     schema: &SchemaName,
     spec: &Spec,
     names: &[String],
@@ -273,8 +254,8 @@ fn read_entry(
     })
 }
 
-fn load_links(conn: &Sqlite, schema: &SchemaName, id: i64) -> Result<Vec<Link>, Error> {
-    let mut stmt = conn.prepare(
+fn load_links(conn: &impl Connection, schema: &SchemaName, id: i64) -> Result<Vec<Link>, Error> {
+    let mut stmt = conn.as_ref().prepare(
         "SELECT name, to_schema, to_id FROM links
          WHERE from_schema = ?1 AND from_id = ?2
          ORDER BY name",
