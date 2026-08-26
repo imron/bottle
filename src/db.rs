@@ -27,6 +27,9 @@ impl<T> UniqueConstraint<T> for Result<T, rusqlite::Error> {
 
 impl From<rusqlite::Error> for Error {
     fn from(err: rusqlite::Error) -> Self {
+        // UDF failures arrive as SqliteFailure plus the message.
+        // sqlite3_result_error drops the boxed Error, so this cannot
+        // downcast UserFunctionError back to Fail::CorruptStored*.
         Self::Fail(Fail::Store(err.to_string()))
     }
 }
