@@ -1,14 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::db::{Connection, Db};
-use crate::error::{Error, Fail, Usage};
+use crate::error::{Error, Fail};
 use crate::ledger::{
     Agent, Amend, Entries, FieldInput, FieldValue, Filter, Get, GroupedLink, GroupedTime, Ignore,
     Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue,
     SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
 use crate::mutable_store;
-use crate::spec::{EnumValue, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
+use crate::spec::{FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
 use crate::store::{self, Find};
 use crate::time::{Instant, Range};
 use jiff::tz::TimeZone;
@@ -74,7 +74,6 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
 }
 
 fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
-    let folded = EnumValue::parse(&op.value)?;
     db.transaction(|tx| {
         let mut kind = store::load_schema(tx, &op.schema)?;
         if kind.retired {
@@ -86,10 +85,10 @@ fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
         let FieldKind::Enum(values) = &mut f.kind else {
             return Err(Error::Fail(Fail::FieldNotEnum(op.field.clone())));
         };
-        if values.iter().any(|v| v == &folded) {
-            return Err(Error::Fail(Fail::EnumValueExists(folded)));
+        if values.iter().any(|v| v == &op.value) {
+            return Err(Error::Fail(Fail::EnumValueExists(op.value)));
         }
-        values.push(folded);
+        values.push(op.value);
         mutable_store::save_spec(tx, &op.schema, &kind.spec)
     })
 }
@@ -136,23 +135,6 @@ fn log(db: &mut Db, agent: &Agent, mut op: Log) -> Result<Outcome, Error> {
 }
 
 fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
-    if op.at.is_none()
-        && op.agent.is_none()
-        && op.links.is_empty()
-        && op.unlinks.is_empty()
-        && op.fields.is_empty()
-    {
-        return Err(Error::Usage(Usage::AmendEmpty));
-    }
-    let mut unlink_set = HashSet::new();
-    for name in &op.unlinks {
-        if !unlink_set.insert(name) {
-            return Err(Error::Usage(Usage::DuplicateUnlink(name.clone())));
-        }
-        if op.links.iter().any(|l| &l.name == name) {
-            return Err(Error::Usage(Usage::LinkAndUnlink(name.clone())));
-        }
-    }
     db.transaction(|tx| {
         let kind = store::load_schema(tx, &op.schema)?;
         if store::get_entry(tx, &op.schema, &kind.spec, op.id)?.is_none() {
@@ -351,11 +333,7 @@ fn resolve_filters(
     links: &[Link],
 ) -> Result<Vec<Filter>, Error> {
     let mut out = Vec::new();
-    let mut seen_fields = HashSet::new();
     for field in fields {
-        if !seen_fields.insert(&field.name) {
-            return Err(Error::Usage(Usage::DuplicateField(field.name.clone())));
-        }
         let Some(spec_field) = spec.field(&field.name) else {
             return Err(Error::Fail(Fail::UnknownField(field.name.clone())));
         };
@@ -364,11 +342,7 @@ fn resolve_filters(
             value: FieldValue::parse(spec_field, &field.value)?,
         });
     }
-    let mut seen_links = HashSet::new();
     for link in links {
-        if !seen_links.insert(&link.name) {
-            return Err(Error::Usage(Usage::DuplicateLinkName(link.name.clone())));
-        }
         if field_named(spec, &link.name) {
             return Err(Error::Fail(Fail::LinkNameCollidesWithField(
                 link.name.clone(),
@@ -389,11 +363,7 @@ fn field_named(spec: &Spec, name: &LinkName) -> bool {
 }
 
 fn ensure_links(conn: &impl Connection, spec: &Spec, links: &[Link]) -> Result<(), Error> {
-    let mut seen = HashSet::new();
     for link in links {
-        if !seen.insert(&link.name) {
-            return Err(Error::Usage(Usage::DuplicateLinkName(link.name.clone())));
-        }
         if field_named(spec, &link.name) {
             return Err(Error::Fail(Fail::LinkNameCollidesWithField(
                 link.name.clone(),
@@ -412,12 +382,8 @@ fn prepare_fields(
     fields: &[FieldInput],
     partial: bool,
 ) -> Result<HashMap<FieldName, FieldValue>, Error> {
-    let mut seen = HashSet::new();
     let mut out = HashMap::new();
     for field in fields {
-        if !seen.insert(&field.name) {
-            return Err(Error::Usage(Usage::DuplicateField(field.name.clone())));
-        }
         let Some(spec_field) = spec.field(&field.name) else {
             return Err(Error::Fail(Fail::UnknownField(field.name.clone())));
         };

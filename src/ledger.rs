@@ -126,7 +126,7 @@ pub struct SchemaAddField {
 pub struct SchemaAddValue {
     pub schema: SchemaName,
     pub field: FieldName,
-    pub value: String,
+    pub value: EnumValue,
 }
 
 #[derive(Debug, Clone)]
