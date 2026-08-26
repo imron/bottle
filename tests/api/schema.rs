@@ -437,22 +437,22 @@ fn yaml_canonicalize_rejects() {
             "duplicate field",
         ),
         (
-            "enumnone",
+            "enum-none",
             "fields:\n  - name: when\n    type: enum\n    required: true\n",
             "needs values",
         ),
         (
-            "enumdup",
+            "enum-dup",
             "fields:\n  - name: when\n    type: enum\n    required: true\n    values: [A, a]\n",
             "duplicate enum value",
         ),
         (
-            "textvalues",
+            "text-values",
             "fields:\n  - name: what\n    type: text\n    required: false\n    values: [x]\n",
             "only apply to enum",
         ),
         (
-            "emptyenum",
+            "empty-enum",
             "fields:\n  - name: when\n    type: enum\n    required: true\n    values: ['']\n",
             "empty enum value",
         ),
@@ -460,7 +460,7 @@ fn yaml_canonicalize_rejects() {
         let file = h.yaml_file(&format!("{name}.yaml"), yaml);
         let err = h
             .run(Cmd::SchemaAdd(cmd::SchemaAdd {
-                name: name.into(),
+                name: name.replace('-', "."),
                 file,
             }))
             .unwrap_err();
