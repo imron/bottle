@@ -101,7 +101,7 @@ pub fn get_entry(
             None => return Ok(None),
         }
     };
-    attach_links(conn, schema, std::slice::from_mut(&mut entry))?;
+    entry.links = links_for(conn, schema, id)?;
     Ok(Some(entry))
 }
 
@@ -112,13 +112,7 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     );
     let mut bind: Vec<SqlVal> = Vec::new();
     apply_find_filters(&mut sql, &mut bind, &q)?;
-    match q.order {
-        Order::Oldest => sql.push_str(" ORDER BY at ASC, id ASC"),
-        Order::Newest => sql.push_str(" ORDER BY at DESC, id DESC"),
-    }
-    if let Some(limit) = q.limit {
-        sql.push_str(&format!(" LIMIT {limit}"));
-    }
+    apply_find_order_limit(&mut sql, &q);
     let mut entries = {
         let mut stmt = conn.as_ref().prepare(&sql)?;
         let col_count = stmt.column_count();
@@ -134,7 +128,7 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
         }
         entries
     };
-    attach_links(conn, q.schema, &mut entries)?;
+    attach_links(conn, &q, &mut entries)?;
     Ok(entries)
 }
 
@@ -390,48 +384,77 @@ fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<En
     })
 }
 
-fn attach_links(
-    conn: &impl Connection,
-    schema: &SchemaName,
-    entries: &mut [Entry],
-) -> Result<(), Error> {
+fn apply_find_order_limit(sql: &mut String, q: &Find<'_>) {
+    match q.order {
+        Order::Oldest => sql.push_str(" ORDER BY at ASC, id ASC"),
+        Order::Newest => sql.push_str(" ORDER BY at DESC, id DESC"),
+    }
+    if let Some(limit) = q.limit {
+        sql.push_str(&format!(" LIMIT {limit}"));
+    }
+}
+
+fn links_for(conn: &impl Connection, schema: &SchemaName, id: i64) -> Result<Vec<Link>, Error> {
+    let mut stmt = conn.as_ref().prepare(
+        "SELECT from_id, name, to_schema, to_id FROM links
+         WHERE from_schema = ?1 AND from_id = ?2
+         ORDER BY name",
+    )?;
+    let mut raw = stmt.query(rusqlite::params![schema.as_str(), id])?;
+    let mut links = Vec::new();
+    while let Some(r) = raw.next()? {
+        links.push(read_link(r)?.1);
+    }
+    Ok(links)
+}
+
+fn attach_links(conn: &impl Connection, q: &Find<'_>, entries: &mut [Entry]) -> Result<(), Error> {
     if entries.is_empty() {
         return Ok(());
     }
-    let mut sql = String::from(
-        "SELECT from_id, name, to_schema, to_id FROM links WHERE from_schema = ?1 AND from_id IN (",
+    let table = quote_ident(&table_name(q.schema));
+    let mut matched = format!("SELECT id FROM {table} WHERE 1=1");
+    let mut bind = Vec::new();
+    apply_find_filters(&mut matched, &mut bind, q)?;
+    apply_find_order_limit(&mut matched, q);
+    bind.push(SqlVal::Text(q.schema.to_string()));
+    let schema_at = bind.len();
+    let sql = format!(
+        "WITH matched AS ({matched})
+         SELECT l.from_id, l.name, l.to_schema, l.to_id
+         FROM links l
+         JOIN matched m ON m.id = l.from_id
+         WHERE l.from_schema = ?{schema_at}
+         ORDER BY l.from_id, l.name"
     );
-    let mut bind = vec![SqlVal::Text(schema.to_string())];
-    for (i, entry) in entries.iter().enumerate() {
-        if i > 0 {
-            sql.push_str(", ");
-        }
-        bind.push(SqlVal::Int(entry.id));
-        sql.push_str(&format!("?{}", bind.len()));
-    }
-    sql.push_str(") ORDER BY from_id, name");
     let mut stmt = conn.as_ref().prepare(&sql)?;
     let mut raw = stmt.query(rusqlite::params_from_iter(
         bind.iter().map(SqlVal::as_param),
     ))?;
     let mut by_id: HashMap<i64, Vec<Link>> = HashMap::new();
     while let Some(r) = raw.next()? {
-        let from_id: i64 = r.get(0)?;
-        let name: String = r.get(1)?;
-        let to_schema: String = r.get(2)?;
-        let to_id: i64 = r.get(3)?;
-        let name = link_name_from_sql(name)?;
-        let to_schema = link_schema_from_sql(to_schema)?;
-        by_id.entry(from_id).or_default().push(Link {
-            name,
-            to: EntryRef {
-                schema: to_schema,
-                id: to_id,
-            },
-        });
+        let (from_id, link) = read_link(r)?;
+        by_id.entry(from_id).or_default().push(link);
     }
     for entry in entries {
         entry.links = by_id.remove(&entry.id).unwrap_or_default();
     }
     Ok(())
+}
+
+fn read_link(r: &rusqlite::Row<'_>) -> Result<(i64, Link), Error> {
+    let from_id: i64 = r.get(0)?;
+    let name: String = r.get(1)?;
+    let to_schema: String = r.get(2)?;
+    let to_id: i64 = r.get(3)?;
+    Ok((
+        from_id,
+        Link {
+            name: link_name_from_sql(name)?,
+            to: EntryRef {
+                schema: link_schema_from_sql(to_schema)?,
+                id: to_id,
+            },
+        },
+    ))
 }
