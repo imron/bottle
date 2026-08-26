@@ -1,6 +1,6 @@
 use crate::error::{Error, Fail};
 use crate::ledger::FieldValue;
-use crate::spec::{FieldType, SchemaName};
+use crate::spec::{FieldType, LinkName, SchemaName};
 use crate::time::Instant;
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
@@ -56,6 +56,18 @@ pub fn instant_from_sql(raw: String) -> Result<Instant, Error> {
         .parse()
         .map_err(|_| Error::Fail(Fail::CorruptStoredTime(raw.clone())))?;
     Ok(Instant::from_timestamp(ts))
+}
+
+pub fn schema_from_sql(name: String) -> Result<SchemaName, Error> {
+    SchemaName::parse(&name).map_err(|_| Error::Fail(Fail::CorruptSchemaName(name)))
+}
+
+pub fn link_name_from_sql(name: String) -> Result<LinkName, Error> {
+    LinkName::parse(&name).map_err(|_| Error::Fail(Fail::CorruptLinkName(name)))
+}
+
+pub fn link_schema_from_sql(name: String) -> Result<SchemaName, Error> {
+    SchemaName::parse(&name).map_err(|_| Error::Fail(Fail::CorruptLinkSchema(name)))
 }
 
 pub fn sql_default(value: &FieldValue) -> String {

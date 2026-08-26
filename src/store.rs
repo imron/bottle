@@ -6,9 +6,14 @@ use rust_decimal::Decimal;
 use crate::db::Connection;
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
-use crate::spec::{EntryRef, FieldName, FieldType, Link, LinkName, SchemaName, Spec, TimePeriod};
-use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident, table_name};
-use crate::time::{Period, Range, ToBound};
+use crate::spec::{
+    EntryRef, EnumValue, FieldName, FieldType, Link, LinkName, SchemaName, Spec, TimePeriod,
+};
+use crate::sql::{
+    SqlVal, instant_from_sql, instant_to_sql, link_name_from_sql, link_schema_from_sql,
+    quote_ident, schema_from_sql, table_name,
+};
+use crate::time::{Period, Range, ToBound, period};
 use jiff::tz::TimeZone;
 
 pub struct Find<'a> {
@@ -34,8 +39,7 @@ pub fn list_schemas(conn: &impl Connection) -> Result<Vec<SchemaInfo>, Error> {
     let mut out = Vec::new();
     for row in rows {
         let (name, retired) = row?;
-        let name = SchemaName::parse(&name)
-            .map_err(|_| Error::Fail(Fail::CorruptSchemaName(name.clone())))?;
+        let name = schema_from_sql(name)?;
         out.push(SchemaInfo {
             name,
             retired: retired != 0,
@@ -174,7 +178,7 @@ pub fn sum_by_time(
         let at_raw: String = r.get(0)?;
         let n_raw: String = r.get(1)?;
         let n: Decimal = n_raw.parse()?;
-        let k = crate::time::period(unit, instant_from_sql(at_raw)?, tz);
+        let k = period(unit, instant_from_sql(at_raw)?, tz);
         *buckets.entry(k).or_insert(Decimal::ZERO) += n;
     }
     Ok(buckets.into_iter().collect())
@@ -212,8 +216,7 @@ pub fn sum_by_link(
         let total: String = r.get(2)?;
         let key = match (to_schema, to_id) {
             (Some(schema), Some(id)) => {
-                let schema = SchemaName::parse(&schema)
-                    .map_err(|_| Error::Fail(Fail::CorruptLinkSchema(schema.clone())))?;
+                let schema = link_schema_from_sql(schema)?;
                 Some(EntryRef { schema, id })
             }
             _ => None,
@@ -324,7 +327,7 @@ fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<En
                                 name,
                                 match v {
                                     Some(s) if !s.is_empty() => {
-                                        FieldValue::Enum(crate::spec::EnumValue::parse(&s)?)
+                                        FieldValue::Enum(EnumValue::parse(&s)?)
                                     }
                                     _ => FieldValue::Empty,
                                 },
@@ -385,10 +388,8 @@ fn attach_links(
         let name: String = r.get(1)?;
         let to_schema: String = r.get(2)?;
         let to_id: i64 = r.get(3)?;
-        let name =
-            LinkName::parse(&name).map_err(|_| Error::Fail(Fail::CorruptLinkName(name.clone())))?;
-        let to_schema = SchemaName::parse(&to_schema)
-            .map_err(|_| Error::Fail(Fail::CorruptLinkSchema(to_schema.clone())))?;
+        let name = link_name_from_sql(name)?;
+        let to_schema = link_schema_from_sql(to_schema)?;
         by_id.entry(from_id).or_default().push(Link {
             name,
             to: EntryRef {

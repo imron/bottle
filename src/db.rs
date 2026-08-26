@@ -30,6 +30,12 @@ impl From<rusqlite::Error> for Error {
     }
 }
 
+impl From<Error> for rusqlite::Error {
+    fn from(err: Error) -> Self {
+        Self::UserFunctionError(Box::new(err))
+    }
+}
+
 /// Readable sqlite session. Implemented by [`Db`] and [`Tx`].
 pub trait Connection: AsRef<Sqlite> {}
 
@@ -140,8 +146,7 @@ fn register_functions(conn: &Sqlite) -> Result<(), Error> {
         |ctx| {
             let left: Option<String> = ctx.get(0)?;
             let right: Option<String> = ctx.get(1)?;
-            dec_eq(left.as_deref(), right.as_deref())
-                .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))
+            Ok(dec_eq(left.as_deref(), right.as_deref())?)
         },
     )?;
     conn.create_aggregate_function(
@@ -166,8 +171,7 @@ impl Aggregate<Decimal, String> for DecSum {
         acc: &mut Decimal,
     ) -> rusqlite::Result<()> {
         let v: Option<String> = ctx.get(0)?;
-        *acc = dec_add(*acc, v.as_deref())
-            .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))?;
+        *acc = dec_add(*acc, v.as_deref())?;
         Ok(())
     }
 
