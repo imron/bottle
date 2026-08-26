@@ -50,33 +50,32 @@ fn op_from_cmd(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
     Ok(match cmd {
         Cmd::Help(_) => return Err(Error::Fail(Fail::HelpNotAnOp)),
         Cmd::SchemaList => Op::SchemaList,
-        Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.from_cmd(tz)?),
-        Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.from_cmd(tz)?),
-        Cmd::SchemaAddField(cmd) => Op::SchemaAddField(cmd.from_cmd(tz)?),
-        Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(cmd.from_cmd(tz)?),
-        Cmd::SchemaRetire(cmd) => Op::SchemaRetire(cmd.from_cmd(tz)?),
-        Cmd::SchemaDrop(cmd) => Op::SchemaDrop(cmd.from_cmd(tz)?),
-        Cmd::Log(cmd) => Op::Log(cmd.from_cmd(tz)?),
-        Cmd::Ls(cmd) => Op::List(cmd.from_cmd(tz)?),
-        Cmd::Get(cmd) => Op::Get(cmd.from_cmd(tz)?),
-        Cmd::Sum(cmd) => Op::Sum(cmd.from_cmd(tz)?),
-        Cmd::Last(cmd) => Op::Last(cmd.from_cmd(tz)?),
-        Cmd::Today(cmd) => Op::Today(cmd.from_cmd(tz)?),
-        Cmd::Amend(cmd) => Op::Amend(cmd.from_cmd(tz)?),
-        Cmd::Ignore(cmd) => Op::Ignore(cmd.from_cmd(tz)?),
+        Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.try_from(tz)?),
+        Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.try_from(tz)?),
+        Cmd::SchemaAddField(cmd) => Op::SchemaAddField(cmd.try_from(tz)?),
+        Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(cmd.try_from(tz)?),
+        Cmd::SchemaRetire(cmd) => Op::SchemaRetire(cmd.try_from(tz)?),
+        Cmd::SchemaDrop(cmd) => Op::SchemaDrop(cmd.try_from(tz)?),
+        Cmd::Log(cmd) => Op::Log(cmd.try_from(tz)?),
+        Cmd::Ls(cmd) => Op::List(cmd.try_from(tz)?),
+        Cmd::Get(cmd) => Op::Get(cmd.try_from(tz)?),
+        Cmd::Sum(cmd) => Op::Sum(cmd.try_from(tz)?),
+        Cmd::Last(cmd) => Op::Last(cmd.try_from(tz)?),
+        Cmd::Today(cmd) => Op::Today(cmd.try_from(tz)?),
+        Cmd::Amend(cmd) => Op::Amend(cmd.try_from(tz)?),
+        Cmd::Ignore(cmd) => Op::Ignore(cmd.try_from(tz)?),
     })
 }
 
 trait FromCmd {
     type Op;
-    #[allow(clippy::wrong_self_convention)]
-    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error>;
+    fn try_from(self, tz: &TimeZone) -> Result<Self::Op, Error>;
 }
 
 impl FromCmd for cmd::SchemaShow {
     type Op = SchemaShow;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(SchemaShow {
             name: SchemaName::parse(&self.name)?,
         })
@@ -86,7 +85,7 @@ impl FromCmd for cmd::SchemaShow {
 impl FromCmd for cmd::SchemaAdd {
     type Op = SchemaAdd;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         let raw = std::fs::read_to_string(&self.file)?;
         Ok(SchemaAdd {
             name: SchemaName::parse(&self.name)?,
@@ -98,7 +97,7 @@ impl FromCmd for cmd::SchemaAdd {
 impl FromCmd for cmd::SchemaAddField {
     type Op = SchemaAddField;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(SchemaAddField {
             schema: SchemaName::parse(&self.schema)?,
             name: FieldName::parse(&self.name)?,
@@ -112,7 +111,7 @@ impl FromCmd for cmd::SchemaAddField {
 impl FromCmd for cmd::SchemaAddValue {
     type Op = SchemaAddValue;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(SchemaAddValue {
             schema: SchemaName::parse(&self.schema)?,
             field: FieldName::parse(&self.field)?,
@@ -124,7 +123,7 @@ impl FromCmd for cmd::SchemaAddValue {
 impl FromCmd for cmd::SchemaRetire {
     type Op = SchemaRetire;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(SchemaRetire {
             name: SchemaName::parse(&self.name)?,
         })
@@ -134,7 +133,7 @@ impl FromCmd for cmd::SchemaRetire {
 impl FromCmd for cmd::SchemaDrop {
     type Op = SchemaDrop;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(SchemaDrop {
             name: SchemaName::parse(&self.name)?,
         })
@@ -144,7 +143,7 @@ impl FromCmd for cmd::SchemaDrop {
 impl FromCmd for cmd::Log {
     type Op = Log;
 
-    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(Log {
             schema: SchemaName::parse(&self.schema)?,
             at: self
@@ -162,7 +161,7 @@ impl FromCmd for cmd::Log {
 impl FromCmd for cmd::Ls {
     type Op = List;
 
-    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(List {
             schema: SchemaName::parse(&self.schema)?,
             range: Range::parse(self.from.as_deref(), self.to.as_deref(), tz)?,
@@ -176,7 +175,7 @@ impl FromCmd for cmd::Ls {
 impl FromCmd for cmd::Get {
     type Op = Get;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(Get {
             schema: SchemaName::parse(&self.schema)?,
             id: self.id,
@@ -187,7 +186,7 @@ impl FromCmd for cmd::Get {
 impl FromCmd for cmd::Sum {
     type Op = Sum;
 
-    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(Sum {
             schema: SchemaName::parse(&self.schema)?,
             field: FieldName::parse(&self.field)?,
@@ -206,7 +205,7 @@ impl FromCmd for cmd::Sum {
 impl FromCmd for cmd::Last {
     type Op = Last;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(Last {
             schema: SchemaName::parse(&self.schema)?,
             agent: self.agent.map(Agent::new),
@@ -218,7 +217,7 @@ impl FromCmd for cmd::Last {
 impl FromCmd for cmd::Today {
     type Op = Today;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(Today {
             schema: SchemaName::parse(&self.schema)?,
             agent: self.agent.map(Agent::new),
@@ -230,7 +229,7 @@ impl FromCmd for cmd::Today {
 impl FromCmd for cmd::Amend {
     type Op = Amend;
 
-    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(Amend {
             schema: SchemaName::parse(&self.schema)?,
             id: self.id,
@@ -250,7 +249,7 @@ impl FromCmd for cmd::Amend {
 impl FromCmd for cmd::Ignore {
     type Op = Ignore;
 
-    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+    fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(Ignore {
             schema: SchemaName::parse(&self.schema)?,
             id: self.id,
