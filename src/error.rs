@@ -64,7 +64,6 @@ pub enum Fail {
     CorruptStoredTime(String),
     HomeNotSet,
     DbPathRequired,
-    HelpNotAnOp,
     Store(String),
     Io(String),
     Time(String),

@@ -3,11 +3,6 @@ use std::path::PathBuf;
 use crate::spec::FieldType;
 
 #[derive(Debug, Clone)]
-pub struct Help {
-    pub topic: Option<String>,
-}
-
-#[derive(Debug, Clone)]
 pub struct SchemaShow {
     pub name: String,
     pub yaml: bool,
@@ -114,7 +109,6 @@ pub struct Ignore {
 
 #[derive(Debug, Clone)]
 pub enum Cmd {
-    Help(Help),
     SchemaList,
     SchemaShow(SchemaShow),
     SchemaAdd(SchemaAdd),

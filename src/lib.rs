@@ -1,7 +1,6 @@
 mod db;
 mod domain;
 mod error;
-mod help;
 mod input;
 mod ledger;
 mod mutable_store;
@@ -37,19 +36,22 @@ impl Bottle {
     }
 }
 
-pub fn run(db: Option<&Path>, agent: Option<String>, cmd: Cmd) -> Result<String, Error> {
-    if let Cmd::Help(help) = &cmd {
-        return help::page(help.topic.as_deref());
-    }
+pub fn help(topic: Option<&str>) -> Result<String, Error> {
+    input::help::page(topic)
+}
+
+pub fn run(
+    db: Option<&Path>,
+    agent: Option<String>,
+    tz: Option<&str>,
+    cmd: Cmd,
+) -> Result<String, Error> {
     let path = db.ok_or(Error::Fail(Fail::DbPathRequired))?;
-    let mut bottle = Bottle::open(path, agent, None)?;
+    let mut bottle = Bottle::open(path, agent, tz)?;
     execute(&mut bottle, cmd)
 }
 
 pub fn execute(bottle: &mut Bottle, cmd: Cmd) -> Result<String, Error> {
-    if let Cmd::Help(help) = cmd {
-        return help::page(help.topic.as_deref());
-    }
     let request = input::parse(cmd, &bottle.tz)?;
     let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, request.op)?;
     input::render(request.style, request.show_ignored, &outcome, &bottle.tz)

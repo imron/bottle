@@ -1,10 +1,11 @@
 pub mod cmd;
 mod error;
+pub(crate) mod help;
 mod tsv;
 
 use jiff::tz::TimeZone;
 
-use crate::error::{Error, Fail, Usage};
+use crate::error::{Error, Usage};
 use crate::ledger::{
     Agent, Amend, Clause, Entries, FieldInput, FieldValue, Get, GroupedLink, GroupedTime, Ignore,
     Last, List, Log, Op, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop,
@@ -56,7 +57,6 @@ impl FromCmd for Cmd {
 
     fn try_from(self, tz: &TimeZone) -> Result<Self::Op, Error> {
         Ok(match self {
-            Cmd::Help(_) => return Err(Error::Fail(Fail::HelpNotAnOp)),
             Cmd::SchemaList => Op::SchemaList,
             Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.try_from(tz)?),
             Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.try_from(tz)?),

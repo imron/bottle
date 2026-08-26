@@ -70,7 +70,6 @@ fn fail_message(err: &Fail) -> String {
         Fail::CorruptStoredTime(raw) => format!("corrupt stored time: {raw}"),
         Fail::HomeNotSet => "HOME is not set".into(),
         Fail::DbPathRequired => "db path required".into(),
-        Fail::HelpNotAnOp => "help is not a ledger operation".into(),
     }
 }
 

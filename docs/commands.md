@@ -28,7 +28,7 @@ Empty means no links.
 
 `--help` on any command is the short usage. `bottle help`
 is the long page (what, why, how) for humans and bots.
-See [src/help/](../src/help/).
+See [src/input/help/](../src/input/help/).
 
 ## help
 
@@ -37,7 +37,7 @@ bottle help
 bottle help <command>
 ```
 
-Prints the matching page from [src/help/](../src/help/).
+Prints the matching page from [src/input/help/](../src/input/help/).
 Overview if no command. Schema verbs are
 `bottle help schema add`.
 `--db` is accepted and ignored. Unknown topic: exit 2.
