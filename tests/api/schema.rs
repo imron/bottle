@@ -67,6 +67,56 @@ fn add_accepts_one_segment_and_many() {
 }
 
 #[test]
+fn dotted_and_underscore_names_are_distinct() {
+    let mut h = harness();
+    h.add_schema("foo.bar", MEAL);
+    h.add_schema("foo_bar", SESSION);
+    let list = h.run_ok(Cmd::SchemaList);
+    assert!(list.contains("foo.bar\tfalse"));
+    assert!(list.contains("foo_bar\tfalse"));
+    h.log(
+        "foo.bar",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "1"),
+            ("protein", "1"),
+            ("carbs", "0"),
+        ],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.log(
+        "foo_bar",
+        &[("title", "upper")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    let dotted = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "foo.bar".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        include_ignored: false,
+    }));
+    let underscored = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "foo_bar".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        include_ignored: false,
+    }));
+    let dotted_lines = tsv_lines(&dotted);
+    let underscored_lines = tsv_lines(&underscored);
+    assert!(dotted_lines[0].contains(&"kcal"));
+    assert_eq!(dotted_lines[1][4], "eggs");
+    assert!(underscored_lines[0].contains(&"title"));
+    assert_eq!(underscored_lines[1][3], "upper");
+}
+
+#[test]
 fn add_rejects_empty_segments() {
     let mut h = harness();
     for name in ["meal.", ".meal", "foo..bar"] {

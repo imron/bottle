@@ -7,7 +7,7 @@ use crate::db::Connection;
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
 use crate::spec::{EntryRef, FieldName, FieldType, Link, LinkName, SchemaName, Spec};
-use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident, table_name};
+use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident};
 use crate::time::{Range, ToBound};
 
 pub struct Find<'a> {
@@ -98,8 +98,10 @@ fn load_entry(
     spec: &Spec,
     id: i64,
 ) -> Result<Option<Entry>, Error> {
-    let table = table_name(schema);
-    let sql = format!("SELECT * FROM {} WHERE id = ?1", quote_ident(&table));
+    let sql = format!(
+        "SELECT * FROM {} WHERE id = ?1",
+        quote_ident(schema.as_str())
+    );
     let mut stmt = conn.prepare(&sql)?;
     let col_count = stmt.column_count();
     let names: Vec<String> = (0..col_count)
@@ -113,8 +115,7 @@ fn load_entry(
 }
 
 fn execute_select(conn: &Sqlite, q: &Find<'_>) -> Result<Vec<Entry>, Error> {
-    let table = table_name(q.schema);
-    let mut sql = format!("SELECT * FROM {} WHERE 1=1", quote_ident(&table));
+    let mut sql = format!("SELECT * FROM {} WHERE 1=1", quote_ident(q.schema.as_str()));
     let mut bind: Vec<SqlVal> = Vec::new();
     if !q.include_ignored {
         sql.push_str(" AND ignored = 0");

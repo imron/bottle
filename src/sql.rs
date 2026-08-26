@@ -1,6 +1,6 @@
 use crate::error::{Error, Fail};
 use crate::ledger::FieldValue;
-use crate::spec::{FieldType, SchemaName};
+use crate::spec::FieldType;
 use crate::time::Instant;
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
@@ -36,10 +36,6 @@ pub fn sql_type(t: FieldType) -> &'static str {
     match t {
         FieldType::Number | FieldType::Text | FieldType::Enum => "TEXT",
     }
-}
-
-pub fn table_name(schema: &SchemaName) -> String {
-    schema.as_str().replace('.', "_")
 }
 
 pub fn quote_ident(name: &str) -> String {

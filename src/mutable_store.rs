@@ -6,14 +6,13 @@ use crate::db::{Tx, UniqueConstraint};
 use crate::error::{Error, Fail};
 use crate::ledger::FieldValue;
 use crate::spec::{Field, FieldName, Link, LinkName, SchemaName, Spec};
-use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
+use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type};
 use crate::time::Instant;
 
 pub fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
     let yaml = spec.to_yaml()?;
-    let table = table_name(name);
     let cols = create_columns(spec);
-    let sql = format!("CREATE TABLE {} ({cols})", quote_ident(&table));
+    let sql = format!("CREATE TABLE {} ({cols})", quote_ident(name.as_str()));
     tx.as_ref()
         .execute(
             "INSERT INTO schemas (name, spec, retired) VALUES (?1, ?2, 0)",
@@ -30,19 +29,17 @@ pub fn add_column(
     field: &Field,
     default: Option<&str>,
 ) -> Result<(), Error> {
-    let table = table_name(schema);
+    let table = quote_ident(schema.as_str());
     let col_type = sql_type(field.type_);
     let alter = if let Some(def) = default {
         let sql_def = sql_default(field.type_, def);
         format!(
-            "ALTER TABLE {} ADD COLUMN {} {col_type} NOT NULL DEFAULT {sql_def}",
-            quote_ident(&table),
+            "ALTER TABLE {table} ADD COLUMN {} {col_type} NOT NULL DEFAULT {sql_def}",
             quote_ident(field.name.as_str())
         )
     } else {
         format!(
-            "ALTER TABLE {} ADD COLUMN {} {col_type}",
-            quote_ident(&table),
+            "ALTER TABLE {table} ADD COLUMN {} {col_type}",
             quote_ident(field.name.as_str())
         )
     };
@@ -77,11 +74,10 @@ pub fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     if n == 0 {
         return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
     }
-    let table = table_name(name);
     tx.as_ref()
         .execute("DELETE FROM links WHERE from_schema = ?1", [name.as_str()])?;
     tx.as_ref()
-        .execute_batch(&format!("DROP TABLE {}", quote_ident(&table)))?;
+        .execute_batch(&format!("DROP TABLE {}", quote_ident(name.as_str())))?;
     Ok(())
 }
 
@@ -94,7 +90,6 @@ pub fn insert_entry(
     values: &HashMap<FieldName, FieldValue>,
     links: &[Link],
 ) -> Result<i64, Error> {
-    let table = table_name(schema);
     let mut col_names = vec!["at".to_string(), "agent".to_string()];
     let mut placeholders = vec!["?1".to_string(), "?2".to_string()];
     let mut bind: Vec<SqlVal> = vec![
@@ -116,7 +111,7 @@ pub fn insert_entry(
     }
     let sql = format!(
         "INSERT INTO {} ({}) VALUES ({})",
-        quote_ident(&table),
+        quote_ident(schema.as_str()),
         col_names
             .iter()
             .map(|c| quote_ident(c))
@@ -143,7 +138,6 @@ pub fn update_entry(
     agent: Option<&str>,
     values: &HashMap<FieldName, FieldValue>,
 ) -> Result<(), Error> {
-    let table = table_name(schema);
     let mut sets = Vec::new();
     let mut bind: Vec<SqlVal> = Vec::new();
     if let Some(at) = at {
@@ -168,7 +162,7 @@ pub fn update_entry(
     bind.push(SqlVal::Int(id));
     let sql = format!(
         "UPDATE {} SET {} WHERE id = ?{}",
-        quote_ident(&table),
+        quote_ident(schema.as_str()),
         sets.join(", "),
         bind.len()
     );
@@ -216,11 +210,10 @@ pub fn upsert_link(
 }
 
 pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<(), Error> {
-    let table = table_name(schema);
     tx.as_ref().execute(
         &format!(
             "UPDATE {} SET ignored = 1 WHERE id = ?1",
-            quote_ident(&table)
+            quote_ident(schema.as_str())
         ),
         [id],
     )?;
