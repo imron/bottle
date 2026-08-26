@@ -11,12 +11,14 @@ fn get_includes_ignored() {
         id: 1,
     }));
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&ls).len(), 2);
@@ -46,7 +48,7 @@ fn get_missing() {
 fn last_newest() {
     let mut h = harness();
     seed_meals(&mut h);
-    let out = h.run_ok(Cmd::Last(cmd::Last {
+    let out = h.run_ok(Cmd::Last(cmd::Filters {
         schema: "nutrition.meal".into(),
         agent: None,
         wheres: vec![],
@@ -61,7 +63,7 @@ fn last_empty() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
     let err = h
-        .run(Cmd::Last(cmd::Last {
+        .run(Cmd::Last(cmd::Filters {
             schema: "nutrition.meal".into(),
             agent: None,
             wheres: vec![],
@@ -80,13 +82,15 @@ fn ignore_hides_from_sum() {
         id: 1,
     }));
     let total = h.run_ok(Cmd::Sum(cmd::Sum {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         field: "protein".into(),
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         group: None,
     }));
     assert_eq!(
@@ -111,7 +115,7 @@ fn today_is_civil_day() {
         &[],
         None,
     );
-    let out = h.run_ok(Cmd::Today(cmd::Today {
+    let out = h.run_ok(Cmd::Today(cmd::Filters {
         schema: "nutrition.meal".into(),
         agent: None,
         wheres: vec![],

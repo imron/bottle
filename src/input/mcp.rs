@@ -208,7 +208,7 @@ impl Server {
 
     #[tool(description = "List registered schemas")]
     fn schema_list(&self) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::SchemaList)
+        self.run(Cmd::Schema(cmd::SchemaCmd::List))
     }
 
     #[tool(description = "Print the field list of a schema")]
@@ -216,10 +216,10 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaShowParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::SchemaShow(cmd::SchemaShow {
+        self.run(Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow {
             name: p.name,
             yaml: p.yaml,
-        }))
+        })))
     }
 
     #[tool(description = "Register a type from a YAML file")]
@@ -227,10 +227,10 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaAddParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::SchemaAdd(cmd::SchemaAdd {
+        self.run(Cmd::Schema(cmd::SchemaCmd::Add(cmd::SchemaAdd {
             name: p.name,
             file: p.file.into(),
-        }))
+        })))
     }
 
     #[tool(description = "Add one field to an existing schema")]
@@ -238,13 +238,13 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaAddFieldParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::SchemaAddField(cmd::SchemaAddField {
+        self.run(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
             schema: p.schema,
             name: p.name,
             type_: field_type(&p.type_)?,
             values: p.values,
             default: p.default,
-        }))
+        })))
     }
 
     #[tool(description = "Append one value to an enum field")]
@@ -252,11 +252,11 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaAddValueParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::SchemaAddValue(cmd::SchemaAddValue {
+        self.run(Cmd::Schema(cmd::SchemaCmd::AddValue(cmd::SchemaAddValue {
             schema: p.schema,
             field: p.field,
             value: p.value,
-        }))
+        })))
     }
 
     #[tool(description = "Retire a schema so log fails and reads still work")]
@@ -264,7 +264,9 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaNameParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::SchemaRetire(cmd::SchemaRetire { name: p.name }))
+        self.run(Cmd::Schema(cmd::SchemaCmd::Retire(cmd::SchemaRetire {
+            name: p.name,
+        })))
     }
 
     #[tool(description = "Drop a schema and its entries")]
@@ -272,7 +274,9 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaNameParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::SchemaDrop(cmd::SchemaDrop { name: p.name }))
+        self.run(Cmd::Schema(cmd::SchemaCmd::Drop(cmd::SchemaDrop {
+            name: p.name,
+        })))
     }
 
     #[tool(description = "Write one entry, or many in one transaction")]
@@ -319,12 +323,14 @@ impl Server {
     #[tool(description = "List entries of a schema")]
     fn ls(&self, Parameters(p): Parameters<LsParams>) -> Result<CallToolResult, McpError> {
         self.run(Cmd::Ls(cmd::Ls {
-            schema: p.schema,
+            filters: cmd::Filters {
+                schema: p.schema,
+                agent: p.agent,
+                wheres: pairs(p.wheres),
+                links: pairs(p.links),
+            },
             from: p.from,
             to: p.to,
-            agent: p.agent,
-            wheres: pairs(p.wheres),
-            links: pairs(p.links),
             include_ignored: p.include_ignored,
         }))
     }
@@ -340,20 +346,22 @@ impl Server {
     #[tool(description = "Total a number field")]
     fn sum(&self, Parameters(p): Parameters<SumParams>) -> Result<CallToolResult, McpError> {
         self.run(Cmd::Sum(cmd::Sum {
-            schema: p.schema,
+            filters: cmd::Filters {
+                schema: p.schema,
+                agent: p.agent,
+                wheres: pairs(p.wheres),
+                links: pairs(p.links),
+            },
             field: p.field,
             from: p.from,
             to: p.to,
-            agent: p.agent,
-            wheres: pairs(p.wheres),
-            links: pairs(p.links),
             group: p.group,
         }))
     }
 
     #[tool(description = "Print the most recent entry of a schema")]
     fn last(&self, Parameters(p): Parameters<FilterParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Last(cmd::Last {
+        self.run(Cmd::Last(cmd::Filters {
             schema: p.schema,
             agent: p.agent,
             wheres: pairs(p.wheres),
@@ -363,7 +371,7 @@ impl Server {
 
     #[tool(description = "List entries for the current civil day")]
     fn today(&self, Parameters(p): Parameters<FilterParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Today(cmd::Today {
+        self.run(Cmd::Today(cmd::Filters {
             schema: p.schema,
             agent: p.agent,
             wheres: pairs(p.wheres),

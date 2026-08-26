@@ -7,13 +7,15 @@ fn sum_and_group_day() {
     let mut h = harness();
     seed_meals(&mut h);
     let total = h.run_ok(Cmd::Sum(cmd::Sum {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         field: "protein".into(),
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         group: None,
     }));
     assert_eq!(
@@ -21,13 +23,15 @@ fn sum_and_group_day() {
         vec![vec!["field", "value"], vec!["protein", "59"]]
     );
     let empty = h.run_ok(Cmd::Sum(cmd::Sum {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         field: "protein".into(),
         from: Some("2020-01-01".into()),
         to: Some("2020-01-02".into()),
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         group: None,
     }));
     assert_eq!(
@@ -35,13 +39,15 @@ fn sum_and_group_day() {
         vec![vec!["field", "value"], vec!["protein", "0"]]
     );
     let grouped = h.run_ok(Cmd::Sum(cmd::Sum {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         field: "protein".into(),
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         group: Some("day".into()),
     }));
     assert!(grouped.starts_with("day\tvalue\n"));
@@ -52,13 +58,15 @@ fn sum_skips_empty_number() {
     let mut h = harness();
     seed_meals(&mut h);
     let total = h.run_ok(Cmd::Sum(cmd::Sum {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         field: "fat".into(),
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         group: None,
     }));
     assert_eq!(
@@ -66,13 +74,15 @@ fn sum_skips_empty_number() {
         vec![vec!["field", "value"], vec!["fat", "39.6"]]
     );
     let grouped = h.run_ok(Cmd::Sum(cmd::Sum {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         field: "fat".into(),
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         group: Some("day".into()),
     }));
     assert_eq!(
@@ -105,13 +115,15 @@ fn sum_group_link_skips_empty_number() {
         Some("2026-08-22T08:02:00Z"),
     );
     let grouped = h.run_ok(Cmd::Sum(cmd::Sum {
-        schema: "fitness.set".into(),
+        filters: cmd::Filters {
+            schema: "fitness.set".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         field: "load".into(),
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         group: Some("session".into()),
     }));
     assert_eq!(
@@ -126,13 +138,15 @@ fn sum_rejects_text_field() {
     seed_meals(&mut h);
     let err = h
         .run(Cmd::Sum(cmd::Sum {
-            schema: "nutrition.meal".into(),
+            filters: cmd::Filters {
+                schema: "nutrition.meal".into(),
+                agent: None,
+                wheres: vec![],
+                links: vec![],
+            },
             field: "what".into(),
             from: None,
             to: None,
-            agent: None,
-            wheres: vec![],
-            links: vec![],
             group: None,
         }))
         .unwrap_err();
@@ -145,13 +159,15 @@ fn sum_group_week_month_year() {
     seed_meals(&mut h);
     for unit in ["week", "month", "year"] {
         let out = h.run_ok(Cmd::Sum(cmd::Sum {
-            schema: "nutrition.meal".into(),
+            filters: cmd::Filters {
+                schema: "nutrition.meal".into(),
+                agent: None,
+                wheres: vec![],
+                links: vec![],
+            },
             field: "protein".into(),
             from: None,
             to: None,
-            agent: None,
-            wheres: vec![],
-            links: vec![],
             group: Some(unit.into()),
         }));
         assert!(out.starts_with(&format!("{unit}\tvalue\n")), "{out}");
@@ -165,13 +181,15 @@ fn sum_unknown_field() {
     seed_meals(&mut h);
     let err = h
         .run(Cmd::Sum(cmd::Sum {
-            schema: "nutrition.meal".into(),
+            filters: cmd::Filters {
+                schema: "nutrition.meal".into(),
+                agent: None,
+                wheres: vec![],
+                links: vec![],
+            },
             field: "fiber".into(),
             from: None,
             to: None,
-            agent: None,
-            wheres: vec![],
-            links: vec![],
             group: None,
         }))
         .unwrap_err();
@@ -184,13 +202,15 @@ fn sum_group_collides_with_field() {
     seed_meals(&mut h);
     let err = h
         .run(Cmd::Sum(cmd::Sum {
-            schema: "nutrition.meal".into(),
+            filters: cmd::Filters {
+                schema: "nutrition.meal".into(),
+                agent: None,
+                wheres: vec![],
+                links: vec![],
+            },
             field: "protein".into(),
             from: None,
             to: None,
-            agent: None,
-            wheres: vec![],
-            links: vec![],
             group: Some("kcal".into()),
         }))
         .unwrap_err();

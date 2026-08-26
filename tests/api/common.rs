@@ -38,10 +38,10 @@ impl Harness {
 
     pub fn add_schema(&mut self, name: &str, yaml: &str) {
         let file = self.yaml_file(&format!("{name}.yaml"), yaml);
-        self.run_ok(Cmd::SchemaAdd(cmd::SchemaAdd {
+        self.run_ok(Cmd::Schema(cmd::SchemaCmd::Add(cmd::SchemaAdd {
             name: name.into(),
             file,
-        }));
+        })));
     }
 
     pub fn log(

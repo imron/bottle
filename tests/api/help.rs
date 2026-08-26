@@ -36,7 +36,7 @@ fn help_does_not_need_a_db() {
 
 #[test]
 fn other_commands_need_a_db() {
-    let err = run(None, None, None, Cmd::SchemaList).unwrap_err();
+    let err = run(None, None, None, Cmd::Schema(cmd::SchemaCmd::List)).unwrap_err();
     common::assert_fail(err, "db path required");
 }
 
@@ -44,7 +44,7 @@ fn other_commands_need_a_db() {
 fn run_opens_db_when_path_given() {
     let dir = tempfile::TempDir::new().unwrap();
     let db = dir.path().join("bottle.db");
-    let out = run(Some(&db), None, None, Cmd::SchemaList).unwrap();
+    let out = run(Some(&db), None, None, Cmd::Schema(cmd::SchemaCmd::List)).unwrap();
     assert_eq!(out, "name\tretired\n");
 }
 
@@ -58,10 +58,10 @@ fn run_uses_given_timezone() {
         Some(&db),
         Some("test".into()),
         Some(common::TZ),
-        Cmd::SchemaAdd(cmd::SchemaAdd {
+        Cmd::Schema(cmd::SchemaCmd::Add(cmd::SchemaAdd {
             name: "nutrition.meal".into(),
             file,
-        }),
+        })),
     )
     .unwrap();
     run(
@@ -88,12 +88,14 @@ fn run_uses_given_timezone() {
         None,
         Some(common::TZ),
         Cmd::Ls(cmd::Ls {
-            schema: "nutrition.meal".into(),
+            filters: cmd::Filters {
+                schema: "nutrition.meal".into(),
+                agent: None,
+                wheres: vec![],
+                links: vec![],
+            },
             from: None,
             to: None,
-            agent: None,
-            wheres: vec![],
-            links: vec![],
             include_ignored: false,
         }),
     )

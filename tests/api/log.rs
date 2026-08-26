@@ -43,12 +43,14 @@ fn enum_folds_on_write() {
         Some("2026-08-22T08:14:00Z"),
     );
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         include_ignored: false,
     }));
     assert!(ls.contains("breakfast"));
@@ -177,12 +179,14 @@ fn agent_from_open() {
         Some("2026-08-22T08:14:00Z"),
     );
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);
@@ -224,12 +228,14 @@ fn agent_trims_spaces() {
         fields: meal_fields(),
     }));
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: Some(" coach".into()),
+            wheres: vec![],
+            links: vec![],
+        },
         from: None,
         to: None,
-        agent: Some(" coach".into()),
-        wheres: vec![],
-        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);
@@ -261,12 +267,14 @@ fn unset_agent_defaults_to_bottle() {
     )
     .unwrap();
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);
@@ -357,12 +365,14 @@ fn link_name_collides_with_field() {
     assert_fail(err, "collides with field");
     let err = h
         .run(Cmd::Ls(cmd::Ls {
-            schema: "nutrition.meal".into(),
+            filters: cmd::Filters {
+                schema: "nutrition.meal".into(),
+                agent: None,
+                wheres: vec![],
+                links: vec![("what".into(), "nutrition.meal/1".into())],
+            },
             from: None,
             to: None,
-            agent: None,
-            wheres: vec![],
-            links: vec![("what".into(), "nutrition.meal/1".into())],
             include_ignored: false,
         }))
         .unwrap_err();
@@ -625,12 +635,14 @@ fn log_entries_one_table() {
     assert_eq!(lines[1][0], "1");
     assert_eq!(lines[2][0], "2");
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&ls).len(), 3);
@@ -647,12 +659,14 @@ fn log_entries_rolls_back_on_error() {
         .unwrap_err();
     assert_fail(err, "missing required");
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
-        schema: "nutrition.meal".into(),
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
         from: None,
         to: None,
-        agent: None,
-        wheres: vec![],
-        links: vec![],
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&ls).len(), 1);

@@ -35,7 +35,7 @@ pub struct Request {
 
 pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Request, Error> {
     let style = match &cmd {
-        Cmd::SchemaShow(cmd::SchemaShow { yaml: true, .. }) => Style::Yaml,
+        Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow { yaml: true, .. })) => Style::Yaml,
         _ => Style::Tsv,
     };
     let show_ignored = matches!(
@@ -55,13 +55,16 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Request, Error> {
 
 fn op(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
     Ok(match cmd {
-        Cmd::SchemaList => Op::SchemaList,
-        Cmd::SchemaShow(cmd) => Op::SchemaShow(schema_show(cmd)?),
-        Cmd::SchemaAdd(cmd) => Op::SchemaAdd(schema_add(cmd)?),
-        Cmd::SchemaAddField(cmd) => Op::SchemaAddField(schema_add_field(cmd)?),
-        Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(schema_add_value(cmd)?),
-        Cmd::SchemaRetire(cmd) => Op::SchemaRetire(schema_retire(cmd)?),
-        Cmd::SchemaDrop(cmd) => Op::SchemaDrop(schema_drop(cmd)?),
+        Cmd::Help { .. } | Cmd::Mcp => {
+            unreachable!("help and mcp are handled by the binary")
+        }
+        Cmd::Schema(cmd::SchemaCmd::List) => Op::SchemaList,
+        Cmd::Schema(cmd::SchemaCmd::Show(cmd)) => Op::SchemaShow(schema_show(cmd)?),
+        Cmd::Schema(cmd::SchemaCmd::Add(cmd)) => Op::SchemaAdd(schema_add(cmd)?),
+        Cmd::Schema(cmd::SchemaCmd::AddField(cmd)) => Op::SchemaAddField(schema_add_field(cmd)?),
+        Cmd::Schema(cmd::SchemaCmd::AddValue(cmd)) => Op::SchemaAddValue(schema_add_value(cmd)?),
+        Cmd::Schema(cmd::SchemaCmd::Retire(cmd)) => Op::SchemaRetire(schema_retire(cmd)?),
+        Cmd::Schema(cmd::SchemaCmd::Drop(cmd)) => Op::SchemaDrop(schema_drop(cmd)?),
         Cmd::Log(cmd) => Op::Log(log(cmd, tz)?),
         Cmd::Ls(cmd) => Op::List(ls(cmd, tz)?),
         Cmd::Get(cmd) => Op::Get(get(cmd)?),
@@ -169,7 +172,7 @@ pub(crate) fn log(cmd: cmd::Log, tz: &TimeZone) -> Result<Log, Error> {
 
 fn ls(cmd: cmd::Ls, tz: &TimeZone) -> Result<List, Error> {
     Ok(List {
-        scope: scope(cmd.schema, cmd.agent, cmd.wheres, cmd.links)?,
+        scope: scope(cmd.filters)?,
         range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
         include_ignored: cmd.include_ignored,
     })
@@ -184,36 +187,27 @@ fn get(cmd: cmd::Get) -> Result<Get, Error> {
 
 fn sum(cmd: cmd::Sum, tz: &TimeZone) -> Result<Sum, Error> {
     Ok(Sum {
-        scope: scope(cmd.schema, cmd.agent, cmd.wheres, cmd.links)?,
+        scope: scope(cmd.filters)?,
         field: FieldName::parse(&cmd.field)?,
         range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
         group: cmd.group.as_deref().map(Group::parse).transpose()?,
     })
 }
 
-fn last(cmd: cmd::Last) -> Result<Last, Error> {
-    Ok(Last {
-        scope: scope(cmd.schema, cmd.agent, cmd.wheres, cmd.links)?,
-    })
+fn last(cmd: cmd::Filters) -> Result<Last, Error> {
+    Ok(Last { scope: scope(cmd)? })
 }
 
-fn today(cmd: cmd::Today) -> Result<Today, Error> {
-    Ok(Today {
-        scope: scope(cmd.schema, cmd.agent, cmd.wheres, cmd.links)?,
-    })
+fn today(cmd: cmd::Filters) -> Result<Today, Error> {
+    Ok(Today { scope: scope(cmd)? })
 }
 
-fn scope(
-    schema: String,
-    agent: Option<String>,
-    wheres: Vec<(String, String)>,
-    links: Vec<(String, String)>,
-) -> Result<Scope, Error> {
+fn scope(filters: cmd::Filters) -> Result<Scope, Error> {
     Ok(Scope {
-        schema: SchemaName::parse(&schema)?,
-        agent: parse_agent(agent)?,
-        fields: parse_wheres(wheres)?,
-        links: parse_links(links)?,
+        schema: SchemaName::parse(&filters.schema)?,
+        agent: parse_agent(filters.agent)?,
+        fields: parse_wheres(filters.wheres)?,
+        links: parse_links(filters.links)?,
     })
 }
 
