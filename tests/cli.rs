@@ -58,6 +58,19 @@ fn help_log_and_schema_add() {
 }
 
 #[test]
+fn mcp_help_and_subcommand() {
+    let (code, stdout, stderr) = run(&["help", "mcp"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.starts_with("# mcp\n"), "{stdout}");
+    let (code, stdout, stderr) = run(&["mcp", "--help"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(
+        stdout.contains("MCP") || stdout.contains("stdio") || stdout.contains("mcp"),
+        "{stdout}{stderr}"
+    );
+}
+
+#[test]
 fn unknown_help_topic_is_usage() {
     let (code, stdout, stderr) = run(&["help", "nope"]);
     assert_eq!(code, 2);

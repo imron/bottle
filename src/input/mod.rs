@@ -1,6 +1,7 @@
 pub mod cmd;
 mod error;
 pub(crate) mod help;
+pub(crate) mod mcp;
 mod tsv;
 
 use std::collections::HashSet;

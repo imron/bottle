@@ -27,6 +27,18 @@ fn run_cli(cli: Cli) -> Result<String, Error> {
             };
             help(topic.as_deref())
         }
+        Command::Mcp => {
+            let db = match cli.db {
+                Some(path) => path,
+                None => bottle::default_db_path()?,
+            };
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| bottle::Error::Fail(bottle::Fail::Io(e.to_string())))?;
+            rt.block_on(bottle::mcp(&db, None, None))?;
+            Ok(String::new())
+        }
         command => {
             let db = match cli.db {
                 Some(path) => path,
@@ -76,6 +88,8 @@ enum Command {
     Help {
         topic: Vec<String>,
     },
+    /// Run bottle as an MCP server on stdio
+    Mcp,
     #[command(subcommand)]
     Schema(SchemaCommand),
     Log(LogArgs),
@@ -209,7 +223,9 @@ struct IgnoreArgs {
 impl Command {
     fn into_cmd(self) -> Cmd {
         match self {
-            Self::Help { .. } => unreachable!("help is handled before into_cmd"),
+            Self::Help { .. } | Self::Mcp => {
+                unreachable!("help and mcp are handled before into_cmd")
+            }
             Self::Schema(SchemaCommand::List) => Cmd::SchemaList,
             Self::Schema(SchemaCommand::Show { name, yaml }) => {
                 Cmd::SchemaShow(cmd::SchemaShow { name, yaml })

@@ -50,6 +50,10 @@ pub fn help(topic: Option<&str>) -> Result<String, Error> {
     input::help::page(topic)
 }
 
+pub async fn mcp(path: &Path, agent: Option<String>, tz: Option<&str>) -> Result<(), Error> {
+    input::mcp::serve(path, agent, tz).await
+}
+
 pub fn run(
     db: Option<&Path>,
     agent: Option<String>,
