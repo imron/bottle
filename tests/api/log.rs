@@ -1,6 +1,6 @@
 use bottle::{Bottle, Cmd, cmd};
 
-use crate::common::{MEAL, SESSION, SET, assert_fail, assert_usage, harness, tsv_lines};
+use crate::common::{self, MEAL, SESSION, SET, assert_fail, assert_usage, harness, tsv_lines};
 
 #[test]
 fn log_prints_id_at_links() {
@@ -193,7 +193,7 @@ fn unset_agent_defaults_to_bottle() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
     let db = h.dir.path().join("bottle.db");
-    let mut bottle = Bottle::open(&db, None, Some(crate::common::TZ)).unwrap();
+    let mut bottle = Bottle::open(&db, None, Some(common::TZ)).unwrap();
     bottle::execute(
         &mut bottle,
         Cmd::Log(cmd::Log {
