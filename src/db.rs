@@ -8,6 +8,28 @@ use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
 
+pub trait UniqueConstraint<T> {
+    fn unique(self, err: Fail) -> Result<T, Error>;
+}
+
+impl<T> UniqueConstraint<T> for Result<T, rusqlite::Error> {
+    fn unique(self, err: Fail) -> Result<T, Error> {
+        self.map_err(|e| {
+            if e.sqlite_error_code() == Some(rusqlite::ErrorCode::ConstraintViolation) {
+                Error::Fail(err)
+            } else {
+                Error::from(e)
+            }
+        })
+    }
+}
+
+impl From<rusqlite::Error> for Error {
+    fn from(err: rusqlite::Error) -> Self {
+        Self::Fail(Fail::Store(err.to_string()))
+    }
+}
+
 /// Readable sqlite session. Implemented by [`Db`] and [`Tx`].
 pub trait Connection: AsRef<Sqlite> {}
 
@@ -118,7 +140,8 @@ fn register_functions(conn: &Sqlite) -> Result<(), Error> {
         |ctx| {
             let left: Option<String> = ctx.get(0)?;
             let right: Option<String> = ctx.get(1)?;
-            Ok(dec_eq(left.as_deref(), right.as_deref())?)
+            dec_eq(left.as_deref(), right.as_deref())
+                .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))
         },
     )?;
     Ok(())

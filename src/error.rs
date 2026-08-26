@@ -85,28 +85,6 @@ impl Error {
 
 impl std::error::Error for Error {}
 
-pub trait UniqueConstraint<T> {
-    fn unique(self, err: Fail) -> Result<T, Error>;
-}
-
-impl<T> UniqueConstraint<T> for Result<T, rusqlite::Error> {
-    fn unique(self, err: Fail) -> Result<T, Error> {
-        self.map_err(|e| {
-            if e.sqlite_error_code() == Some(rusqlite::ErrorCode::ConstraintViolation) {
-                Error::Fail(err)
-            } else {
-                Error::from(e)
-            }
-        })
-    }
-}
-
-impl From<rusqlite::Error> for Error {
-    fn from(err: rusqlite::Error) -> Self {
-        Self::Fail(Fail::Store(err.to_string()))
-    }
-}
-
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Self::Fail(Fail::Io(err.to_string()))
@@ -122,11 +100,5 @@ impl From<rust_decimal::Error> for Error {
 impl From<jiff::Error> for Error {
     fn from(err: jiff::Error) -> Self {
         Self::Fail(Fail::Time(err.to_string()))
-    }
-}
-
-impl From<Error> for rusqlite::Error {
-    fn from(err: Error) -> Self {
-        rusqlite::Error::UserFunctionError(Box::new(err))
     }
 }

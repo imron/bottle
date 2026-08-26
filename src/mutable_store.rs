@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use rusqlite::params;
 
-use crate::db::Tx;
-use crate::error::{Error, Fail, UniqueConstraint};
+use crate::db::{Tx, UniqueConstraint};
+use crate::error::{Error, Fail};
 use crate::ledger::FieldValue;
 use crate::spec::{Field, FieldName, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
