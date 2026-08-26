@@ -7,7 +7,8 @@ use crate::db::Connection;
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
 use crate::spec::{
-    EntryRef, EnumValue, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec, TimePeriod,
+    EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec,
+    TimePeriod,
 };
 use crate::sql::{
     SqlVal, StoredAgent, StoredEnum, StoredLinkName, StoredLinkSchema, StoredNumber,
@@ -86,18 +87,15 @@ pub fn get_entry(
     id: i64,
 ) -> Result<Option<Entry>, Error> {
     let sql = format!(
-        "SELECT * FROM {} WHERE id = ?1",
+        "SELECT {} FROM {} WHERE id = ?1",
+        entry_columns(spec),
         quote_ident(&table_name(schema))
     );
     let mut entry = {
         let mut stmt = conn.as_ref().prepare(&sql)?;
-        let col_count = stmt.column_count();
-        let names: Vec<String> = (0..col_count)
-            .map(|i| stmt.column_name(i).unwrap_or("").to_string())
-            .collect();
         let mut raw = stmt.query([id])?;
         match raw.next()? {
-            Some(r) => read_entry(spec, &names, r)?,
+            Some(r) => read_entry(spec, r)?,
             None => return Ok(None),
         }
     };
@@ -107,7 +105,8 @@ pub fn get_entry(
 
 pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     let mut sql = format!(
-        "SELECT * FROM {} WHERE 1=1",
+        "SELECT {} FROM {} WHERE 1=1",
+        entry_columns(q.spec),
         quote_ident(&table_name(q.schema))
     );
     let mut bind: Vec<SqlVal> = Vec::new();
@@ -115,16 +114,12 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     apply_find_order_limit(&mut sql, &q);
     let mut entries = {
         let mut stmt = conn.as_ref().prepare(&sql)?;
-        let col_count = stmt.column_count();
-        let names: Vec<String> = (0..col_count)
-            .map(|i| stmt.column_name(i).unwrap_or("").to_string())
-            .collect();
         let mut raw = stmt.query(rusqlite::params_from_iter(
             bind.iter().map(SqlVal::as_param),
         ))?;
         let mut entries = Vec::new();
         while let Some(r) = raw.next()? {
-            entries.push(read_entry(q.spec, &names, r)?);
+            entries.push(read_entry(q.spec, r)?);
         }
         entries
     };
@@ -315,74 +310,53 @@ fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) ->
     Ok(())
 }
 
-fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<Entry, Error> {
+fn entry_columns(spec: &Spec) -> String {
+    let mut cols = vec![
+        "id".to_string(),
+        "at".to_string(),
+        "agent".to_string(),
+        "ignored".to_string(),
+    ];
+    for field in &spec.fields {
+        cols.push(quote_ident(field.name.as_str()));
+    }
+    cols.join(", ")
+}
+
+fn read_entry(spec: &Spec, r: &rusqlite::Row<'_>) -> Result<Entry, Error> {
+    let id: i64 = r.get(0)?;
+    let at_raw: String = r.get(1)?;
+    let agent: Option<String> = r.get(2)?;
+    let ignored: i64 = r.get(3)?;
     let mut values = HashMap::new();
-    let mut id = 0_i64;
-    let mut at_raw = String::new();
-    let mut agent: Option<String> = None;
-    let mut ignored = false;
-    for (i, name) in names.iter().enumerate() {
-        match name.as_str() {
-            "id" => id = r.get(i)?,
-            "at" => at_raw = r.get(i)?,
-            "agent" => agent = r.get(i)?,
-            "ignored" => {
-                let v: i64 = r.get(i)?;
-                ignored = v != 0;
-            }
-            other => {
-                let Ok(field_name) = FieldName::parse(other) else {
-                    continue;
-                };
-                if let Some(field) = spec.field(&field_name) {
-                    let name = field.name.clone();
-                    match &field.kind {
-                        FieldKind::Number => {
-                            let v: Option<String> = r.get(i)?;
-                            values.insert(
-                                name,
-                                match v {
-                                    Some(s) if !s.is_empty() => {
-                                        FieldValue::Number(Decimal::try_from(StoredNumber(s))?)
-                                    }
-                                    _ => FieldValue::Empty,
-                                },
-                            );
-                        }
-                        FieldKind::Enum(_) => {
-                            let v: Option<String> = r.get(i)?;
-                            values.insert(
-                                name,
-                                match v {
-                                    Some(s) if !s.is_empty() => {
-                                        FieldValue::Enum(EnumValue::try_from(StoredEnum(s))?)
-                                    }
-                                    _ => FieldValue::Empty,
-                                },
-                            );
-                        }
-                        FieldKind::Text => {
-                            let v: Option<String> = r.get(i)?;
-                            values.insert(
-                                name,
-                                match v {
-                                    Some(s) if !s.is_empty() => FieldValue::Text(s),
-                                    _ => FieldValue::Empty,
-                                },
-                            );
-                        }
-                    }
-                }
-            }
-        }
+    for (i, field) in spec.fields.iter().enumerate() {
+        values.insert(field.name.clone(), read_field_value(field, r, 4 + i)?);
     }
     Ok(Entry {
         id,
         at: Instant::try_from(StoredTime(at_raw))?,
         agent: agent.map(StoredAgent).map(Agent::try_from).transpose()?,
-        ignored,
+        ignored: ignored != 0,
         values,
         links: Vec::new(),
+    })
+}
+
+fn read_field_value(field: &Field, r: &rusqlite::Row<'_>, i: usize) -> Result<FieldValue, Error> {
+    let v: Option<String> = r.get(i)?;
+    Ok(match &field.kind {
+        FieldKind::Number => match v {
+            Some(s) if !s.is_empty() => FieldValue::Number(Decimal::try_from(StoredNumber(s))?),
+            _ => FieldValue::Empty,
+        },
+        FieldKind::Enum(_) => match v {
+            Some(s) if !s.is_empty() => FieldValue::Enum(EnumValue::try_from(StoredEnum(s))?),
+            _ => FieldValue::Empty,
+        },
+        FieldKind::Text => match v {
+            Some(s) if !s.is_empty() => FieldValue::Text(s),
+            _ => FieldValue::Empty,
+        },
     })
 }
 
