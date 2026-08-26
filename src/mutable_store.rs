@@ -95,7 +95,7 @@ pub fn insert_entry(
     let mut bind: Vec<SqlVal> = vec![
         SqlVal::Text(instant_to_sql(at)?),
         match agent {
-            Some(a) => SqlVal::Text(a.as_str().to_string()),
+            Some(a) => SqlVal::Text(a.to_string()),
             None => SqlVal::Null,
         },
     ];
@@ -146,7 +146,7 @@ pub fn update_entry(
     }
     if let Some(agent) = agent {
         sets.push(format!("agent = ?{}", bind.len() + 1));
-        bind.push(SqlVal::Text(agent.as_str().to_string()));
+        bind.push(SqlVal::Text(agent.to_string()));
     }
     for (name, val) in values {
         sets.push(format!(
