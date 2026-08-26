@@ -50,188 +50,210 @@ fn op_from_cmd(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
     Ok(match cmd {
         Cmd::Help(_) => return Err(Error::Fail(Fail::HelpNotAnOp)),
         Cmd::SchemaList => Op::SchemaList,
-        Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.try_into()?),
-        Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.try_into()?),
-        Cmd::SchemaAddField(cmd) => Op::SchemaAddField(cmd.try_into()?),
-        Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(cmd.try_into()?),
-        Cmd::SchemaRetire(cmd) => Op::SchemaRetire(cmd.try_into()?),
-        Cmd::SchemaDrop(cmd) => Op::SchemaDrop(cmd.try_into()?),
-        Cmd::Log(cmd) => Op::Log(log_from(cmd, tz)?),
-        Cmd::Ls(cmd) => Op::List(list_from(cmd, tz)?),
-        Cmd::Get(cmd) => Op::Get(cmd.try_into()?),
-        Cmd::Sum(cmd) => Op::Sum(sum_from(cmd, tz)?),
-        Cmd::Last(cmd) => Op::Last(cmd.try_into()?),
-        Cmd::Today(cmd) => Op::Today(cmd.try_into()?),
-        Cmd::Amend(cmd) => Op::Amend(amend_from(cmd, tz)?),
-        Cmd::Ignore(cmd) => Op::Ignore(cmd.try_into()?),
+        Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.from_cmd(tz)?),
+        Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.from_cmd(tz)?),
+        Cmd::SchemaAddField(cmd) => Op::SchemaAddField(cmd.from_cmd(tz)?),
+        Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(cmd.from_cmd(tz)?),
+        Cmd::SchemaRetire(cmd) => Op::SchemaRetire(cmd.from_cmd(tz)?),
+        Cmd::SchemaDrop(cmd) => Op::SchemaDrop(cmd.from_cmd(tz)?),
+        Cmd::Log(cmd) => Op::Log(cmd.from_cmd(tz)?),
+        Cmd::Ls(cmd) => Op::List(cmd.from_cmd(tz)?),
+        Cmd::Get(cmd) => Op::Get(cmd.from_cmd(tz)?),
+        Cmd::Sum(cmd) => Op::Sum(cmd.from_cmd(tz)?),
+        Cmd::Last(cmd) => Op::Last(cmd.from_cmd(tz)?),
+        Cmd::Today(cmd) => Op::Today(cmd.from_cmd(tz)?),
+        Cmd::Amend(cmd) => Op::Amend(cmd.from_cmd(tz)?),
+        Cmd::Ignore(cmd) => Op::Ignore(cmd.from_cmd(tz)?),
     })
 }
 
-impl TryFrom<cmd::SchemaShow> for SchemaShow {
-    type Error = Error;
+trait FromCmd {
+    type Op;
+    #[allow(clippy::wrong_self_convention)]
+    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error>;
+}
 
-    fn try_from(cmd: cmd::SchemaShow) -> Result<Self, Error> {
-        Ok(Self {
-            name: SchemaName::parse(&cmd.name)?,
+impl FromCmd for cmd::SchemaShow {
+    type Op = SchemaShow;
+
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(SchemaShow {
+            name: SchemaName::parse(&self.name)?,
         })
     }
 }
 
-impl TryFrom<cmd::SchemaAdd> for SchemaAdd {
-    type Error = Error;
+impl FromCmd for cmd::SchemaAdd {
+    type Op = SchemaAdd;
 
-    fn try_from(cmd: cmd::SchemaAdd) -> Result<Self, Error> {
-        let raw = std::fs::read_to_string(&cmd.file)?;
-        Ok(Self {
-            name: SchemaName::parse(&cmd.name)?,
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        let raw = std::fs::read_to_string(&self.file)?;
+        Ok(SchemaAdd {
+            name: SchemaName::parse(&self.name)?,
             spec: Spec::parse_yaml(&raw)?,
         })
     }
 }
 
-impl TryFrom<cmd::SchemaAddField> for SchemaAddField {
-    type Error = Error;
+impl FromCmd for cmd::SchemaAddField {
+    type Op = SchemaAddField;
 
-    fn try_from(cmd: cmd::SchemaAddField) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            name: FieldName::parse(&cmd.name)?,
-            type_: cmd.type_,
-            values: cmd.values,
-            default: cmd.default,
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(SchemaAddField {
+            schema: SchemaName::parse(&self.schema)?,
+            name: FieldName::parse(&self.name)?,
+            type_: self.type_,
+            values: self.values,
+            default: self.default,
         })
     }
 }
 
-impl TryFrom<cmd::SchemaAddValue> for SchemaAddValue {
-    type Error = Error;
+impl FromCmd for cmd::SchemaAddValue {
+    type Op = SchemaAddValue;
 
-    fn try_from(cmd: cmd::SchemaAddValue) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            field: FieldName::parse(&cmd.field)?,
-            value: cmd.value,
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(SchemaAddValue {
+            schema: SchemaName::parse(&self.schema)?,
+            field: FieldName::parse(&self.field)?,
+            value: self.value,
         })
     }
 }
 
-impl TryFrom<cmd::SchemaRetire> for SchemaRetire {
-    type Error = Error;
+impl FromCmd for cmd::SchemaRetire {
+    type Op = SchemaRetire;
 
-    fn try_from(cmd: cmd::SchemaRetire) -> Result<Self, Error> {
-        Ok(Self {
-            name: SchemaName::parse(&cmd.name)?,
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(SchemaRetire {
+            name: SchemaName::parse(&self.name)?,
         })
     }
 }
 
-impl TryFrom<cmd::SchemaDrop> for SchemaDrop {
-    type Error = Error;
+impl FromCmd for cmd::SchemaDrop {
+    type Op = SchemaDrop;
 
-    fn try_from(cmd: cmd::SchemaDrop) -> Result<Self, Error> {
-        Ok(Self {
-            name: SchemaName::parse(&cmd.name)?,
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(SchemaDrop {
+            name: SchemaName::parse(&self.name)?,
         })
     }
 }
 
-fn log_from(cmd: cmd::Log, tz: &TimeZone) -> Result<Log, Error> {
-    Ok(Log {
-        schema: SchemaName::parse(&cmd.schema)?,
-        at: cmd
-            .at
-            .as_deref()
-            .map(|s| time::parse_instant(s, tz))
-            .transpose()?,
-        agent: cmd.agent.map(Agent::new),
-        links: parse_links(cmd.links)?,
-        fields: parse_fields(cmd.fields)?,
-    })
-}
+impl FromCmd for cmd::Log {
+    type Op = Log;
 
-fn list_from(cmd: cmd::Ls, tz: &TimeZone) -> Result<List, Error> {
-    Ok(List {
-        schema: SchemaName::parse(&cmd.schema)?,
-        range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
-        agent: cmd.agent.map(Agent::new),
-        filters: parse_clauses(cmd.wheres)?,
-        include_ignored: cmd.include_ignored,
-    })
-}
-
-impl TryFrom<cmd::Get> for Get {
-    type Error = Error;
-
-    fn try_from(cmd: cmd::Get) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            id: cmd.id,
+    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(Log {
+            schema: SchemaName::parse(&self.schema)?,
+            at: self
+                .at
+                .as_deref()
+                .map(|s| time::parse_instant(s, tz))
+                .transpose()?,
+            agent: self.agent.map(Agent::new),
+            links: parse_links(self.links)?,
+            fields: parse_fields(self.fields)?,
         })
     }
 }
 
-fn sum_from(cmd: cmd::Sum, tz: &TimeZone) -> Result<Sum, Error> {
-    Ok(Sum {
-        schema: SchemaName::parse(&cmd.schema)?,
-        field: FieldName::parse(&cmd.field)?,
-        range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
-        agent: cmd.agent.map(Agent::new),
-        filters: parse_clauses(cmd.wheres)?,
-        group: cmd
-            .group
-            .as_deref()
-            .map(crate::spec::Group::parse)
-            .transpose()?,
-    })
-}
+impl FromCmd for cmd::Ls {
+    type Op = List;
 
-impl TryFrom<cmd::Last> for Last {
-    type Error = Error;
-
-    fn try_from(cmd: cmd::Last) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            agent: cmd.agent.map(Agent::new),
-            filters: parse_clauses(cmd.wheres)?,
+    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(List {
+            schema: SchemaName::parse(&self.schema)?,
+            range: Range::parse(self.from.as_deref(), self.to.as_deref(), tz)?,
+            agent: self.agent.map(Agent::new),
+            filters: parse_clauses(self.wheres)?,
+            include_ignored: self.include_ignored,
         })
     }
 }
 
-impl TryFrom<cmd::Today> for Today {
-    type Error = Error;
+impl FromCmd for cmd::Get {
+    type Op = Get;
 
-    fn try_from(cmd: cmd::Today) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            agent: cmd.agent.map(Agent::new),
-            filters: parse_clauses(cmd.wheres)?,
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(Get {
+            schema: SchemaName::parse(&self.schema)?,
+            id: self.id,
         })
     }
 }
 
-fn amend_from(cmd: cmd::Amend, tz: &TimeZone) -> Result<Amend, Error> {
-    Ok(Amend {
-        schema: SchemaName::parse(&cmd.schema)?,
-        id: cmd.id,
-        at: cmd
-            .at
-            .as_deref()
-            .map(|s| time::parse_instant(s, tz))
-            .transpose()?,
-        agent: cmd.agent.map(Agent::new),
-        links: parse_links(cmd.links)?,
-        unlinks: parse_unlinks(cmd.unlinks)?,
-        fields: parse_fields(cmd.fields)?,
-    })
+impl FromCmd for cmd::Sum {
+    type Op = Sum;
+
+    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(Sum {
+            schema: SchemaName::parse(&self.schema)?,
+            field: FieldName::parse(&self.field)?,
+            range: Range::parse(self.from.as_deref(), self.to.as_deref(), tz)?,
+            agent: self.agent.map(Agent::new),
+            filters: parse_clauses(self.wheres)?,
+            group: self
+                .group
+                .as_deref()
+                .map(crate::spec::Group::parse)
+                .transpose()?,
+        })
+    }
 }
 
-impl TryFrom<cmd::Ignore> for Ignore {
-    type Error = Error;
+impl FromCmd for cmd::Last {
+    type Op = Last;
 
-    fn try_from(cmd: cmd::Ignore) -> Result<Self, Error> {
-        Ok(Self {
-            schema: SchemaName::parse(&cmd.schema)?,
-            id: cmd.id,
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(Last {
+            schema: SchemaName::parse(&self.schema)?,
+            agent: self.agent.map(Agent::new),
+            filters: parse_clauses(self.wheres)?,
+        })
+    }
+}
+
+impl FromCmd for cmd::Today {
+    type Op = Today;
+
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(Today {
+            schema: SchemaName::parse(&self.schema)?,
+            agent: self.agent.map(Agent::new),
+            filters: parse_clauses(self.wheres)?,
+        })
+    }
+}
+
+impl FromCmd for cmd::Amend {
+    type Op = Amend;
+
+    fn from_cmd(self, tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(Amend {
+            schema: SchemaName::parse(&self.schema)?,
+            id: self.id,
+            at: self
+                .at
+                .as_deref()
+                .map(|s| time::parse_instant(s, tz))
+                .transpose()?,
+            agent: self.agent.map(Agent::new),
+            links: parse_links(self.links)?,
+            unlinks: parse_unlinks(self.unlinks)?,
+            fields: parse_fields(self.fields)?,
+        })
+    }
+}
+
+impl FromCmd for cmd::Ignore {
+    type Op = Ignore;
+
+    fn from_cmd(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(Ignore {
+            schema: SchemaName::parse(&self.schema)?,
+            id: self.id,
         })
     }
 }
