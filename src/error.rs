@@ -63,7 +63,6 @@ pub enum Fail {
     CorruptLinkSchema(String),
     CorruptStoredTime(String),
     HomeNotSet,
-    UnknownTimeZone(String),
     DbPathRequired,
     HelpNotAnOp,
     Store(String),
@@ -117,6 +116,12 @@ impl From<std::io::Error> for Error {
 impl From<rust_decimal::Error> for Error {
     fn from(err: rust_decimal::Error) -> Self {
         Self::Fail(Fail::InvalidNumber(err.to_string()))
+    }
+}
+
+impl From<jiff::Error> for Error {
+    fn from(err: jiff::Error) -> Self {
+        Self::Fail(Fail::Time(err.to_string()))
     }
 }
 

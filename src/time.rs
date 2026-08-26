@@ -3,7 +3,7 @@ use jiff::civil::{Date, DateTime};
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
 
-use crate::error::{Error, Fail, Usage};
+use crate::error::{Error, Usage};
 use crate::spec::TimePeriod;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -26,9 +26,7 @@ impl Instant {
 pub fn zone(name: Option<&str>) -> Result<TimeZone, Error> {
     match name {
         None => Ok(TimeZone::system()),
-        Some(name) => {
-            TimeZone::get(name).map_err(|_| Error::Fail(Fail::UnknownTimeZone(name.to_string())))
-        }
+        Some(name) => Ok(TimeZone::get(name)?),
     }
 }
 
@@ -41,8 +39,7 @@ pub fn parse_instant(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
 
 pub fn display_local(at: Instant, tz: &TimeZone) -> Result<String, Error> {
     let zoned = at.0.to_zoned(tz.clone());
-    strtime::format("%Y-%m-%dT%H:%M:%S%:z", &zoned)
-        .map_err(|e| Error::Fail(Fail::Time(e.to_string())))
+    Ok(strtime::format("%Y-%m-%dT%H:%M:%S%:z", &zoned)?)
 }
 
 fn from_bound(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
@@ -75,9 +72,7 @@ impl Range {
     pub fn today(tz: &TimeZone) -> Result<Self, Error> {
         let today = Timestamp::now().to_zoned(tz.clone()).date();
         let start = Instant(date_midnight(today, tz)?);
-        let next = today
-            .checked_add(jiff::Span::new().days(1))
-            .map_err(|e| Error::Fail(Fail::Time(e.to_string())))?;
+        let next = today.checked_add(jiff::Span::new().days(1))?;
         let end = Instant(date_midnight(next, tz)?);
         Ok(Self {
             from: Some(start),
@@ -90,9 +85,7 @@ fn to_bound(input: &str, tz: &TimeZone) -> Result<ToBound, Error> {
     match parse(input, tz)? {
         Parsed::Instant(ts) => Ok(ToBound::Inclusive(Instant(ts))),
         Parsed::Date(date) => {
-            let next = date
-                .checked_add(jiff::Span::new().days(1))
-                .map_err(|e| Error::Fail(Fail::Time(e.to_string())))?;
+            let next = date.checked_add(jiff::Span::new().days(1))?;
             Ok(ToBound::Exclusive(Instant(date_midnight(next, tz)?)))
         }
     }
@@ -199,7 +192,5 @@ fn looks_like_hms(s: &str) -> bool {
 }
 
 fn date_midnight(date: Date, tz: &TimeZone) -> Result<Timestamp, Error> {
-    date.to_zoned(tz.clone())
-        .map(|z| z.timestamp())
-        .map_err(|e| Error::Fail(Fail::Time(e.to_string())))
+    Ok(date.to_zoned(tz.clone())?.timestamp())
 }
