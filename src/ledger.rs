@@ -26,6 +26,7 @@ impl Agent {
     }
 
     pub fn parse(s: &str) -> Result<Self, Error> {
+        let s = s.trim_matches(' ');
         if s.contains('\t') || s.contains('\n') {
             return Err(Error::Fail(Fail::AgentHasTabOrNewline));
         }

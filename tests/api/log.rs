@@ -211,6 +211,30 @@ fn agent_rejects_tab() {
 }
 
 #[test]
+fn agent_trims_spaces() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.run_ok(Cmd::Log(cmd::Log {
+        schema: "nutrition.meal".into(),
+        at: Some("2026-08-22T08:14:00Z".into()),
+        agent: Some("  coach  ".into()),
+        links: vec![],
+        fields: meal_fields(),
+    }));
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: Some(" coach".into()),
+        wheres: vec![],
+        include_ignored: false,
+    }));
+    let lines = tsv_lines(&ls);
+    let agent_idx = lines[0].iter().position(|c| *c == "agent").unwrap();
+    assert_eq!(lines[1][agent_idx], "coach");
+}
+
+#[test]
 fn unset_agent_defaults_to_bottle() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
