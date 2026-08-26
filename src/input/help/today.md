@@ -8,7 +8,7 @@ today — list entries for the current civil day
 
 ```
 bottle today <schema> [--agent NAME] \
-  [--where field=value]...
+  [--where field=value]... [--link name=SCHEMA/ID]...
 ```
 
 ## Description
@@ -28,8 +28,10 @@ Ignored entries are omitted.
 `--agent NAME` — only entries written by that agent.
 
 `--where field=value` — may repeat; all clauses are AND.
-A declared field name filters that field. Any other name
-is a link; the value must be `schema/id`.
+The name must be a declared field.
+
+`--link name=SCHEMA/ID` — may repeat; all clauses are AND.
+Entries that have that named pointer.
 
 ## Output
 

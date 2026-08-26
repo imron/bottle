@@ -86,6 +86,7 @@ fn add_catalog_names_are_usable() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);
@@ -353,6 +354,7 @@ fn add_field_with_default() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);
@@ -389,6 +391,7 @@ fn add_field_enum_default_folds() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);
@@ -401,6 +404,7 @@ fn add_field_enum_default_folds() {
         to: None,
         agent: None,
         wheres: vec![("mood".into(), "happy".into())],
+        links: vec![],
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&matched).len(), 2);

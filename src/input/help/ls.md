@@ -9,7 +9,7 @@ ls — list entries of a schema
 ```
 bottle ls <schema> [--from DATE|TIME] [--to DATE|TIME] \
   [--agent NAME] [--where field=value]... \
-  [--include-ignored]
+  [--link name=SCHEMA/ID]... [--include-ignored]
 ```
 
 ## Description
@@ -40,12 +40,14 @@ change daylight saving time are 23 or 25 hours long.
 `amend` the same flag sets it.
 
 `--where field=value` — may repeat; all clauses are AND.
-If the name is a declared field, it filters that field
-(`enum` values folded lowercase, `text` exact and
-case-sensitive). Otherwise it is a link name and the value
-must be `schema/id`. `--where` on `id`, `at`, `agent`,
-`ignored`, or `links` is an error; use `--agent`, `get`,
-or `--from` / `--to`.
+The name must be a declared field (`enum` values folded
+lowercase, `text` exact and case-sensitive). `--where` on
+`id`, `at`, `agent`, `ignored`, or `links` is an error;
+use `--agent`, `get`, or `--from` / `--to`.
+
+`--link name=SCHEMA/ID` — may repeat; all clauses are AND.
+Entries that have that named pointer. Same spelling as
+`log --link`.
 
 `--include-ignored` — include ignored entries and print
 the `ignored` column.
@@ -62,7 +64,7 @@ pairs, sorted by name. Empty means no links.
 ## Examples
 
 ```
-bottle ls fitness.set --where session=fitness.session/1
+bottle ls fitness.set --link session=fitness.session/1
 bottle ls money.txn --from 2026-08-01 --to 2026-08-31 \
   --where kind=out
 ```

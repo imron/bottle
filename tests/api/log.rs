@@ -48,6 +48,7 @@ fn enum_folds_on_write() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     assert!(ls.contains("breakfast"));
@@ -181,6 +182,7 @@ fn agent_from_open() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);
@@ -227,6 +229,7 @@ fn agent_trims_spaces() {
         to: None,
         agent: Some(" coach".into()),
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);
@@ -263,6 +266,7 @@ fn unset_agent_defaults_to_bottle() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);

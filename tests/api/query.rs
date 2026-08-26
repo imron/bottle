@@ -41,6 +41,7 @@ fn ls_columns_and_number_format() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&out);
@@ -79,6 +80,7 @@ fn ls_keeps_logged_number_scale() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&out);
@@ -89,6 +91,7 @@ fn ls_keeps_logged_number_scale() {
         to: None,
         agent: None,
         wheres: vec![("fat".into(), "39.6".into())],
+        links: vec![],
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&matched).len(), 2);
@@ -104,6 +107,7 @@ fn ls_from_instant() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&out);
@@ -121,6 +125,7 @@ fn ls_instant_to_is_inclusive() {
         to: Some("2026-08-22T08:14:00Z".into()),
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&out);
@@ -138,6 +143,7 @@ fn ls_from_to_dates() {
         to: Some("2026-08-22".into()),
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&out);
@@ -155,6 +161,7 @@ fn ls_where_enum_folds() {
         to: None,
         agent: None,
         wheres: vec![("when".into(), "LUNCH".into())],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&out);
@@ -172,6 +179,7 @@ fn ls_where_text_is_exact() {
         to: None,
         agent: None,
         wheres: vec![("what".into(), "Eggs".into())],
+        links: vec![],
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&out).len(), 1);
@@ -188,6 +196,7 @@ fn ls_where_agent_reserved() {
             to: None,
             agent: None,
             wheres: vec![("agent".into(), "test".into())],
+            links: vec![],
             include_ignored: false,
         }))
         .unwrap_err();
@@ -204,6 +213,7 @@ fn ls_filter_agent_flag() {
         to: None,
         agent: Some("other".into()),
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&none).len(), 1);
@@ -213,6 +223,7 @@ fn ls_filter_agent_flag() {
         to: None,
         agent: Some("test".into()),
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&some).len(), 3);
@@ -232,6 +243,7 @@ fn get_includes_ignored() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&ls).len(), 2);
@@ -268,6 +280,7 @@ fn sum_and_group_day() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         group: None,
     }));
     assert_eq!(
@@ -281,6 +294,7 @@ fn sum_and_group_day() {
         to: Some("2020-01-02".into()),
         agent: None,
         wheres: vec![],
+        links: vec![],
         group: None,
     }));
     assert_eq!(
@@ -294,6 +308,7 @@ fn sum_and_group_day() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         group: Some("day".into()),
     }));
     assert!(grouped.starts_with("day\tvalue\n"));
@@ -310,6 +325,7 @@ fn sum_skips_empty_number() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         group: None,
     }));
     assert_eq!(
@@ -323,6 +339,7 @@ fn sum_skips_empty_number() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         group: Some("day".into()),
     }));
     assert_eq!(
@@ -361,6 +378,7 @@ fn sum_group_link_skips_empty_number() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         group: Some("session".into()),
     }));
     assert_eq!(
@@ -381,6 +399,7 @@ fn sum_rejects_text_field() {
             to: None,
             agent: None,
             wheres: vec![],
+            links: vec![],
             group: None,
         }))
         .unwrap_err();
@@ -395,6 +414,7 @@ fn last_newest() {
         schema: "nutrition.meal".into(),
         agent: None,
         wheres: vec![],
+        links: vec![],
     }));
     let lines = tsv_lines(&out);
     assert_eq!(lines[1][4], "rice");
@@ -409,6 +429,7 @@ fn last_empty() {
             schema: "nutrition.meal".into(),
             agent: None,
             wheres: vec![],
+            links: vec![],
         }))
         .unwrap_err();
     assert_fail(err, "not found");
@@ -442,7 +463,8 @@ fn links_where_and_group() {
         from: None,
         to: None,
         agent: None,
-        wheres: vec![("session".into(), "fitness.session/1".into())],
+        wheres: vec![],
+        links: vec![("session".into(), "fitness.session/1".into())],
         include_ignored: false,
     }));
     let lines = tsv_lines(&ls);
@@ -455,6 +477,7 @@ fn links_where_and_group() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         group: Some("session".into()),
     }));
     assert!(grouped.contains("fitness.session/1\t8"));
@@ -557,6 +580,7 @@ fn ignore_hides_from_sum() {
         to: None,
         agent: None,
         wheres: vec![],
+        links: vec![],
         group: None,
     }));
     assert_eq!(
@@ -585,6 +609,7 @@ fn today_is_civil_day() {
         schema: "nutrition.meal".into(),
         agent: None,
         wheres: vec![],
+        links: vec![],
     }));
     assert!(out.contains("now"));
 }
@@ -703,6 +728,7 @@ fn sum_group_week_month_year() {
             to: None,
             agent: None,
             wheres: vec![],
+            links: vec![],
             group: Some(unit.into()),
         }));
         assert!(out.starts_with(&format!("{unit}\tvalue\n")), "{out}");
@@ -720,6 +746,7 @@ fn ls_where_number_skips_null() {
         to: None,
         agent: None,
         wheres: vec![("fat".into(), "39.6".into())],
+        links: vec![],
         include_ignored: false,
     }));
     let lines = tsv_lines(&out);
@@ -739,6 +766,7 @@ fn sum_unknown_field() {
             to: None,
             agent: None,
             wheres: vec![],
+            links: vec![],
             group: None,
         }))
         .unwrap_err();
@@ -757,6 +785,7 @@ fn sum_group_collides_with_field() {
             to: None,
             agent: None,
             wheres: vec![],
+            links: vec![],
             group: Some("kcal".into()),
         }))
         .unwrap_err();
@@ -774,6 +803,7 @@ fn invalid_date_bound() {
             to: None,
             agent: None,
             wheres: vec![],
+            links: vec![],
             include_ignored: false,
         }))
         .unwrap_err();
@@ -791,8 +821,27 @@ fn where_invalid_ident() {
             to: None,
             agent: None,
             wheres: vec![("When".into(), "breakfast".into())],
+            links: vec![],
             include_ignored: false,
         }))
         .unwrap_err();
-    assert_fail(err, "invalid name");
+    assert_fail(err, "invalid field name");
+}
+
+#[test]
+fn where_unknown_field() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Ls(cmd::Ls {
+            schema: "nutrition.meal".into(),
+            from: None,
+            to: None,
+            agent: None,
+            wheres: vec![("nope".into(), "x".into())],
+            links: vec![],
+            include_ignored: false,
+        }))
+        .unwrap_err();
+    assert_fail(err, "unknown field");
 }

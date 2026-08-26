@@ -3,13 +3,13 @@ use std::collections::{HashMap, HashSet};
 use crate::db::{Connection, Db};
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
-    Agent, Amend, Clause, Entries, FieldInput, FieldValue, Filter, Get, GroupedLink, GroupedTime,
-    Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue,
+    Agent, Amend, Entries, FieldInput, FieldValue, Filter, Get, GroupedLink, GroupedTime, Ignore,
+    Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue,
     SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
 use crate::mutable_store;
 use crate::spec::{
-    EntryRef, Field, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec, fold_enum,
+    Field, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec, fold_enum,
     fold_enum_values, parse_number,
 };
 use crate::store::{self, Find};
@@ -256,7 +256,8 @@ fn last(db: &Db, op: Last) -> Result<Outcome, Error> {
             schema: &op.schema,
             range: Range::default(),
             agent: op.agent.as_ref().map(Agent::as_str),
-            filters: &op.filters,
+            fields: &op.fields,
+            links: &op.links,
             include_ignored: false,
             order: Order::Newest,
             limit: Some(1),
@@ -277,7 +278,8 @@ fn today(db: &Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
             schema: &op.schema,
             range: Range::today(tz)?,
             agent: op.agent.as_ref().map(Agent::as_str),
-            filters: &op.filters,
+            fields: &op.fields,
+            links: &op.links,
             include_ignored: false,
             order: Order::Oldest,
             limit: None,
@@ -292,7 +294,8 @@ fn list(db: &Db, op: List) -> Result<Outcome, Error> {
             schema: &op.schema,
             range: op.range,
             agent: op.agent.as_ref().map(Agent::as_str),
-            filters: &op.filters,
+            fields: &op.fields,
+            links: &op.links,
             include_ignored: op.include_ignored,
             order: Order::Oldest,
             limit: None,
@@ -304,7 +307,8 @@ struct Query<'a> {
     schema: &'a SchemaName,
     range: Range,
     agent: Option<&'a str>,
-    filters: &'a [Clause],
+    fields: &'a [FieldInput],
+    links: &'a [Link],
     include_ignored: bool,
     order: Order,
     limit: Option<usize>,
@@ -312,7 +316,7 @@ struct Query<'a> {
 
 fn find_entries(db: &Db, q: Query<'_>) -> Result<Outcome, Error> {
     let spec = store::load_schema(db, q.schema)?.spec;
-    let resolved = resolve_filters(&spec, q.filters)?;
+    let resolved = resolve_filters(&spec, q.fields, q.links)?;
     let entries = store::find(
         db,
         Find {
@@ -337,7 +341,7 @@ fn sum(db: &Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
     if f.type_ != FieldType::Number {
         return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
     }
-    let resolved = resolve_filters(&spec, &op.filters)?;
+    let resolved = resolve_filters(&spec, &op.fields, &op.links)?;
     let q = Find {
         schema: &op.schema,
         spec: &spec,
@@ -367,28 +371,38 @@ fn sum(db: &Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
     })
 }
 
-fn resolve_filters(spec: &Spec, filters: &[Clause]) -> Result<Vec<Filter>, Error> {
+fn resolve_filters(
+    spec: &Spec,
+    fields: &[FieldInput],
+    links: &[Link],
+) -> Result<Vec<Filter>, Error> {
     let mut out = Vec::new();
-    for clause in filters {
-        if let Ok(name) = FieldName::parse(clause.name.as_str())
-            && let Some(field) = spec.field(&name)
-        {
-            let value = match field.type_ {
-                FieldType::Number => FieldValue::Number(parse_number(&clause.value)?),
-                FieldType::Enum => FieldValue::Enum(fold_enum(&clause.value)?),
-                FieldType::Text => FieldValue::Text(clause.value.clone()),
-            };
-            out.push(Filter::Field {
-                name: field.name.clone(),
-                value,
-            });
-            continue;
+    let mut seen_fields = HashSet::new();
+    for field in fields {
+        if !seen_fields.insert(&field.name) {
+            return Err(Error::Usage(Usage::DuplicateField(field.name.clone())));
         }
-        let link_name = LinkName::parse(clause.name.as_str())?;
-        let to = EntryRef::parse(&clause.value)?;
+        let Some(spec_field) = spec.field(&field.name) else {
+            return Err(Error::Fail(Fail::UnknownField(field.name.clone())));
+        };
+        out.push(Filter::Field {
+            name: spec_field.name.clone(),
+            value: parse_field_value(spec_field, &field.value)?,
+        });
+    }
+    let mut seen_links = HashSet::new();
+    for link in links {
+        if !seen_links.insert(&link.name) {
+            return Err(Error::Usage(Usage::DuplicateLinkName(link.name.clone())));
+        }
+        if field_named(spec, &link.name) {
+            return Err(Error::Fail(Fail::LinkNameCollidesWithField(
+                link.name.clone(),
+            )));
+        }
         out.push(Filter::Link {
-            name: link_name,
-            to,
+            name: link.name.clone(),
+            to: link.to.clone(),
         });
     }
     Ok(out)

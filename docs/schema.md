@@ -87,7 +87,7 @@ bottle log fitness.set --link session=fitness.session/7 \
   movement=squat reps=8 load=24 unit=kg
 ```
 
-`--where session=fitness.session/7` lists entries with
+`--link session=fitness.session/7` lists entries with
 that link. `sum --group session` groups by that target.
 
 On the CLI and in TSV the target is `schema/id`. The

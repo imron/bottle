@@ -4,8 +4,8 @@ use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
 use crate::spec::{
-    self, EntryRef, EnumValue, FieldName, FieldType, Group, Identifier, Link, LinkName, SchemaName,
-    Spec, TimePeriod,
+    self, EntryRef, EnumValue, FieldName, FieldType, Group, Link, LinkName, SchemaName, Spec,
+    TimePeriod,
 };
 use crate::time::{Instant, Period, Range};
 
@@ -66,12 +66,6 @@ pub struct SchemaInfo {
 pub enum Filter {
     Field { name: FieldName, value: FieldValue },
     Link { name: LinkName, to: EntryRef },
-}
-
-#[derive(Debug, Clone)]
-pub struct Clause {
-    pub name: Identifier,
-    pub value: String,
 }
 
 #[derive(Debug, Clone)]
@@ -137,7 +131,8 @@ pub struct List {
     pub schema: SchemaName,
     pub range: Range,
     pub agent: Option<Agent>,
-    pub filters: Vec<Clause>,
+    pub fields: Vec<FieldInput>,
+    pub links: Vec<Link>,
     pub include_ignored: bool,
 }
 
@@ -153,7 +148,8 @@ pub struct Sum {
     pub field: FieldName,
     pub range: Range,
     pub agent: Option<Agent>,
-    pub filters: Vec<Clause>,
+    pub fields: Vec<FieldInput>,
+    pub links: Vec<Link>,
     pub group: Option<Group>,
 }
 
@@ -161,14 +157,16 @@ pub struct Sum {
 pub struct Last {
     pub schema: SchemaName,
     pub agent: Option<Agent>,
-    pub filters: Vec<Clause>,
+    pub fields: Vec<FieldInput>,
+    pub links: Vec<Link>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Today {
     pub schema: SchemaName,
     pub agent: Option<Agent>,
-    pub filters: Vec<Clause>,
+    pub fields: Vec<FieldInput>,
+    pub links: Vec<Link>,
 }
 
 #[derive(Debug, Clone)]

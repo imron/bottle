@@ -56,6 +56,7 @@ pub struct Ls {
     pub to: Option<String>,
     pub agent: Option<String>,
     pub wheres: Vec<(String, String)>,
+    pub links: Vec<(String, String)>,
     pub include_ignored: bool,
 }
 
@@ -73,6 +74,7 @@ pub struct Sum {
     pub to: Option<String>,
     pub agent: Option<String>,
     pub wheres: Vec<(String, String)>,
+    pub links: Vec<(String, String)>,
     pub group: Option<String>,
 }
 
@@ -81,6 +83,7 @@ pub struct Last {
     pub schema: String,
     pub agent: Option<String>,
     pub wheres: Vec<(String, String)>,
+    pub links: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +91,7 @@ pub struct Today {
     pub schema: String,
     pub agent: Option<String>,
     pub wheres: Vec<(String, String)>,
+    pub links: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone)]

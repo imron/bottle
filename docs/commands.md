@@ -153,19 +153,18 @@ entries in one transaction, use MCP `entries`. See
 ```
 bottle ls <schema> [--from DATE|TIME] [--to DATE|TIME] \
   [--agent NAME] [--where field=value]... \
-  [--include-ignored]
+  [--link name=SCHEMA/ID]... [--include-ignored]
 ```
 
 Columns: `id`, `at`, `links`, schema fields in spec
 order, `agent`. `ignored` only with `--include-ignored`.
 `--agent` filters that bookkeeping column. `--where` may
-repeat (AND). If the name is a declared field, it filters
-that field (`enum` values folded lowercase; `text`
-exact). Otherwise it is a link name and the value must be
-`schema/id`. `--where` on reserved names (`id`, `at`,
-`agent`, `ignored`, `links`) is an error; use `--agent`,
-`get`, or `--from` / `--to`. Order: oldest `at`, then
-`id`.
+repeat (AND) and must name a declared field (`enum`
+values folded lowercase; `text` exact). `--link` filters
+by a named pointer; the value is `schema/id`. `--where`
+on reserved names (`id`, `at`, `agent`, `ignored`,
+`links`) is an error; use `--agent`, `get`, or
+`--from` / `--to`. Order: oldest `at`, then `id`.
 
 ## get
 
@@ -183,6 +182,7 @@ because ids are per table.
 bottle sum <schema> <field> [--from DATE|TIME] \
   [--to DATE|TIME] [--agent NAME] \
   [--where field=value]... \
+  [--link name=SCHEMA/ID]... \
   [--group day|week|month|year|<link>]
 ```
 
@@ -205,7 +205,7 @@ lines).
 
 ```
 bottle last <schema> [--agent NAME] \
-  [--where field=value]...
+  [--where field=value]... [--link name=SCHEMA/ID]...
 ```
 
 Newest `at`, then highest `id`. Same columns as `ls`.
@@ -215,7 +215,7 @@ Exit 1 if none.
 
 ```
 bottle today <schema> [--agent NAME] \
-  [--where field=value]...
+  [--where field=value]... [--link name=SCHEMA/ID]...
 ```
 
 `ls` for the current host civil day. No totals. Run `sum`.

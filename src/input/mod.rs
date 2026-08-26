@@ -7,8 +7,8 @@ use jiff::tz::TimeZone;
 
 use crate::error::{Error, Usage};
 use crate::ledger::{
-    Agent, Amend, Clause, Entries, FieldInput, FieldValue, Get, GroupedLink, GroupedTime, Ignore,
-    Last, List, Log, Op, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop,
+    Agent, Amend, Entries, FieldInput, FieldValue, Get, GroupedLink, GroupedTime, Ignore, Last,
+    List, Log, Op, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop,
     SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
 use crate::spec::{FieldName, Identifier, Link, LinkName, SchemaName, Spec, is_reserved};
@@ -170,7 +170,8 @@ impl FromCmd for cmd::Ls {
             schema: SchemaName::parse(&self.schema)?,
             range: Range::parse(self.from.as_deref(), self.to.as_deref(), tz)?,
             agent: parse_agent(self.agent)?,
-            filters: parse_clauses(self.wheres)?,
+            fields: parse_wheres(self.wheres)?,
+            links: parse_links(self.links)?,
             include_ignored: self.include_ignored,
         })
     }
@@ -196,7 +197,8 @@ impl FromCmd for cmd::Sum {
             field: FieldName::parse(&self.field)?,
             range: Range::parse(self.from.as_deref(), self.to.as_deref(), tz)?,
             agent: parse_agent(self.agent)?,
-            filters: parse_clauses(self.wheres)?,
+            fields: parse_wheres(self.wheres)?,
+            links: parse_links(self.links)?,
             group: self
                 .group
                 .as_deref()
@@ -213,7 +215,8 @@ impl FromCmd for cmd::Last {
         Ok(Last {
             schema: SchemaName::parse(&self.schema)?,
             agent: parse_agent(self.agent)?,
-            filters: parse_clauses(self.wheres)?,
+            fields: parse_wheres(self.wheres)?,
+            links: parse_links(self.links)?,
         })
     }
 }
@@ -225,7 +228,8 @@ impl FromCmd for cmd::Today {
         Ok(Today {
             schema: SchemaName::parse(&self.schema)?,
             agent: parse_agent(self.agent)?,
-            filters: parse_clauses(self.wheres)?,
+            fields: parse_wheres(self.wheres)?,
+            links: parse_links(self.links)?,
         })
     }
 }
@@ -347,7 +351,7 @@ fn parse_fields(fields: Vec<(String, String)>) -> Result<Vec<FieldInput>, Error>
         .collect()
 }
 
-fn parse_clauses(wheres: Vec<(String, String)>) -> Result<Vec<Clause>, Error> {
+fn parse_wheres(wheres: Vec<(String, String)>) -> Result<Vec<FieldInput>, Error> {
     wheres
         .into_iter()
         .map(|(name, value)| {
@@ -356,8 +360,8 @@ fn parse_clauses(wheres: Vec<(String, String)>) -> Result<Vec<Clause>, Error> {
                     &name,
                 )?)));
             }
-            Ok(Clause {
-                name: Identifier::parse(&name)?,
+            Ok(FieldInput {
+                name: FieldName::parse(&name)?,
                 value,
             })
         })

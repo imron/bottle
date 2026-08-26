@@ -129,7 +129,7 @@ bottle log fitness.set --link session=fitness.session/1 \
   movement=squat reps=8 load=24 unit=kg
 bottle log fitness.set --link session=fitness.session/1 \
   movement=squat reps=8 load=24 unit=kg
-bottle ls fitness.set --where session=fitness.session/1
+bottle ls fitness.set --link session=fitness.session/1
 bottle sum fitness.set volume --from 2026-08-16 \
   --to 2026-08-22 --where unit=kg
 ```
@@ -240,7 +240,7 @@ bottle log work.hours --link project=work.project/1 \
   hours=2.5 note=api
 bottle today work.hours
 bottle sum work.hours hours --from 2026-08-16 \
-  --to 2026-08-22 --where project=work.project/1
+  --to 2026-08-22 --link project=work.project/1
 bottle sum work.hours hours --from 2026-08-01 \
   --to 2026-08-31 --group project
 ```

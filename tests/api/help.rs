@@ -93,6 +93,7 @@ fn run_uses_given_timezone() {
             to: None,
             agent: None,
             wheres: vec![],
+            links: vec![],
             include_ignored: false,
         }),
     )
