@@ -257,6 +257,57 @@ fn get_includes_ignored() {
 }
 
 #[test]
+fn ls_include_ignored() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let before = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        links: vec![],
+        include_ignored: true,
+    }));
+    let before_lines = tsv_lines(&before);
+    assert_eq!(before_lines[0].last().copied(), Some("ignored"));
+    assert_eq!(before_lines.len(), 3);
+    assert_eq!(before_lines[1].last().copied(), Some("false"));
+    assert_eq!(before_lines[2].last().copied(), Some("false"));
+    h.run_ok(Cmd::Ignore(cmd::Ignore {
+        schema: "nutrition.meal".into(),
+        id: 1,
+    }));
+    let hidden = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        links: vec![],
+        include_ignored: false,
+    }));
+    assert_eq!(tsv_lines(&hidden).len(), 2);
+    assert!(!tsv_lines(&hidden)[0].contains(&"ignored"));
+    let shown = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        links: vec![],
+        include_ignored: true,
+    }));
+    let shown_lines = tsv_lines(&shown);
+    assert_eq!(shown_lines.len(), 3);
+    assert_eq!(shown_lines[0].last().copied(), Some("ignored"));
+    assert_eq!(shown_lines[1][0], "1");
+    assert_eq!(shown_lines[1].last().copied(), Some("true"));
+    assert_eq!(shown_lines[2][0], "2");
+    assert_eq!(shown_lines[2].last().copied(), Some("false"));
+}
+
+#[test]
 fn get_missing() {
     let mut h = harness();
     seed_meals(&mut h);
