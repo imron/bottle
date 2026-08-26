@@ -87,7 +87,7 @@ impl Spec {
     pub fn to_yaml(&self) -> Result<String, Error> {
         match serde_yaml::to_string(self) {
             Ok(yaml) => Ok(yaml),
-            Err(_) => Err(Error::Fail(Fail::Yaml)),
+            Err(err) => Err(Error::Fail(Fail::Yaml(err.to_string()))),
         }
     }
 
