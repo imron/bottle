@@ -355,6 +355,18 @@ fn link_name_collides_with_field() {
         }))
         .unwrap_err();
     assert_fail(err, "collides with field");
+    let err = h
+        .run(Cmd::Ls(cmd::Ls {
+            schema: "nutrition.meal".into(),
+            from: None,
+            to: None,
+            agent: None,
+            wheres: vec![],
+            links: vec![("what".into(), "nutrition.meal/1".into())],
+            include_ignored: false,
+        }))
+        .unwrap_err();
+    assert_fail(err, "collides with field");
 }
 
 #[test]

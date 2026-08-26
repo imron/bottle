@@ -273,6 +273,16 @@ fn add_field_enum_requires_values() {
         }))
         .unwrap_err();
     assert_usage(err, "--values is required");
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "mood".into(),
+            type_: FieldType::Enum,
+            values: Some(vec![]),
+            default: None,
+        }))
+        .unwrap_err();
+    assert_usage(err, "--values is required");
 }
 
 #[test]
@@ -285,6 +295,16 @@ fn add_field_values_only_for_enum() {
             name: "fiber".into(),
             type_: FieldType::Number,
             values: Some(vec!["1".into()]),
+            default: None,
+        }))
+        .unwrap_err();
+    assert_usage(err, "--values is only valid");
+    let err = h
+        .run(Cmd::SchemaAddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "note".into(),
+            type_: FieldType::Text,
+            values: Some(vec!["x".into()]),
             default: None,
         }))
         .unwrap_err();
@@ -360,6 +380,25 @@ fn add_field_with_default() {
     let lines = tsv_lines(&ls);
     let idx = lines[0].iter().position(|c| *c == "note").unwrap();
     assert_eq!(lines[1][idx], "O'Brien");
+    h.run_ok(Cmd::SchemaAddField(cmd::SchemaAddField {
+        schema: "nutrition.meal".into(),
+        name: "fiber".into(),
+        type_: FieldType::Number,
+        values: None,
+        default: Some("3".into()),
+    }));
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        links: vec![],
+        include_ignored: false,
+    }));
+    let lines = tsv_lines(&ls);
+    let idx = lines[0].iter().position(|c| *c == "fiber").unwrap();
+    assert_eq!(lines[1][idx], "3");
 }
 
 #[test]
@@ -482,6 +521,16 @@ fn yaml_canonicalize_rejects() {
             "text_values",
             "fields:\n  - name: what\n    type: text\n    required: false\n    values: [x]\n",
             "only apply to enum",
+        ),
+        (
+            "number_values",
+            "fields:\n  - name: kcal\n    type: number\n    required: false\n    values: [x]\n",
+            "only apply to enum",
+        ),
+        (
+            "enum_empty_list",
+            "fields:\n  - name: when\n    type: enum\n    required: true\n    values: []\n",
+            "needs values",
         ),
         (
             "empty_enum",

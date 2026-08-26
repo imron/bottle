@@ -181,5 +181,47 @@ mod tests {
             Agent::try_from(StoredAgent("a\tb".into())),
             Err(Error::Fail(Fail::CorruptStoredAgent(_)))
         ));
+        assert_eq!(
+            Decimal::try_from(StoredNumber("nope".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored number: nope"
+        );
+        assert_eq!(
+            Instant::try_from(StoredTime("nope".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored time: nope"
+        );
+        assert_eq!(
+            SchemaName::try_from(StoredSchemaName("Nope".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt schema name: Nope"
+        );
+        assert_eq!(
+            LinkName::try_from(StoredLinkName("Nope".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt link name: Nope"
+        );
+        assert_eq!(
+            SchemaName::try_from(StoredLinkSchema("Nope".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt link schema: Nope"
+        );
+        assert_eq!(
+            EnumValue::try_from(StoredEnum("a,b".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored enum: a,b"
+        );
+        assert_eq!(
+            Agent::try_from(StoredAgent("a\tb".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored agent: a\tb"
+        );
     }
 }
