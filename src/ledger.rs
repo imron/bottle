@@ -232,7 +232,7 @@ pub enum Op {
     SchemaAddValue(SchemaAddValue),
     SchemaRetire(SchemaRetire),
     SchemaDrop(SchemaDrop),
-    Log(Log),
+    Log(Vec<Log>),
     List(List),
     Get(Get),
     Sum(Sum),

@@ -106,12 +106,7 @@ fn drop_schema(db: &mut Db, op: SchemaDrop) -> Result<(), Error> {
     })
 }
 
-fn log(db: &mut Db, agent: &Agent, op: Log) -> Result<Outcome, Error> {
-    db.transaction(|tx| insert_log(tx, agent, op))
-        .map(|posted| Outcome::Posted(vec![posted]))
-}
-
-pub fn log_many(db: &mut Db, agent: &Agent, ops: Vec<Log>) -> Result<Outcome, Error> {
+fn log(db: &mut Db, agent: &Agent, ops: Vec<Log>) -> Result<Outcome, Error> {
     db.transaction(|tx| {
         let mut out = Vec::new();
         for op in ops {

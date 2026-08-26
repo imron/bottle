@@ -65,7 +65,17 @@ fn op(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
         Cmd::Schema(cmd::SchemaCmd::AddValue(cmd)) => Op::SchemaAddValue(schema_add_value(cmd)?),
         Cmd::Schema(cmd::SchemaCmd::Retire(cmd)) => Op::SchemaRetire(schema_retire(cmd)?),
         Cmd::Schema(cmd::SchemaCmd::Drop(cmd)) => Op::SchemaDrop(schema_drop(cmd)?),
-        Cmd::Log(cmd) => Op::Log(log(cmd, tz)?),
+        Cmd::Log(cmd) => Op::Log(vec![log(cmd, tz)?]),
+        Cmd::Logs(cmds) => {
+            if cmds.is_empty() {
+                return Err(Error::Usage(Usage::EmptyLog));
+            }
+            let mut ops = Vec::with_capacity(cmds.len());
+            for cmd in cmds {
+                ops.push(log(cmd, tz)?);
+            }
+            Op::Log(ops)
+        }
         Cmd::Ls(cmd) => Op::List(ls(cmd, tz)?),
         Cmd::Get(cmd) => Op::Get(get(cmd)?),
         Cmd::Sum(cmd) => Op::Sum(sum(cmd, tz)?),
@@ -156,7 +166,7 @@ fn schema_drop(cmd: cmd::SchemaDrop) -> Result<SchemaDrop, Error> {
     })
 }
 
-pub(crate) fn log(cmd: cmd::Log, tz: &TimeZone) -> Result<Log, Error> {
+fn log(cmd: cmd::Log, tz: &TimeZone) -> Result<Log, Error> {
     Ok(Log {
         schema: SchemaName::parse(&cmd.schema)?,
         at: cmd

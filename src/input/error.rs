@@ -13,6 +13,7 @@ fn usage_message(err: &Usage) -> String {
     match err {
         Usage::EnumValuesRequired => "--values is required for enum".into(),
         Usage::EnumValuesNotAllowed => "--values is only valid for enum".into(),
+        Usage::EmptyLog => "log requires at least one entry".into(),
         Usage::AmendEmpty => "amend requires at least one change".into(),
         Usage::DuplicateUnlink(name) => format!("duplicate --unlink {name}"),
         Usage::LinkAndUnlink(name) => format!("--link and --unlink of the same name: {name}"),

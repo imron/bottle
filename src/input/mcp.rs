@@ -311,11 +311,7 @@ impl Server {
                         fields: cells(entry.fields)?,
                     });
                 }
-                let mut bottle = self
-                    .bottle
-                    .lock()
-                    .map_err(|_| McpError::internal_error("lock poisoned", None))?;
-                tool_result(crate::log_entries(&mut bottle, logs))
+                self.run(Cmd::Logs(logs))
             }
         }
     }

@@ -27,7 +27,7 @@ impl Harness {
     }
 
     pub fn log_entries(&mut self, logs: Vec<cmd::Log>) -> Result<String, Error> {
-        bottle::log_entries(&mut self.bottle, logs)
+        self.run(Cmd::Logs(logs))
     }
 
     pub fn yaml_file(&self, name: &str, body: &str) -> PathBuf {

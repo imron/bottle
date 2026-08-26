@@ -162,6 +162,8 @@ pub enum Cmd {
     #[command(subcommand)]
     Schema(SchemaCmd),
     Log(Log),
+    #[command(skip)]
+    Logs(Vec<Log>),
     Ls(Ls),
     Get(Get),
     Sum(Sum),

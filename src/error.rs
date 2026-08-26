@@ -10,6 +10,7 @@ pub enum Error {
 pub enum Usage {
     EnumValuesRequired,
     EnumValuesNotAllowed,
+    EmptyLog,
     AmendEmpty,
     DuplicateUnlink(LinkName),
     LinkAndUnlink(LinkName),
