@@ -379,8 +379,11 @@ fn grouped_time(
 ) -> Result<Outcome, Error> {
     let mut buckets: BTreeMap<Period, Decimal> = BTreeMap::new();
     for entry in entries {
+        let Some(n) = entry.number(field) else {
+            continue;
+        };
         let k = time::period(unit, entry.at, tz);
-        *buckets.entry(k).or_insert(Decimal::ZERO) += entry.number(field).unwrap_or(Decimal::ZERO);
+        *buckets.entry(k).or_insert(Decimal::ZERO) += n;
     }
     Ok(Outcome::GroupedTime(GroupedTime {
         unit,
@@ -391,13 +394,15 @@ fn grouped_time(
 fn grouped_link(entries: &[Entry], field: &FieldName, name: LinkName) -> Result<Outcome, Error> {
     let mut buckets: BTreeMap<Option<EntryRef>, Decimal> = BTreeMap::new();
     for entry in entries {
+        let Some(n) = entry.number(field) else {
+            continue;
+        };
         let key = entry
             .links
             .iter()
             .find(|l| l.name == name)
             .map(|l| l.to.clone());
-        *buckets.entry(key).or_insert(Decimal::ZERO) +=
-            entry.number(field).unwrap_or(Decimal::ZERO);
+        *buckets.entry(key).or_insert(Decimal::ZERO) += n;
     }
     Ok(Outcome::GroupedLink(GroupedLink {
         name,

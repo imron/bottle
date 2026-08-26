@@ -316,6 +316,57 @@ fn sum_skips_empty_number() {
         tsv_lines(&total),
         vec![vec!["field", "value"], vec!["fat", "39.6"]]
     );
+    let grouped = h.run_ok(Cmd::Sum(cmd::Sum {
+        schema: "nutrition.meal".into(),
+        field: "fat".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        group: Some("day".into()),
+    }));
+    assert_eq!(
+        tsv_lines(&grouped),
+        vec![vec!["day", "value"], vec!["2026-08-22", "39.6"]]
+    );
+}
+
+#[test]
+fn sum_group_link_skips_empty_number() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.session",
+        &[("title", "upper")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.log(
+        "fitness.set",
+        &[("movement", "squat"), ("reps", "8"), ("load", "24")],
+        &[("session", "fitness.session/1")],
+        Some("2026-08-22T08:01:00Z"),
+    );
+    h.log(
+        "fitness.set",
+        &[("movement", "plank"), ("reps", "1")],
+        &[],
+        Some("2026-08-22T08:02:00Z"),
+    );
+    let grouped = h.run_ok(Cmd::Sum(cmd::Sum {
+        schema: "fitness.set".into(),
+        field: "load".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        group: Some("session".into()),
+    }));
+    assert_eq!(
+        tsv_lines(&grouped),
+        vec![vec!["session", "value"], vec!["fitness.session/1", "24"]]
+    );
 }
 
 #[test]
