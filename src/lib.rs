@@ -30,12 +30,19 @@ impl Bottle {
     pub fn open(path: &Path, agent: Option<String>, tz: Option<&str>) -> Result<Self, Error> {
         Ok(Self {
             db: db::Db::open(path)?,
-            agent: match agent.as_deref() {
-                Some(s) => Agent::parse(s)?,
-                None => Agent::bottle(),
-            },
+            agent: resolve_agent(
+                agent.as_deref(),
+                std::env::var("BOTTLE_AGENT").ok().as_deref(),
+            )?,
             tz: time::zone(tz)?,
         })
+    }
+}
+
+fn resolve_agent(explicit: Option<&str>, env: Option<&str>) -> Result<Agent, Error> {
+    match explicit.or(env) {
+        Some(s) => Agent::parse(s),
+        None => Ok(Agent::bottle()),
     }
 }
 
@@ -58,4 +65,23 @@ pub fn execute(bottle: &mut Bottle, cmd: Cmd) -> Result<String, Error> {
     let request = input::parse(cmd, &bottle.tz)?;
     let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, request.op)?;
     input::render(request.style, request.show_ignored, &outcome, &bottle.tz)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn agent_prefers_explicit_then_env_then_bottle() {
+        assert_eq!(
+            resolve_agent(Some("cli"), Some("env")).unwrap().as_str(),
+            "cli"
+        );
+        assert_eq!(resolve_agent(None, Some("env")).unwrap().as_str(), "env");
+        assert_eq!(resolve_agent(None, None).unwrap().as_str(), "bottle");
+        assert_eq!(
+            resolve_agent(None, Some("  bot  ")).unwrap().as_str(),
+            "bot"
+        );
+    }
 }
