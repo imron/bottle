@@ -45,10 +45,6 @@ impl FieldValue {
 pub struct Agent(String);
 
 impl Agent {
-    pub fn new(s: impl Into<String>) -> Self {
-        Self(s.into())
-    }
-
     pub fn parse(s: &str) -> Result<Self, Error> {
         let s = s.trim_matches(' ');
         if s.contains('\t') || s.contains('\n') {
