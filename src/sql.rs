@@ -1,6 +1,6 @@
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, FieldValue};
-use crate::spec::{EnumValue, FieldKind, LinkName, SchemaName};
+use crate::spec::{EnumValue, FieldKind, LinkName, SchemaName, parse_number};
 use crate::time::Instant;
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
@@ -60,79 +60,49 @@ pub struct StoredNumber(pub String);
 pub struct StoredEnum(pub String);
 pub struct StoredAgent(pub String);
 
+macro_rules! try_from_stored_name {
+    ($stored:ident, $ty:ty, $fail:ident) => {
+        impl TryFrom<$stored> for $ty {
+            type Error = Error;
+
+            fn try_from($stored(raw): $stored) -> Result<Self, Error> {
+                match <$ty>::parse(&raw) {
+                    Ok(value) if value.as_str() == raw => Ok(value),
+                    _ => Err(Error::Fail(Fail::$fail(raw))),
+                }
+            }
+        }
+    };
+}
+
 impl TryFrom<StoredTime> for Instant {
     type Error = Error;
 
     fn try_from(StoredTime(raw): StoredTime) -> Result<Self, Error> {
-        match raw.parse() {
-            Ok(ts) => Ok(Instant::from_timestamp(ts)),
-            Err(_) => Err(Error::Fail(Fail::CorruptStoredTime(raw))),
+        let Ok(ts) = raw.parse() else {
+            return Err(Error::Fail(Fail::CorruptStoredTime(raw)));
+        };
+        let at = Instant::from_timestamp(ts);
+        match instant_to_sql(at) {
+            Ok(canonical) if canonical == raw => Ok(at),
+            _ => Err(Error::Fail(Fail::CorruptStoredTime(raw))),
         }
     }
 }
 
-impl TryFrom<StoredSchemaName> for SchemaName {
-    type Error = Error;
-
-    fn try_from(StoredSchemaName(name): StoredSchemaName) -> Result<Self, Error> {
-        match SchemaName::parse(&name) {
-            Ok(name) => Ok(name),
-            Err(_) => Err(Error::Fail(Fail::CorruptSchemaName(name))),
-        }
-    }
-}
-
-impl TryFrom<StoredLinkName> for LinkName {
-    type Error = Error;
-
-    fn try_from(StoredLinkName(name): StoredLinkName) -> Result<Self, Error> {
-        match LinkName::parse(&name) {
-            Ok(name) => Ok(name),
-            Err(_) => Err(Error::Fail(Fail::CorruptLinkName(name))),
-        }
-    }
-}
-
-impl TryFrom<StoredLinkSchema> for SchemaName {
-    type Error = Error;
-
-    fn try_from(StoredLinkSchema(name): StoredLinkSchema) -> Result<Self, Error> {
-        match SchemaName::parse(&name) {
-            Ok(name) => Ok(name),
-            Err(_) => Err(Error::Fail(Fail::CorruptLinkSchema(name))),
-        }
-    }
-}
+try_from_stored_name!(StoredSchemaName, SchemaName, CorruptSchemaName);
+try_from_stored_name!(StoredLinkName, LinkName, CorruptLinkName);
+try_from_stored_name!(StoredLinkSchema, SchemaName, CorruptLinkSchema);
+try_from_stored_name!(StoredEnum, EnumValue, CorruptStoredEnum);
+try_from_stored_name!(StoredAgent, Agent, CorruptStoredAgent);
 
 impl TryFrom<StoredNumber> for Decimal {
     type Error = Error;
 
     fn try_from(StoredNumber(raw): StoredNumber) -> Result<Self, Error> {
-        match raw.parse() {
-            Ok(n) => Ok(n),
-            Err(_) => Err(Error::Fail(Fail::CorruptStoredNumber(raw))),
-        }
-    }
-}
-
-impl TryFrom<StoredEnum> for EnumValue {
-    type Error = Error;
-
-    fn try_from(StoredEnum(raw): StoredEnum) -> Result<Self, Error> {
-        match EnumValue::parse(&raw) {
-            Ok(value) => Ok(value),
-            Err(_) => Err(Error::Fail(Fail::CorruptStoredEnum(raw))),
-        }
-    }
-}
-
-impl TryFrom<StoredAgent> for Agent {
-    type Error = Error;
-
-    fn try_from(StoredAgent(raw): StoredAgent) -> Result<Self, Error> {
-        match Agent::parse(&raw) {
-            Ok(agent) => Ok(agent),
-            Err(_) => Err(Error::Fail(Fail::CorruptStoredAgent(raw))),
+        match parse_number(&raw) {
+            Ok(n) if n.to_string() == raw => Ok(n),
+            _ => Err(Error::Fail(Fail::CorruptStoredNumber(raw))),
         }
     }
 }
@@ -153,34 +123,6 @@ mod tests {
 
     #[test]
     fn stored_values_are_corrupt_when_invalid() {
-        assert!(matches!(
-            Decimal::try_from(StoredNumber("nope".into())),
-            Err(Error::Fail(Fail::CorruptStoredNumber(_)))
-        ));
-        assert!(matches!(
-            Instant::try_from(StoredTime("nope".into())),
-            Err(Error::Fail(Fail::CorruptStoredTime(_)))
-        ));
-        assert!(matches!(
-            SchemaName::try_from(StoredSchemaName("Nope".into())),
-            Err(Error::Fail(Fail::CorruptSchemaName(_)))
-        ));
-        assert!(matches!(
-            LinkName::try_from(StoredLinkName("Nope".into())),
-            Err(Error::Fail(Fail::CorruptLinkName(_)))
-        ));
-        assert!(matches!(
-            SchemaName::try_from(StoredLinkSchema("Nope".into())),
-            Err(Error::Fail(Fail::CorruptLinkSchema(_)))
-        ));
-        assert!(matches!(
-            EnumValue::try_from(StoredEnum("a,b".into())),
-            Err(Error::Fail(Fail::CorruptStoredEnum(_)))
-        ));
-        assert!(matches!(
-            Agent::try_from(StoredAgent("a\tb".into())),
-            Err(Error::Fail(Fail::CorruptStoredAgent(_)))
-        ));
         assert_eq!(
             Decimal::try_from(StoredNumber("nope".into()))
                 .unwrap_err()
@@ -223,5 +165,93 @@ mod tests {
                 .to_string(),
             "corrupt stored agent: a\tb"
         );
+    }
+
+    #[test]
+    fn stored_values_are_corrupt_when_not_canonical() {
+        assert_eq!(
+            SchemaName::try_from(StoredSchemaName("foo_bar".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt schema name: foo_bar"
+        );
+        assert_eq!(
+            SchemaName::try_from(StoredLinkSchema("foo_bar".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt link schema: foo_bar"
+        );
+        assert_eq!(
+            EnumValue::try_from(StoredEnum("Breakfast".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored enum: Breakfast"
+        );
+        assert_eq!(
+            Agent::try_from(StoredAgent(" coach ".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored agent:  coach "
+        );
+        assert_eq!(
+            Decimal::try_from(StoredNumber("1e3".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored number: 1e3"
+        );
+        assert_eq!(
+            Decimal::try_from(StoredNumber("01".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored number: 01"
+        );
+        assert_eq!(
+            Instant::try_from(StoredTime("2026-08-22T08:14:00+00:00".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored time: 2026-08-22T08:14:00+00:00"
+        );
+        assert_eq!(
+            Instant::try_from(StoredTime("2026-08-22T08:14:00z".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored time: 2026-08-22T08:14:00z"
+        );
+    }
+
+    #[test]
+    fn stored_values_accept_canonical_form() {
+        assert_eq!(
+            SchemaName::try_from(StoredSchemaName("foo.bar".into()))
+                .unwrap()
+                .as_str(),
+            "foo.bar"
+        );
+        assert_eq!(
+            LinkName::try_from(StoredLinkName("session".into()))
+                .unwrap()
+                .as_str(),
+            "session"
+        );
+        assert_eq!(
+            EnumValue::try_from(StoredEnum("breakfast".into()))
+                .unwrap()
+                .as_str(),
+            "breakfast"
+        );
+        assert_eq!(
+            Agent::try_from(StoredAgent("coach".into()))
+                .unwrap()
+                .as_str(),
+            "coach"
+        );
+        assert_eq!(
+            Decimal::try_from(StoredNumber("39.60".into()))
+                .unwrap()
+                .to_string(),
+            "39.60"
+        );
+        let at = Instant::try_from(StoredTime("2026-08-22T08:14:00Z".into())).unwrap();
+        assert_eq!(instant_to_sql(at).unwrap(), "2026-08-22T08:14:00Z");
     }
 }
