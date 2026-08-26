@@ -595,3 +595,65 @@ fn link_target_must_exist() {
         .unwrap_err();
     assert_fail(err, "unknown schema");
 }
+
+fn meal_log(when: &str, kcal: &str) -> cmd::Log {
+    cmd::Log {
+        schema: "nutrition.meal".into(),
+        at: Some("2026-08-22T08:14:00Z".into()),
+        agent: None,
+        links: vec![],
+        fields: vec![
+            ("when".into(), when.into()),
+            ("what".into(), "eggs".into()),
+            ("kcal".into(), kcal.into()),
+            ("protein".into(), "1".into()),
+            ("carbs".into(), "0".into()),
+        ],
+    }
+}
+
+#[test]
+fn log_entries_one_table() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let out = h
+        .log_entries(vec![meal_log("breakfast", "1"), meal_log("lunch", "2")])
+        .unwrap();
+    let lines = tsv_lines(&out);
+    assert_eq!(lines[0], vec!["id", "at", "links"]);
+    assert_eq!(lines.len(), 3);
+    assert_eq!(lines[1][0], "1");
+    assert_eq!(lines[2][0], "2");
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        links: vec![],
+        include_ignored: false,
+    }));
+    assert_eq!(tsv_lines(&ls).len(), 3);
+}
+
+#[test]
+fn log_entries_rolls_back_on_error() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let mut bad = meal_log("lunch", "2");
+    bad.fields.pop();
+    let err = h
+        .log_entries(vec![meal_log("breakfast", "1"), bad])
+        .unwrap_err();
+    assert_fail(err, "missing required");
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "nutrition.meal".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        links: vec![],
+        include_ignored: false,
+    }));
+    assert_eq!(tsv_lines(&ls).len(), 1);
+}

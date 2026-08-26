@@ -26,6 +26,10 @@ impl Harness {
         self.run(cmd).unwrap_or_else(|e| panic!("{e}"))
     }
 
+    pub fn log_entries(&mut self, logs: Vec<cmd::Log>) -> Result<String, Error> {
+        bottle::log_entries(&mut self.bottle, logs)
+    }
+
     pub fn yaml_file(&self, name: &str, body: &str) -> PathBuf {
         let path = self.dir.path().join(name);
         std::fs::write(&path, body).unwrap();

@@ -290,7 +290,7 @@ pub enum Outcome {
     Schemas(Schemas),
     Spec(Spec),
     Entries(Entries),
-    Posted(Posted),
+    Posted(Vec<Posted>),
     Stamp(Stamp),
     Total(Total),
     GroupedTime(GroupedTime),

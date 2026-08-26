@@ -67,6 +67,15 @@ pub fn execute(bottle: &mut Bottle, cmd: Cmd) -> Result<String, Error> {
     input::render(request.style, request.show_ignored, &outcome, &bottle.tz)
 }
 
+pub fn log_entries(bottle: &mut Bottle, logs: Vec<cmd::Log>) -> Result<String, Error> {
+    let mut ops = Vec::new();
+    for log in logs {
+        ops.push(input::log(log, &bottle.tz)?);
+    }
+    let outcome = domain::log_many(&mut bottle.db, &bottle.agent, ops)?;
+    input::render(input::Style::Tsv, false, &outcome, &bottle.tz)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

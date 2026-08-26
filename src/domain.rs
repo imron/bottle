@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::db::{Connection, Db};
+use crate::db::{Connection, Db, Tx};
 use crate::error::{Error, Fail};
 use crate::ledger::{
     Agent, Amend, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink, GroupedTime,
@@ -106,32 +106,46 @@ fn drop_schema(db: &mut Db, op: SchemaDrop) -> Result<(), Error> {
     })
 }
 
-fn log(db: &mut Db, agent: &Agent, mut op: Log) -> Result<Outcome, Error> {
+fn log(db: &mut Db, agent: &Agent, op: Log) -> Result<Outcome, Error> {
+    db.transaction(|tx| insert_log(tx, agent, op))
+        .map(|posted| Outcome::Posted(vec![posted]))
+}
+
+pub fn log_many(db: &mut Db, agent: &Agent, ops: Vec<Log>) -> Result<Outcome, Error> {
+    db.transaction(|tx| {
+        let mut out = Vec::new();
+        for op in ops {
+            out.push(insert_log(tx, agent, op)?);
+        }
+        Ok(out)
+    })
+    .map(Outcome::Posted)
+}
+
+fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Error> {
     let agent = op.agent.as_ref().unwrap_or(agent);
     let at = op.at.unwrap_or_else(Instant::now);
-    let id = db.transaction(|tx| {
-        let kind = store::load_schema(tx, &op.schema)?;
-        if kind.retired {
-            return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
-        }
-        let values = prepare_fields(&kind.spec, &op.fields, false)?;
-        ensure_links(tx, &kind.spec, &op.links)?;
-        op.links.sort_by(|a, b| a.name.cmp(&b.name));
-        mutable_store::insert_entry(
-            tx,
-            &op.schema,
-            &kind.spec,
-            at,
-            Some(agent),
-            &values,
-            &op.links,
-        )
-    })?;
-    Ok(Outcome::Posted(Posted {
+    let kind = store::load_schema(tx, &op.schema)?;
+    if kind.retired {
+        return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
+    }
+    let values = prepare_fields(&kind.spec, &op.fields, false)?;
+    ensure_links(tx, &kind.spec, &op.links)?;
+    op.links.sort_by(|a, b| a.name.cmp(&b.name));
+    let id = mutable_store::insert_entry(
+        tx,
+        &op.schema,
+        &kind.spec,
+        at,
+        Some(agent),
+        &values,
+        &op.links,
+    )?;
+    Ok(Posted {
         id,
         at,
         links: op.links,
-    }))
+    })
 }
 
 fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
@@ -159,11 +173,11 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
                 id: op.id,
             })
         })?;
-        Ok(Outcome::Posted(Posted {
+        Ok(Outcome::Posted(vec![Posted {
             id: op.id,
             at: entry.at,
             links: entry.links,
-        }))
+        }]))
     })
 }
 

@@ -152,7 +152,7 @@ fn schema_drop(cmd: cmd::SchemaDrop) -> Result<SchemaDrop, Error> {
     })
 }
 
-fn log(cmd: cmd::Log, tz: &TimeZone) -> Result<Log, Error> {
+pub(crate) fn log(cmd: cmd::Log, tz: &TimeZone) -> Result<Log, Error> {
     Ok(Log {
         schema: SchemaName::parse(&cmd.schema)?,
         at: cmd
@@ -279,12 +279,16 @@ pub fn render(
         Outcome::Entries(Entries { spec, entries }) => {
             render_entries(spec, entries, show_ignored, tz)
         }
-        Outcome::Posted(Posted { id, at, links }) => {
-            let at = time::display_local(*at, tz)?;
-            Ok(tsv::table(
-                &["id", "at", "links"],
-                &[vec![id.to_string(), at, render_links(links)]],
-            ))
+        Outcome::Posted(rows) => {
+            let mut out = Vec::new();
+            for Posted { id, at, links } in rows {
+                out.push(vec![
+                    id.to_string(),
+                    time::display_local(*at, tz)?,
+                    render_links(links),
+                ]);
+            }
+            Ok(tsv::table(&["id", "at", "links"], &out))
         }
         Outcome::Stamp(Stamp { id, at }) => {
             let at = time::display_local(*at, tz)?;
