@@ -48,8 +48,7 @@ pub fn quote_ident(name: &str) -> String {
 
 pub fn instant_to_sql(at: Instant) -> Result<String, Error> {
     let zoned = at.timestamp().to_zoned(TimeZone::UTC);
-    strtime::format("%Y-%m-%dT%H:%M:%SZ", &zoned)
-        .map_err(|e| Error::Fail(Fail::Time(e.to_string())))
+    Ok(strtime::format("%Y-%m-%dT%H:%M:%SZ", &zoned)?)
 }
 
 pub fn instant_from_sql(raw: String) -> Result<Instant, Error> {
