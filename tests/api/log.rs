@@ -576,3 +576,22 @@ fn newline_and_bad_enum() {
         .unwrap_err();
     assert_fail(err, "invalid");
 }
+
+#[test]
+fn link_target_must_exist() {
+    let mut h = harness();
+    h.add_schema("fitness.set", SET);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "fitness.set".into(),
+            at: Some("2026-08-22T08:00:00Z".into()),
+            agent: None,
+            links: vec![("session".into(), "fitness.session/1".into())],
+            fields: vec![
+                ("movement".into(), "squat".into()),
+                ("reps".into(), "8".into()),
+            ],
+        }))
+        .unwrap_err();
+    assert_fail(err, "unknown schema");
+}

@@ -1,5 +1,8 @@
+mod amend;
 mod common;
+mod get;
 mod help;
 mod log;
-mod query;
+mod ls;
 mod schema;
+mod sum;

@@ -63,6 +63,35 @@ impl Harness {
     }
 }
 
+pub fn seed_meals(h: &mut Harness) {
+    h.add_schema("nutrition.meal", MEAL);
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "568"),
+            ("protein", "49"),
+            ("carbs", "5"),
+            ("fat", "39.6"),
+        ],
+        &[],
+        Some("2026-08-22T08:14:00Z"),
+    );
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "lunch"),
+            ("what", "rice"),
+            ("kcal", "200"),
+            ("protein", "10"),
+            ("carbs", "40"),
+        ],
+        &[],
+        Some("2026-08-23T12:00:00Z"),
+    );
+}
+
 pub const MEAL: &str = r#"
 fields:
   - name: when
