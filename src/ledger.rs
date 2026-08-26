@@ -104,7 +104,7 @@ pub struct Find<'a> {
     pub schema: &'a SchemaName,
     pub spec: &'a Spec,
     pub range: Range,
-    pub agent: Option<&'a str>,
+    pub agent: Option<&'a Agent>,
     pub include_ignored: bool,
     pub filters: &'a [Filter],
     pub order: Order,

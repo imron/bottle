@@ -122,7 +122,7 @@ fn log(db: &mut Db, agent: &Agent, mut op: Log) -> Result<Outcome, Error> {
             &op.schema,
             &kind.spec,
             at,
-            Some(agent.as_str()),
+            Some(agent),
             &values,
             &op.links,
         )
@@ -145,14 +145,7 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
         }
         let values = prepare_fields(&kind.spec, &op.fields, true)?;
         ensure_links(tx, &kind.spec, &op.links)?;
-        mutable_store::update_entry(
-            tx,
-            &op.schema,
-            op.id,
-            op.at,
-            op.agent.as_ref().map(Agent::as_str),
-            &values,
-        )?;
+        mutable_store::update_entry(tx, &op.schema, op.id, op.at, op.agent.as_ref(), &values)?;
         for name in &op.unlinks {
             mutable_store::delete_link(tx, &op.schema, op.id, name)?;
         }
@@ -270,7 +263,7 @@ fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
                 schema: &q.scope.schema,
                 spec: &spec,
                 range: q.range,
-                agent: q.scope.agent.as_ref().map(Agent::as_str),
+                agent: q.scope.agent.as_ref(),
                 include_ignored: q.include_ignored,
                 filters: &resolved,
                 order: q.order,
@@ -295,7 +288,7 @@ fn sum(db: &mut Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
             schema: &op.scope.schema,
             spec: &spec,
             range: op.range,
-            agent: op.scope.agent.as_ref().map(Agent::as_str),
+            agent: op.scope.agent.as_ref(),
             include_ignored: false,
             filters: &resolved,
             order: Order::Oldest,

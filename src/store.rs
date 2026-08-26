@@ -245,7 +245,7 @@ fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) ->
         }
     }
     if let Some(agent) = q.agent {
-        bind.push(SqlVal::Text(agent.to_string()));
+        bind.push(SqlVal::Text(agent.as_str().to_string()));
         sql.push_str(&format!(" AND agent = ?{}", bind.len()));
     }
     for filter in q.filters {

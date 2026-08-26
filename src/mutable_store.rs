@@ -4,7 +4,7 @@ use rusqlite::params;
 
 use crate::db::{Tx, UniqueConstraint};
 use crate::error::{Error, Fail};
-use crate::ledger::FieldValue;
+use crate::ledger::{Agent, FieldValue};
 use crate::spec::{Field, FieldName, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
 use crate::time::Instant;
@@ -86,7 +86,7 @@ pub fn insert_entry(
     schema: &SchemaName,
     spec: &Spec,
     at: Instant,
-    agent: Option<&str>,
+    agent: Option<&Agent>,
     values: &HashMap<FieldName, FieldValue>,
     links: &[Link],
 ) -> Result<i64, Error> {
@@ -95,7 +95,7 @@ pub fn insert_entry(
     let mut bind: Vec<SqlVal> = vec![
         SqlVal::Text(instant_to_sql(at)?),
         match agent {
-            Some(a) => SqlVal::Text(a.to_string()),
+            Some(a) => SqlVal::Text(a.as_str().to_string()),
             None => SqlVal::Null,
         },
     ];
@@ -135,7 +135,7 @@ pub fn update_entry(
     schema: &SchemaName,
     id: i64,
     at: Option<Instant>,
-    agent: Option<&str>,
+    agent: Option<&Agent>,
     values: &HashMap<FieldName, FieldValue>,
 ) -> Result<(), Error> {
     let mut sets = Vec::new();
@@ -146,7 +146,7 @@ pub fn update_entry(
     }
     if let Some(agent) = agent {
         sets.push(format!("agent = ?{}", bind.len() + 1));
-        bind.push(SqlVal::Text(agent.to_string()));
+        bind.push(SqlVal::Text(agent.as_str().to_string()));
     }
     for (name, val) in values {
         sets.push(format!(
