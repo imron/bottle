@@ -52,22 +52,31 @@ pub fn instant_to_sql(at: Instant) -> Result<String, Error> {
 }
 
 pub fn instant_from_sql(raw: String) -> Result<Instant, Error> {
-    let ts = raw
-        .parse()
-        .map_err(|_| Error::Fail(Fail::CorruptStoredTime(raw.clone())))?;
-    Ok(Instant::from_timestamp(ts))
+    match raw.parse() {
+        Ok(ts) => Ok(Instant::from_timestamp(ts)),
+        Err(_) => Err(Error::Fail(Fail::CorruptStoredTime(raw))),
+    }
 }
 
 pub fn schema_from_sql(name: String) -> Result<SchemaName, Error> {
-    SchemaName::parse(&name).map_err(|_| Error::Fail(Fail::CorruptSchemaName(name)))
+    match SchemaName::parse(&name) {
+        Ok(name) => Ok(name),
+        Err(_) => Err(Error::Fail(Fail::CorruptSchemaName(name))),
+    }
 }
 
 pub fn link_name_from_sql(name: String) -> Result<LinkName, Error> {
-    LinkName::parse(&name).map_err(|_| Error::Fail(Fail::CorruptLinkName(name)))
+    match LinkName::parse(&name) {
+        Ok(name) => Ok(name),
+        Err(_) => Err(Error::Fail(Fail::CorruptLinkName(name))),
+    }
 }
 
 pub fn link_schema_from_sql(name: String) -> Result<SchemaName, Error> {
-    SchemaName::parse(&name).map_err(|_| Error::Fail(Fail::CorruptLinkSchema(name)))
+    match SchemaName::parse(&name) {
+        Ok(name) => Ok(name),
+        Err(_) => Err(Error::Fail(Fail::CorruptLinkSchema(name))),
+    }
 }
 
 pub fn sql_default(value: &FieldValue) -> String {
