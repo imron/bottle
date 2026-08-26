@@ -40,36 +40,40 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Request, Error> {
             })
     );
     Ok(Request {
-        op: op_from_cmd(cmd, tz)?,
+        op: cmd.try_from(tz)?,
         style,
         show_ignored,
-    })
-}
-
-fn op_from_cmd(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
-    Ok(match cmd {
-        Cmd::Help(_) => return Err(Error::Fail(Fail::HelpNotAnOp)),
-        Cmd::SchemaList => Op::SchemaList,
-        Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.try_from(tz)?),
-        Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.try_from(tz)?),
-        Cmd::SchemaAddField(cmd) => Op::SchemaAddField(cmd.try_from(tz)?),
-        Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(cmd.try_from(tz)?),
-        Cmd::SchemaRetire(cmd) => Op::SchemaRetire(cmd.try_from(tz)?),
-        Cmd::SchemaDrop(cmd) => Op::SchemaDrop(cmd.try_from(tz)?),
-        Cmd::Log(cmd) => Op::Log(cmd.try_from(tz)?),
-        Cmd::Ls(cmd) => Op::List(cmd.try_from(tz)?),
-        Cmd::Get(cmd) => Op::Get(cmd.try_from(tz)?),
-        Cmd::Sum(cmd) => Op::Sum(cmd.try_from(tz)?),
-        Cmd::Last(cmd) => Op::Last(cmd.try_from(tz)?),
-        Cmd::Today(cmd) => Op::Today(cmd.try_from(tz)?),
-        Cmd::Amend(cmd) => Op::Amend(cmd.try_from(tz)?),
-        Cmd::Ignore(cmd) => Op::Ignore(cmd.try_from(tz)?),
     })
 }
 
 trait FromCmd {
     type Op;
     fn try_from(self, tz: &TimeZone) -> Result<Self::Op, Error>;
+}
+
+impl FromCmd for Cmd {
+    type Op = Op;
+
+    fn try_from(self, tz: &TimeZone) -> Result<Self::Op, Error> {
+        Ok(match self {
+            Cmd::Help(_) => return Err(Error::Fail(Fail::HelpNotAnOp)),
+            Cmd::SchemaList => Op::SchemaList,
+            Cmd::SchemaShow(cmd) => Op::SchemaShow(cmd.try_from(tz)?),
+            Cmd::SchemaAdd(cmd) => Op::SchemaAdd(cmd.try_from(tz)?),
+            Cmd::SchemaAddField(cmd) => Op::SchemaAddField(cmd.try_from(tz)?),
+            Cmd::SchemaAddValue(cmd) => Op::SchemaAddValue(cmd.try_from(tz)?),
+            Cmd::SchemaRetire(cmd) => Op::SchemaRetire(cmd.try_from(tz)?),
+            Cmd::SchemaDrop(cmd) => Op::SchemaDrop(cmd.try_from(tz)?),
+            Cmd::Log(cmd) => Op::Log(cmd.try_from(tz)?),
+            Cmd::Ls(cmd) => Op::List(cmd.try_from(tz)?),
+            Cmd::Get(cmd) => Op::Get(cmd.try_from(tz)?),
+            Cmd::Sum(cmd) => Op::Sum(cmd.try_from(tz)?),
+            Cmd::Last(cmd) => Op::Last(cmd.try_from(tz)?),
+            Cmd::Today(cmd) => Op::Today(cmd.try_from(tz)?),
+            Cmd::Amend(cmd) => Op::Amend(cmd.try_from(tz)?),
+            Cmd::Ignore(cmd) => Op::Ignore(cmd.try_from(tz)?),
+        })
+    }
 }
 
 impl FromCmd for cmd::SchemaShow {
