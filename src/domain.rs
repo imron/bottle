@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use rust_decimal::Decimal;
 
-use crate::db::Db;
+use crate::db::{Connection, Db};
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, Clause, Entries, Entry, FieldInput, FieldValue, Filter, Get, GroupedLink,
@@ -64,13 +64,6 @@ fn add_schema(db: &mut Db, op: SchemaAdd) -> Result<(), Error> {
 }
 
 fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
-    let mut kind = store::load_schema(db, &op.schema)?;
-    if kind.retired {
-        return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
-    }
-    if kind.spec.field(&op.name).is_some() {
-        return Err(Error::Fail(Fail::FieldExists(op.name.clone())));
-    }
     let values = if op.type_ == FieldType::Enum {
         let Some(vals) = op.values else {
             return Err(Error::Usage(Usage::EnumValuesRequired));
@@ -85,13 +78,20 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
     if let Some(ref def) = op.default {
         parse_field_value_parts(&op.name, op.type_, values.as_deref(), def)?;
     }
-    let field = Field {
-        name: op.name,
-        type_: op.type_,
-        required,
-        values,
-    };
     db.transaction(|tx| {
+        let mut kind = store::load_schema(tx, &op.schema)?;
+        if kind.retired {
+            return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
+        }
+        if kind.spec.field(&op.name).is_some() {
+            return Err(Error::Fail(Fail::FieldExists(op.name.clone())));
+        }
+        let field = Field {
+            name: op.name.clone(),
+            type_: op.type_,
+            required,
+            values,
+        };
         mutable_store::add_column(tx, &op.schema, &field, op.default.as_deref())?;
         kind.spec.fields.push(field);
         mutable_store::save_spec(tx, &op.schema, &kind.spec)
@@ -99,23 +99,25 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
 }
 
 fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
-    let mut kind = store::load_schema(db, &op.schema)?;
-    if kind.retired {
-        return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
-    }
-    let Some(f) = kind.spec.fields.iter_mut().find(|f| f.name == op.field) else {
-        return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
-    };
-    if f.type_ != FieldType::Enum {
-        return Err(Error::Fail(Fail::FieldNotEnum(op.field.clone())));
-    }
     let folded = fold_enum(&op.value)?;
-    let values = f.values.get_or_insert_with(Vec::new);
-    if values.iter().any(|v| v == &folded) {
-        return Err(Error::Fail(Fail::EnumValueExists(folded)));
-    }
-    values.push(folded);
-    db.transaction(|tx| mutable_store::save_spec(tx, &op.schema, &kind.spec))
+    db.transaction(|tx| {
+        let mut kind = store::load_schema(tx, &op.schema)?;
+        if kind.retired {
+            return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
+        }
+        let Some(f) = kind.spec.fields.iter_mut().find(|f| f.name == op.field) else {
+            return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
+        };
+        if f.type_ != FieldType::Enum {
+            return Err(Error::Fail(Fail::FieldNotEnum(op.field.clone())));
+        }
+        let values = f.values.get_or_insert_with(Vec::new);
+        if values.iter().any(|v| v == &folded) {
+            return Err(Error::Fail(Fail::EnumValueExists(folded)));
+        }
+        values.push(folded);
+        mutable_store::save_spec(tx, &op.schema, &kind.spec)
+    })
 }
 
 fn retire(db: &mut Db, op: SchemaRetire) -> Result<(), Error> {
@@ -124,7 +126,7 @@ fn retire(db: &mut Db, op: SchemaRetire) -> Result<(), Error> {
 
 fn drop_schema(db: &mut Db, op: SchemaDrop) -> Result<(), Error> {
     db.transaction(|tx| {
-        if mutable_store::inbound_link_count(tx, &op.name)? > 0 {
+        if store::inbound_link_count(tx, &op.name)? > 0 {
             return Err(Error::Fail(Fail::SchemaHasInboundLinks(op.name.clone())));
         }
         mutable_store::drop_schema(tx, &op.name)
@@ -132,16 +134,16 @@ fn drop_schema(db: &mut Db, op: SchemaDrop) -> Result<(), Error> {
 }
 
 fn log(db: &mut Db, agent: &Agent, mut op: Log) -> Result<Outcome, Error> {
-    let kind = store::load_schema(db, &op.schema)?;
-    if kind.retired {
-        return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
-    }
     let agent = op.agent.as_ref().unwrap_or(agent);
     let at = op.at.unwrap_or_else(Instant::now);
-    let values = prepare_fields(&kind.spec, &op.fields, false)?;
-    ensure_links(db, &kind.spec, &op.links)?;
-    op.links.sort_by(|a, b| a.name.cmp(&b.name));
     let id = db.transaction(|tx| {
+        let kind = store::load_schema(tx, &op.schema)?;
+        if kind.retired {
+            return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
+        }
+        let values = prepare_fields(&kind.spec, &op.fields, false)?;
+        ensure_links(tx, &kind.spec, &op.links)?;
+        op.links.sort_by(|a, b| a.name.cmp(&b.name));
         mutable_store::insert_entry(
             tx,
             &op.schema,
@@ -168,13 +170,6 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
     {
         return Err(Error::Usage(Usage::AmendEmpty));
     }
-    let kind = store::load_schema(db, &op.schema)?;
-    if store::get_entry(db, &op.schema, &kind.spec, op.id)?.is_none() {
-        return Err(Error::Fail(Fail::EntryNotFound {
-            schema: op.schema.clone(),
-            id: op.id,
-        }));
-    }
     let mut unlink_set = HashSet::new();
     for name in &op.unlinks {
         if !unlink_set.insert(name) {
@@ -184,9 +179,16 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
             return Err(Error::Usage(Usage::LinkAndUnlink(name.clone())));
         }
     }
-    let values = prepare_fields(&kind.spec, &op.fields, true)?;
-    ensure_links(db, &kind.spec, &op.links)?;
     db.transaction(|tx| {
+        let kind = store::load_schema(tx, &op.schema)?;
+        if store::get_entry(tx, &op.schema, &kind.spec, op.id)?.is_none() {
+            return Err(Error::Fail(Fail::EntryNotFound {
+                schema: op.schema.clone(),
+                id: op.id,
+            }));
+        }
+        let values = prepare_fields(&kind.spec, &op.fields, true)?;
+        ensure_links(tx, &kind.spec, &op.links)?;
         mutable_store::update_entry(
             tx,
             &op.schema,
@@ -202,13 +204,12 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
         for link in &op.links {
             mutable_store::upsert_link(tx, &op.schema, op.id, link)?;
         }
-        let entry =
-            mutable_store::get_entry(tx, &op.schema, &kind.spec, op.id)?.ok_or_else(|| {
-                Error::Fail(Fail::EntryNotFound {
-                    schema: op.schema.clone(),
-                    id: op.id,
-                })
-            })?;
+        let entry = store::get_entry(tx, &op.schema, &kind.spec, op.id)?.ok_or_else(|| {
+            Error::Fail(Fail::EntryNotFound {
+                schema: op.schema.clone(),
+                id: op.id,
+            })
+        })?;
         Ok(Outcome::Posted(Posted {
             id: op.id,
             at: entry.at,
@@ -218,18 +219,20 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
 }
 
 fn ignore(db: &mut Db, op: Ignore) -> Result<Outcome, Error> {
-    let spec = store::load_schema(db, &op.schema)?.spec;
-    let Some(entry) = store::get_entry(db, &op.schema, &spec, op.id)? else {
-        return Err(Error::Fail(Fail::EntryNotFound {
-            schema: op.schema.clone(),
+    db.transaction(|tx| {
+        let spec = store::load_schema(tx, &op.schema)?.spec;
+        let Some(entry) = store::get_entry(tx, &op.schema, &spec, op.id)? else {
+            return Err(Error::Fail(Fail::EntryNotFound {
+                schema: op.schema.clone(),
+                id: op.id,
+            }));
+        };
+        mutable_store::set_ignored(tx, &op.schema, op.id)?;
+        Ok(Outcome::Stamp(Stamp {
             id: op.id,
-        }));
-    };
-    db.transaction(|tx| mutable_store::set_ignored(tx, &op.schema, op.id))?;
-    Ok(Outcome::Stamp(Stamp {
-        id: op.id,
-        at: entry.at,
-    }))
+            at: entry.at,
+        }))
+    })
 }
 
 fn get(db: &Db, op: Get) -> Result<Outcome, Error> {
@@ -433,7 +436,7 @@ fn field_named(spec: &Spec, name: &LinkName) -> bool {
         .is_some_and(|n| spec.field(&n).is_some())
 }
 
-fn ensure_links(db: &Db, spec: &Spec, links: &[Link]) -> Result<(), Error> {
+fn ensure_links(conn: &impl Connection, spec: &Spec, links: &[Link]) -> Result<(), Error> {
     let mut seen = HashSet::new();
     for link in links {
         if !seen.insert(&link.name) {
@@ -444,8 +447,8 @@ fn ensure_links(db: &Db, spec: &Spec, links: &[Link]) -> Result<(), Error> {
                 link.name.clone(),
             )));
         }
-        let target = store::load_schema(db, &link.to.schema)?;
-        if store::get_entry(db, &link.to.schema, &target.spec, link.to.id)?.is_none() {
+        let target = store::load_schema(conn, &link.to.schema)?;
+        if store::get_entry(conn, &link.to.schema, &target.spec, link.to.id)?.is_none() {
             return Err(Error::Fail(Fail::LinkTargetMissing(link.to.clone())));
         }
     }

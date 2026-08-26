@@ -19,11 +19,19 @@ input → domain → store
   help. Input never talks to store.
 - **domain** is the ledger: schemas, entries, links, instants.
   Ledgers have entries, not rows. Domain does not import rusqlite,
-  Cmd, or TSV. It does not return rendered output.
+  Cmd, or TSV. It does not return rendered output. Domain owns
+  transaction boundaries via `db.transaction(...)`. If a write's
+  decision depends on a read, that read runs in the same Immediate
+  transaction as the write.
 - **store** is sqlite. It takes domain objects and returns domain
   objects. sqlite TEXT/INTEGER stay inside store; convert to
   Instant, SchemaName, Link, and so on before returning. Store
   types never leak into domain. Input types never leak into domain.
+- **Db** and **Tx** are bottle session types, not rusqlite. Reads
+  take `&impl Connection` (implemented by `Db` and `Tx`) and live
+  in `store.rs`. Writes take `&mut Tx` only and live in
+  `mutable_store.rs`. It is an error for a mutating query to live
+  in `store.rs` or a read-only query to live in `mutable_store.rs`.
 
 ## Commits
 

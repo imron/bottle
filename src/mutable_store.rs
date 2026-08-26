@@ -4,37 +4,23 @@ use rusqlite::params;
 
 use crate::db::Tx;
 use crate::error::{Error, Fail, UniqueConstraint};
-use crate::ledger::{Entry, FieldValue};
+use crate::ledger::FieldValue;
 use crate::spec::{Field, FieldName, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
-use crate::store::{inbound_link_count as inbound_on, load_entry};
 use crate::time::Instant;
-
-pub fn get_entry(
-    tx: &Tx<'_>,
-    schema: &SchemaName,
-    spec: &Spec,
-    id: i64,
-) -> Result<Option<Entry>, Error> {
-    load_entry(tx.conn(), schema, spec, id)
-}
-
-pub fn inbound_link_count(tx: &Tx<'_>, name: &SchemaName) -> Result<i64, Error> {
-    inbound_on(tx.conn(), name)
-}
 
 pub fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
     let yaml = spec.to_yaml()?;
     let table = table_name(name);
     let cols = create_columns(spec);
     let sql = format!("CREATE TABLE {} ({cols})", quote_ident(&table));
-    tx.conn()
+    tx.as_ref()
         .execute(
             "INSERT INTO schemas (name, spec, retired) VALUES (?1, ?2, 0)",
             params![name.as_str(), yaml],
         )
         .unique(Fail::SchemaExists(name.clone()))?;
-    tx.conn().execute_batch(&sql)?;
+    tx.as_ref().execute_batch(&sql)?;
     Ok(())
 }
 
@@ -60,13 +46,13 @@ pub fn add_column(
             quote_ident(field.name.as_str())
         )
     };
-    tx.conn().execute_batch(&alter)?;
+    tx.as_ref().execute_batch(&alter)?;
     Ok(())
 }
 
 pub fn save_spec(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
     let yaml = spec.to_yaml()?;
-    tx.conn().execute(
+    tx.as_ref().execute(
         "UPDATE schemas SET spec = ?1 WHERE name = ?2",
         params![yaml, name.as_str()],
     )?;
@@ -74,7 +60,7 @@ pub fn save_spec(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), 
 }
 
 pub fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
-    let n = tx.conn().execute(
+    let n = tx.as_ref().execute(
         "UPDATE schemas SET retired = 1 WHERE name = ?1",
         [name.as_str()],
     )?;
@@ -86,15 +72,15 @@ pub fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
 
 pub fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
     let n = tx
-        .conn()
+        .as_ref()
         .execute("DELETE FROM schemas WHERE name = ?1", [name.as_str()])?;
     if n == 0 {
         return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
     }
     let table = table_name(name);
-    tx.conn()
+    tx.as_ref()
         .execute("DELETE FROM links WHERE from_schema = ?1", [name.as_str()])?;
-    tx.conn()
+    tx.as_ref()
         .execute_batch(&format!("DROP TABLE {}", quote_ident(&table)))?;
     Ok(())
 }
@@ -139,12 +125,12 @@ pub fn insert_entry(
         placeholders.join(", ")
     );
     {
-        let mut stmt = tx.conn().prepare(&sql)?;
+        let mut stmt = tx.as_ref().prepare(&sql)?;
         stmt.execute(rusqlite::params_from_iter(
             bind.iter().map(SqlVal::as_param),
         ))?;
     }
-    let id = tx.conn().last_insert_rowid();
+    let id = tx.as_ref().last_insert_rowid();
     insert_links(tx, schema, id, links)?;
     Ok(id)
 }
@@ -186,7 +172,7 @@ pub fn update_entry(
         sets.join(", "),
         bind.len()
     );
-    tx.conn().execute(
+    tx.as_ref().execute(
         &sql,
         rusqlite::params_from_iter(bind.iter().map(SqlVal::as_param)),
     )?;
@@ -199,7 +185,7 @@ pub fn delete_link(
     id: i64,
     name: &LinkName,
 ) -> Result<(), Error> {
-    tx.conn().execute(
+    tx.as_ref().execute(
         "DELETE FROM links WHERE from_schema = ?1 AND from_id = ?2 AND name = ?3",
         params![schema.as_str(), id, name.as_str()],
     )?;
@@ -212,7 +198,7 @@ pub fn upsert_link(
     id: i64,
     link: &Link,
 ) -> Result<(), Error> {
-    tx.conn().execute(
+    tx.as_ref().execute(
         "INSERT INTO links (from_schema, from_id, name, to_schema, to_id)
          VALUES (?1, ?2, ?3, ?4, ?5)
          ON CONFLICT (from_schema, from_id, name) DO UPDATE SET
@@ -231,7 +217,7 @@ pub fn upsert_link(
 
 pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<(), Error> {
     let table = table_name(schema);
-    tx.conn().execute(
+    tx.as_ref().execute(
         &format!(
             "UPDATE {} SET ignored = 1 WHERE id = ?1",
             quote_ident(&table)
@@ -243,7 +229,7 @@ pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<(), 
 
 fn insert_links(tx: &Tx<'_>, schema: &SchemaName, id: i64, links: &[Link]) -> Result<(), Error> {
     for link in links {
-        tx.conn().execute(
+        tx.as_ref().execute(
             "INSERT INTO links (from_schema, from_id, name, to_schema, to_id)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![

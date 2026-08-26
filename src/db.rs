@@ -1,14 +1,18 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use rusqlite::Connection as Sqlite;
+use rusqlite::TransactionBehavior;
 use rusqlite::functions::FunctionFlags;
-use rusqlite::{Connection, TransactionBehavior};
 use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
 
+/// Readable sqlite session. Implemented by [`Db`] and [`Tx`].
+pub trait Connection: AsRef<Sqlite> {}
+
 pub struct Db {
-    conn: Connection,
+    conn: Sqlite,
 }
 
 pub struct Tx<'a> {
@@ -22,7 +26,7 @@ impl Db {
         {
             std::fs::create_dir_all(parent)?;
         }
-        let conn = Connection::open(path)?;
+        let conn = Sqlite::open(path)?;
         conn.busy_timeout(Duration::from_millis(5000))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.execute_batch(
@@ -57,14 +61,18 @@ impl Db {
             Err(err) => Err(err),
         }
     }
+}
 
-    pub fn conn(&self) -> &Connection {
+impl AsRef<Sqlite> for Db {
+    fn as_ref(&self) -> &Sqlite {
         &self.conn
     }
 }
 
+impl Connection for Db {}
+
 impl<'a> Tx<'a> {
-    fn begin(conn: &'a mut Connection) -> Result<Self, Error> {
+    fn begin(conn: &'a mut Sqlite) -> Result<Self, Error> {
         Ok(Self {
             inner: conn.transaction_with_behavior(TransactionBehavior::Immediate)?,
         })
@@ -74,11 +82,15 @@ impl<'a> Tx<'a> {
         self.inner.commit()?;
         Ok(())
     }
+}
 
-    pub fn conn(&self) -> &Connection {
+impl AsRef<Sqlite> for Tx<'_> {
+    fn as_ref(&self) -> &Sqlite {
         &self.inner
     }
 }
+
+impl Connection for Tx<'_> {}
 
 pub fn default_db_path() -> Result<PathBuf, Error> {
     if let Some(path) = std::env::var_os("BOTTLE_DB") {
@@ -98,7 +110,7 @@ pub fn default_db_path() -> Result<PathBuf, Error> {
     Ok(home.join(".local/share/bottle/bottle.db"))
 }
 
-fn register_functions(conn: &Connection) -> Result<(), Error> {
+fn register_functions(conn: &Sqlite) -> Result<(), Error> {
     conn.create_scalar_function(
         "bottle_dec_eq",
         2,
