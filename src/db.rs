@@ -25,8 +25,8 @@ impl<T> UniqueConstraint<T> for Result<T, rusqlite::Error> {
 }
 
 impl From<rusqlite::Error> for Error {
-    fn from(err: rusqlite::Error) -> Self {
-        Self::Fail(Fail::Store(err.to_string()))
+    fn from(_err: rusqlite::Error) -> Self {
+        Self::Fail(Fail::Store)
     }
 }
 

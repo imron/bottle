@@ -47,7 +47,7 @@ pub enum Fail {
     EnumHasNoValues(FieldName),
     InvalidEnumValue { field: FieldName, value: String },
     InvalidSpec(String),
-    Yaml(String),
+    Yaml,
     InvalidSchemaName(String),
     InvalidFieldName(String),
     ReservedFieldName(String),
@@ -66,9 +66,10 @@ pub enum Fail {
     CorruptStoredTime(String),
     HomeNotSet,
     DbPathRequired,
-    Store(String),
-    Io(String),
-    Time(String),
+    FileNotFound(String),
+    Store,
+    Io,
+    Time,
 }
 
 impl Error {
@@ -87,8 +88,8 @@ impl Error {
 impl std::error::Error for Error {}
 
 impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Self::Fail(Fail::Io(err.to_string()))
+    fn from(_err: std::io::Error) -> Self {
+        Self::Fail(Fail::Io)
     }
 }
 
@@ -99,7 +100,7 @@ impl From<rust_decimal::Error> for Error {
 }
 
 impl From<jiff::Error> for Error {
-    fn from(err: jiff::Error) -> Self {
-        Self::Fail(Fail::Time(err.to_string()))
+    fn from(_err: jiff::Error) -> Self {
+        Self::Fail(Fail::Time)
     }
 }

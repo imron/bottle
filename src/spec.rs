@@ -85,7 +85,10 @@ impl Spec {
     }
 
     pub fn to_yaml(&self) -> Result<String, Error> {
-        serde_yaml::to_string(self).map_err(|e| Error::Fail(Fail::Yaml(e.to_string())))
+        match serde_yaml::to_string(self) {
+            Ok(yaml) => Ok(yaml),
+            Err(_) => Err(Error::Fail(Fail::Yaml)),
+        }
     }
 
     pub fn field(&self, name: &FieldName) -> Option<&Field> {

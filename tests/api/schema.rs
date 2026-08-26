@@ -595,7 +595,7 @@ fn yaml_missing_and_invalid() {
             file: h.dir.path().join("missing.yaml"),
         }))
         .unwrap_err();
-    assert_fail(err, "No such file");
+    assert_fail(err, "file not found");
     let file = h.yaml_file("bad.yaml", "fields: [");
     let err = h
         .run(Cmd::SchemaAdd(cmd::SchemaAdd {

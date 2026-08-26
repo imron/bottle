@@ -5,7 +5,7 @@ mod tsv;
 
 use jiff::tz::TimeZone;
 
-use crate::error::{Error, Usage};
+use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, Entries, FieldInput, FieldValue, Get, GroupedLink, GroupedTime, Ignore, Last,
     List, Log, Op, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop,
@@ -90,7 +90,15 @@ impl FromCmd for cmd::SchemaAdd {
     type Op = SchemaAdd;
 
     fn try_from(self, _tz: &TimeZone) -> Result<Self::Op, Error> {
-        let raw = std::fs::read_to_string(&self.file)?;
+        let raw = match std::fs::read_to_string(&self.file) {
+            Ok(raw) => raw,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                return Err(Error::Fail(Fail::FileNotFound(
+                    self.file.display().to_string(),
+                )));
+            }
+            Err(err) => return Err(err.into()),
+        };
         Ok(SchemaAdd {
             name: SchemaName::parse(&self.name)?,
             spec: Spec::parse_yaml(&raw)?,
