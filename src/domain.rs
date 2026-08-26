@@ -8,7 +8,7 @@ use crate::ledger::{
     SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Summed, Today, Total,
 };
 use crate::mutable_store;
-use crate::spec::{FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
+use crate::spec::{FieldKind, FieldName, Group, Link, SchemaName, Spec};
 use crate::store;
 use crate::time::{Instant, Range};
 use jiff::tz::TimeZone;
@@ -314,7 +314,7 @@ fn sum(db: &mut Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
             limit: None,
         };
         if let Some(Group::Link(name)) = &op.group
-            && field_named(&spec, name)
+            && spec.has_field_named(name)
         {
             return Err(Error::Fail(Fail::LinkNameCollidesWithField(name.clone())));
         }
@@ -345,7 +345,7 @@ fn resolve_filters(
         });
     }
     for link in links {
-        if field_named(spec, &link.name) {
+        if spec.has_field_named(&link.name) {
             return Err(Error::Fail(Fail::LinkNameCollidesWithField(
                 link.name.clone(),
             )));
@@ -358,15 +358,9 @@ fn resolve_filters(
     Ok(out)
 }
 
-fn field_named(spec: &Spec, name: &LinkName) -> bool {
-    FieldName::parse(name.as_str())
-        .ok()
-        .is_some_and(|n| spec.field(&n).is_some())
-}
-
 fn ensure_links(conn: &impl Connection, spec: &Spec, links: &[Link]) -> Result<(), Error> {
     for link in links {
-        if field_named(spec, &link.name) {
+        if spec.has_field_named(&link.name) {
             return Err(Error::Fail(Fail::LinkNameCollidesWithField(
                 link.name.clone(),
             )));

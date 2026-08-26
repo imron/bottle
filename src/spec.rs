@@ -148,6 +148,10 @@ impl Spec {
         self.fields.iter().find(|f| &f.name == name)
     }
 
+    pub fn has_field_named(&self, name: &LinkName) -> bool {
+        self.fields.iter().any(|f| f.name.as_str() == name.as_str())
+    }
+
     fn from_doc(doc: SpecDoc) -> Result<Self, Error> {
         let mut seen = HashSet::new();
         let mut fields = Vec::new();
