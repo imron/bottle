@@ -137,7 +137,8 @@ pub struct SchemaAdd {
 #[derive(Debug, Clone)]
 pub struct SchemaAddField {
     pub schema: SchemaName,
-    pub field: Field,
+    pub name: FieldName,
+    pub kind: FieldKind,
     pub default: Option<FieldValue>,
 }
 

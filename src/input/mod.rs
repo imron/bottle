@@ -111,19 +111,21 @@ fn schema_add(cmd: cmd::SchemaAdd) -> Result<SchemaAdd, Error> {
 fn schema_add_field(cmd: cmd::SchemaAddField) -> Result<SchemaAddField, Error> {
     let name = FieldName::parse(&cmd.name)?;
     let kind = field_kind(cmd.type_, cmd.values)?;
-    let field = Field {
-        name,
-        kind,
-        required: cmd.default.is_some(),
+    let default = match cmd.default.as_deref() {
+        None => None,
+        Some(raw) => Some(FieldValue::parse(
+            &Field {
+                name: name.clone(),
+                kind: kind.clone(),
+                required: true,
+            },
+            raw,
+        )?),
     };
-    let default = cmd
-        .default
-        .as_deref()
-        .map(|raw| FieldValue::parse(&field, raw))
-        .transpose()?;
     Ok(SchemaAddField {
         schema: SchemaName::parse(&cmd.schema)?,
-        field,
+        name,
+        kind,
         default,
     })
 }

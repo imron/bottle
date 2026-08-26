@@ -8,7 +8,7 @@ use crate::ledger::{
     SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed, Today, Total,
 };
 use crate::mutable_store;
-use crate::spec::{FieldKind, FieldName, Group, Link, Spec};
+use crate::spec::{Field, FieldKind, FieldName, Group, Link, Spec};
 use crate::store;
 use crate::time::{Instant, Range};
 use jiff::tz::TimeZone;
@@ -64,11 +64,16 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
         if kind.retired {
             return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
         }
-        if kind.spec.field(&op.field.name).is_some() {
-            return Err(Error::Fail(Fail::FieldExists(op.field.name.clone())));
+        let field = Field {
+            name: op.name.clone(),
+            kind: op.kind,
+            required: op.default.is_some(),
+        };
+        if kind.spec.field(&field.name).is_some() {
+            return Err(Error::Fail(Fail::FieldExists(field.name.clone())));
         }
-        mutable_store::add_column(tx, &op.schema, &op.field, op.default.as_ref())?;
-        kind.spec.fields.push(op.field);
+        mutable_store::add_column(tx, &op.schema, &field, op.default.as_ref())?;
+        kind.spec.fields.push(field);
         mutable_store::save_spec(tx, &op.schema, &kind.spec)
     })
 }
