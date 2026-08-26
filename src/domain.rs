@@ -1,13 +1,11 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
-
-use rust_decimal::Decimal;
+use std::collections::{HashMap, HashSet};
 
 use crate::db::{Connection, Db};
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
-    Agent, Amend, Clause, Entries, Entry, FieldInput, FieldValue, Filter, Get, GroupedLink,
-    GroupedTime, Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField,
-    SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
+    Agent, Amend, Clause, Entries, FieldInput, FieldValue, Filter, Get, GroupedLink, GroupedTime,
+    Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue,
+    SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
 };
 use crate::mutable_store;
 use crate::spec::{
@@ -15,7 +13,7 @@ use crate::spec::{
     fold_enum_values, parse_number,
 };
 use crate::store::{self, Find};
-use crate::time::{self, Instant, Period, Range};
+use crate::time::{Instant, Range};
 use jiff::tz::TimeZone;
 
 pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outcome, Error> {
@@ -340,74 +338,35 @@ fn sum(db: &Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
         return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
     }
     let resolved = resolve_filters(&spec, &op.filters)?;
-    let entries = store::find(
-        db,
-        Find {
-            schema: &op.schema,
-            spec: &spec,
-            range: op.range,
-            agent: op.agent.as_ref().map(Agent::as_str),
-            include_ignored: false,
-            filters: &resolved,
-            order: Order::Oldest,
-            limit: None,
-        },
-    )?;
+    let q = Find {
+        schema: &op.schema,
+        spec: &spec,
+        range: op.range,
+        agent: op.agent.as_ref().map(Agent::as_str),
+        include_ignored: false,
+        filters: &resolved,
+        order: Order::Oldest,
+        limit: None,
+    };
     match op.group {
-        None => {
-            let total: Decimal = entries.iter().filter_map(|e| e.number(&op.field)).sum();
-            Ok(Outcome::Total(Total {
-                field: op.field,
-                value: total,
-            }))
-        }
-        Some(Group::Time(unit)) => grouped_time(&entries, &op.field, unit, tz),
+        None => Ok(Outcome::Total(Total {
+            value: store::sum_total(db, q, &op.field)?,
+            field: op.field,
+        })),
+        Some(Group::Time(unit)) => Ok(Outcome::GroupedTime(GroupedTime {
+            buckets: store::sum_by_time(db, q, &op.field, unit, tz)?,
+            unit,
+        })),
         Some(Group::Link(name)) => {
             if field_named(&spec, &name) {
                 return Err(Error::Fail(Fail::LinkNameCollidesWithField(name)));
             }
-            grouped_link(&entries, &op.field, name)
+            Ok(Outcome::GroupedLink(GroupedLink {
+                buckets: store::sum_by_link(db, q, &op.field, &name)?,
+                name,
+            }))
         }
     }
-}
-
-fn grouped_time(
-    entries: &[Entry],
-    field: &FieldName,
-    unit: crate::spec::TimePeriod,
-    tz: &TimeZone,
-) -> Result<Outcome, Error> {
-    let mut buckets: BTreeMap<Period, Decimal> = BTreeMap::new();
-    for entry in entries {
-        let Some(n) = entry.number(field) else {
-            continue;
-        };
-        let k = time::period(unit, entry.at, tz);
-        *buckets.entry(k).or_insert(Decimal::ZERO) += n;
-    }
-    Ok(Outcome::GroupedTime(GroupedTime {
-        unit,
-        buckets: buckets.into_iter().collect(),
-    }))
-}
-
-fn grouped_link(entries: &[Entry], field: &FieldName, name: LinkName) -> Result<Outcome, Error> {
-    let mut buckets: BTreeMap<Option<EntryRef>, Decimal> = BTreeMap::new();
-    for entry in entries {
-        let Some(n) = entry.number(field) else {
-            continue;
-        };
-        let key = entry
-            .links
-            .iter()
-            .find(|l| l.name == name)
-            .map(|l| l.to.clone());
-        *buckets.entry(key).or_insert(Decimal::ZERO) += n;
-    }
-    Ok(Outcome::GroupedLink(GroupedLink {
-        name,
-        buckets: buckets.into_iter().collect(),
-    }))
 }
 
 fn resolve_filters(spec: &Spec, filters: &[Clause]) -> Result<Vec<Filter>, Error> {

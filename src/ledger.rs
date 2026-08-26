@@ -50,15 +50,6 @@ pub struct Entry {
     pub links: Vec<Link>,
 }
 
-impl Entry {
-    pub fn number(&self, field: &FieldName) -> Option<Decimal> {
-        match self.values.get(field) {
-            Some(FieldValue::Number(n)) => Some(*n),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Schema {
     pub spec: Spec,

@@ -1,13 +1,15 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use rusqlite::OptionalExtension;
+use rust_decimal::Decimal;
 
 use crate::db::Connection;
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, Entry, FieldValue, Filter, Order, Schema, SchemaInfo};
-use crate::spec::{EntryRef, FieldName, FieldType, Link, LinkName, SchemaName, Spec};
+use crate::spec::{EntryRef, FieldName, FieldType, Link, LinkName, SchemaName, Spec, TimePeriod};
 use crate::sql::{SqlVal, instant_from_sql, instant_to_sql, quote_ident, table_name};
-use crate::time::{Range, ToBound};
+use crate::time::{Period, Range, ToBound};
+use jiff::tz::TimeZone;
 
 pub struct Find<'a> {
     pub schema: &'a SchemaName,
@@ -105,6 +107,123 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
         quote_ident(&table_name(q.schema))
     );
     let mut bind: Vec<SqlVal> = Vec::new();
+    apply_find_filters(&mut sql, &mut bind, &q)?;
+    match q.order {
+        Order::Oldest => sql.push_str(" ORDER BY at ASC, id ASC"),
+        Order::Newest => sql.push_str(" ORDER BY at DESC, id DESC"),
+    }
+    if let Some(limit) = q.limit {
+        sql.push_str(&format!(" LIMIT {limit}"));
+    }
+    let mut entries = {
+        let mut stmt = conn.as_ref().prepare(&sql)?;
+        let col_count = stmt.column_count();
+        let names: Vec<String> = (0..col_count)
+            .map(|i| stmt.column_name(i).unwrap_or("").to_string())
+            .collect();
+        let mut raw = stmt.query(rusqlite::params_from_iter(
+            bind.iter().map(SqlVal::as_param),
+        ))?;
+        let mut entries = Vec::new();
+        while let Some(r) = raw.next()? {
+            entries.push(read_entry(q.spec, &names, r)?);
+        }
+        entries
+    };
+    attach_links(conn, q.schema, &mut entries)?;
+    Ok(entries)
+}
+
+pub fn sum_total(conn: &impl Connection, q: Find<'_>, field: &FieldName) -> Result<Decimal, Error> {
+    let col = quote_ident(field.as_str());
+    let mut sql = format!(
+        "SELECT bottle_dec_sum({col}) FROM {} WHERE 1=1",
+        quote_ident(&table_name(q.schema))
+    );
+    let mut bind = Vec::new();
+    apply_find_filters(&mut sql, &mut bind, &q)?;
+    let raw: String = conn.as_ref().query_row(
+        &sql,
+        rusqlite::params_from_iter(bind.iter().map(SqlVal::as_param)),
+        |row| row.get(0),
+    )?;
+    Ok(raw.parse()?)
+}
+
+pub fn sum_by_time(
+    conn: &impl Connection,
+    q: Find<'_>,
+    field: &FieldName,
+    unit: TimePeriod,
+    tz: &TimeZone,
+) -> Result<Vec<(Period, Decimal)>, Error> {
+    let col = quote_ident(field.as_str());
+    let mut sql = format!(
+        "SELECT at, {col} FROM {} WHERE 1=1",
+        quote_ident(&table_name(q.schema))
+    );
+    let mut bind = Vec::new();
+    apply_find_filters(&mut sql, &mut bind, &q)?;
+    sql.push_str(&format!(" AND {col} IS NOT NULL AND {col} != ''"));
+    let mut stmt = conn.as_ref().prepare(&sql)?;
+    let mut raw = stmt.query(rusqlite::params_from_iter(
+        bind.iter().map(SqlVal::as_param),
+    ))?;
+    let mut buckets: BTreeMap<Period, Decimal> = BTreeMap::new();
+    while let Some(r) = raw.next()? {
+        let at_raw: String = r.get(0)?;
+        let n_raw: String = r.get(1)?;
+        let n: Decimal = n_raw.parse()?;
+        let k = crate::time::period(unit, instant_from_sql(at_raw)?, tz);
+        *buckets.entry(k).or_insert(Decimal::ZERO) += n;
+    }
+    Ok(buckets.into_iter().collect())
+}
+
+pub fn sum_by_link(
+    conn: &impl Connection,
+    q: Find<'_>,
+    field: &FieldName,
+    name: &LinkName,
+) -> Result<Vec<(Option<EntryRef>, Decimal)>, Error> {
+    let col = quote_ident(field.as_str());
+    let table = quote_ident(&table_name(q.schema));
+    let mut inner = format!("SELECT id, {col} AS n FROM {table} WHERE 1=1");
+    let mut bind = Vec::new();
+    apply_find_filters(&mut inner, &mut bind, &q)?;
+    inner.push_str(&format!(" AND {col} IS NOT NULL AND {col} != ''"));
+    bind.push(SqlVal::Text(q.schema.to_string()));
+    bind.push(SqlVal::Text(name.to_string()));
+    let a = bind.len() - 1;
+    let sql = format!(
+        "SELECT l.to_schema, l.to_id, bottle_dec_sum(x.n) FROM ({inner}) x
+         LEFT JOIN links l ON l.from_schema = ?{a} AND l.from_id = x.id AND l.name = ?{}
+         GROUP BY l.to_schema, l.to_id",
+        a + 1
+    );
+    let mut stmt = conn.as_ref().prepare(&sql)?;
+    let mut raw = stmt.query(rusqlite::params_from_iter(
+        bind.iter().map(SqlVal::as_param),
+    ))?;
+    let mut buckets: BTreeMap<Option<EntryRef>, Decimal> = BTreeMap::new();
+    while let Some(r) = raw.next()? {
+        let to_schema: Option<String> = r.get(0)?;
+        let to_id: Option<i64> = r.get(1)?;
+        let total: String = r.get(2)?;
+        let key = match (to_schema, to_id) {
+            (Some(schema), Some(id)) => {
+                let schema = SchemaName::parse(&schema)
+                    .map_err(|_| Error::Fail(Fail::CorruptLinkSchema(schema.clone())))?;
+                Some(EntryRef { schema, id })
+            }
+            _ => None,
+        };
+        buckets.insert(key, total.parse()?);
+    }
+    Ok(buckets.into_iter().collect())
+}
+
+fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) -> Result<(), Error> {
     if !q.include_ignored {
         sql.push_str(" AND ignored = 0");
     }
@@ -164,30 +283,7 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
             }
         }
     }
-    match q.order {
-        Order::Oldest => sql.push_str(" ORDER BY at ASC, id ASC"),
-        Order::Newest => sql.push_str(" ORDER BY at DESC, id DESC"),
-    }
-    if let Some(limit) = q.limit {
-        sql.push_str(&format!(" LIMIT {limit}"));
-    }
-    let mut entries = {
-        let mut stmt = conn.as_ref().prepare(&sql)?;
-        let col_count = stmt.column_count();
-        let names: Vec<String> = (0..col_count)
-            .map(|i| stmt.column_name(i).unwrap_or("").to_string())
-            .collect();
-        let mut raw = stmt.query(rusqlite::params_from_iter(
-            bind.iter().map(SqlVal::as_param),
-        ))?;
-        let mut entries = Vec::new();
-        while let Some(r) = raw.next()? {
-            entries.push(read_entry(q.spec, &names, r)?);
-        }
-        entries
-    };
-    attach_links(conn, q.schema, &mut entries)?;
-    Ok(entries)
+    Ok(())
 }
 
 fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<Entry, Error> {

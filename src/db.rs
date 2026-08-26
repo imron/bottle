@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use rusqlite::Connection as Sqlite;
 use rusqlite::TransactionBehavior;
-use rusqlite::functions::FunctionFlags;
+use rusqlite::functions::{Aggregate, FunctionFlags};
 use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
@@ -144,7 +144,50 @@ fn register_functions(conn: &Sqlite) -> Result<(), Error> {
                 .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))
         },
     )?;
+    conn.create_aggregate_function(
+        "bottle_dec_sum",
+        1,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        DecSum,
+    )?;
     Ok(())
+}
+
+struct DecSum;
+
+impl Aggregate<Decimal, String> for DecSum {
+    fn init(&self, _ctx: &mut rusqlite::functions::Context<'_>) -> rusqlite::Result<Decimal> {
+        Ok(Decimal::ZERO)
+    }
+
+    fn step(
+        &self,
+        ctx: &mut rusqlite::functions::Context<'_>,
+        acc: &mut Decimal,
+    ) -> rusqlite::Result<()> {
+        let v: Option<String> = ctx.get(0)?;
+        *acc = dec_add(*acc, v.as_deref())
+            .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))?;
+        Ok(())
+    }
+
+    fn finalize(
+        &self,
+        _ctx: &mut rusqlite::functions::Context<'_>,
+        acc: Option<Decimal>,
+    ) -> rusqlite::Result<String> {
+        Ok(acc.unwrap_or(Decimal::ZERO).to_string())
+    }
+}
+
+fn dec_add(acc: Decimal, raw: Option<&str>) -> Result<Decimal, Error> {
+    let Some(raw) = raw else {
+        return Ok(acc);
+    };
+    if raw.is_empty() {
+        return Ok(acc);
+    }
+    Ok(acc + raw.parse::<Decimal>()?)
 }
 
 fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
@@ -188,5 +231,17 @@ mod tests {
     #[test]
     fn rejects_invalid_number() {
         assert!(dec_eq(Some("nope"), Some("1")).is_err());
+    }
+
+    #[test]
+    fn sum_skips_null_and_empty() {
+        assert_eq!(dec_add(Decimal::ZERO, None).unwrap(), Decimal::ZERO);
+        assert_eq!(dec_add(Decimal::ZERO, Some("")).unwrap(), Decimal::ZERO);
+        assert_eq!(
+            dec_add("39.6".parse().unwrap(), Some("10"))
+                .unwrap()
+                .to_string(),
+            "49.6"
+        );
     }
 }
