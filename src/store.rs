@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rusqlite::{OptionalExtension, params};
+use rusqlite::OptionalExtension;
 
 use crate::db::Connection;
 use crate::error::{Error, Fail};
@@ -83,16 +83,20 @@ pub fn get_entry(
         "SELECT * FROM {} WHERE id = ?1",
         quote_ident(&table_name(schema))
     );
-    let mut stmt = conn.as_ref().prepare(&sql)?;
-    let col_count = stmt.column_count();
-    let names: Vec<String> = (0..col_count)
-        .map(|i| stmt.column_name(i).unwrap_or("").to_string())
-        .collect();
-    let mut raw = stmt.query([id])?;
-    match raw.next()? {
-        Some(r) => Ok(Some(read_entry(conn, schema, spec, &names, r)?)),
-        None => Ok(None),
-    }
+    let mut entry = {
+        let mut stmt = conn.as_ref().prepare(&sql)?;
+        let col_count = stmt.column_count();
+        let names: Vec<String> = (0..col_count)
+            .map(|i| stmt.column_name(i).unwrap_or("").to_string())
+            .collect();
+        let mut raw = stmt.query([id])?;
+        match raw.next()? {
+            Some(r) => read_entry(spec, &names, r)?,
+            None => return Ok(None),
+        }
+    };
+    attach_links(conn, schema, std::slice::from_mut(&mut entry))?;
+    Ok(Some(entry))
 }
 
 pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
@@ -167,28 +171,26 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     if let Some(limit) = q.limit {
         sql.push_str(&format!(" LIMIT {limit}"));
     }
-    let mut stmt = conn.as_ref().prepare(&sql)?;
-    let col_count = stmt.column_count();
-    let names: Vec<String> = (0..col_count)
-        .map(|i| stmt.column_name(i).unwrap_or("").to_string())
-        .collect();
-    let mut raw = stmt.query(rusqlite::params_from_iter(
-        bind.iter().map(SqlVal::as_param),
-    ))?;
-    let mut entries = Vec::new();
-    while let Some(r) = raw.next()? {
-        entries.push(read_entry(conn, q.schema, q.spec, &names, r)?);
-    }
+    let mut entries = {
+        let mut stmt = conn.as_ref().prepare(&sql)?;
+        let col_count = stmt.column_count();
+        let names: Vec<String> = (0..col_count)
+            .map(|i| stmt.column_name(i).unwrap_or("").to_string())
+            .collect();
+        let mut raw = stmt.query(rusqlite::params_from_iter(
+            bind.iter().map(SqlVal::as_param),
+        ))?;
+        let mut entries = Vec::new();
+        while let Some(r) = raw.next()? {
+            entries.push(read_entry(q.spec, &names, r)?);
+        }
+        entries
+    };
+    attach_links(conn, q.schema, &mut entries)?;
     Ok(entries)
 }
 
-fn read_entry(
-    conn: &impl Connection,
-    schema: &SchemaName,
-    spec: &Spec,
-    names: &[String],
-    r: &rusqlite::Row<'_>,
-) -> Result<Entry, Error> {
+fn read_entry(spec: &Spec, names: &[String], r: &rusqlite::Row<'_>) -> Result<Entry, Error> {
     let mut values = HashMap::new();
     let mut id = 0_i64;
     let mut at_raw = String::new();
@@ -253,30 +255,45 @@ fn read_entry(
         agent: agent.map(Agent::new),
         ignored,
         values,
-        links: load_links(conn, schema, id)?,
+        links: Vec::new(),
     })
 }
 
-fn load_links(conn: &impl Connection, schema: &SchemaName, id: i64) -> Result<Vec<Link>, Error> {
-    let mut stmt = conn.as_ref().prepare(
-        "SELECT name, to_schema, to_id FROM links
-         WHERE from_schema = ?1 AND from_id = ?2
-         ORDER BY name",
-    )?;
-    let rows = stmt.query_map(params![schema.as_str(), id], |row| {
-        let name: String = row.get(0)?;
-        let to_schema: String = row.get(1)?;
-        let to_id: i64 = row.get(2)?;
-        Ok((name, to_schema, to_id))
-    })?;
-    let mut out = Vec::new();
-    for row in rows {
-        let (name, to_schema, to_id) = row?;
+fn attach_links(
+    conn: &impl Connection,
+    schema: &SchemaName,
+    entries: &mut [Entry],
+) -> Result<(), Error> {
+    if entries.is_empty() {
+        return Ok(());
+    }
+    let mut sql = String::from(
+        "SELECT from_id, name, to_schema, to_id FROM links WHERE from_schema = ?1 AND from_id IN (",
+    );
+    let mut bind = vec![SqlVal::Text(schema.to_string())];
+    for (i, entry) in entries.iter().enumerate() {
+        if i > 0 {
+            sql.push_str(", ");
+        }
+        bind.push(SqlVal::Int(entry.id));
+        sql.push_str(&format!("?{}", bind.len()));
+    }
+    sql.push_str(") ORDER BY from_id, name");
+    let mut stmt = conn.as_ref().prepare(&sql)?;
+    let mut raw = stmt.query(rusqlite::params_from_iter(
+        bind.iter().map(SqlVal::as_param),
+    ))?;
+    let mut by_id: HashMap<i64, Vec<Link>> = HashMap::new();
+    while let Some(r) = raw.next()? {
+        let from_id: i64 = r.get(0)?;
+        let name: String = r.get(1)?;
+        let to_schema: String = r.get(2)?;
+        let to_id: i64 = r.get(3)?;
         let name =
             LinkName::parse(&name).map_err(|_| Error::Fail(Fail::CorruptLinkName(name.clone())))?;
         let to_schema = SchemaName::parse(&to_schema)
             .map_err(|_| Error::Fail(Fail::CorruptLinkSchema(to_schema.clone())))?;
-        out.push(Link {
+        by_id.entry(from_id).or_default().push(Link {
             name,
             to: EntryRef {
                 schema: to_schema,
@@ -284,5 +301,8 @@ fn load_links(conn: &impl Connection, schema: &SchemaName, id: i64) -> Result<Ve
             },
         });
     }
-    Ok(out)
+    for entry in entries {
+        entry.links = by_id.remove(&entry.id).unwrap_or_default();
+    }
+    Ok(())
 }
