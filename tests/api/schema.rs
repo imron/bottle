@@ -67,24 +67,26 @@ fn add_accepts_one_segment_and_many() {
 }
 
 #[test]
-fn add_rejects_underscore_in_schema() {
+fn add_underscore_is_the_dotted_name() {
     let mut h = harness();
-    for name in ["foo_bar", "foo.bar_baz", "a_b"] {
-        let file = h.yaml_file(&format!("{name}.yaml"), MEAL);
-        let err = h
-            .run(Cmd::SchemaAdd(cmd::SchemaAdd {
-                name: name.into(),
-                file,
-            }))
-            .unwrap_err();
-        assert_fail(err, "invalid schema name");
-    }
+    h.add_schema("foo.bar", MEAL);
+    let file = h.yaml_file("again.yaml", MEAL);
+    let err = h
+        .run(Cmd::SchemaAdd(cmd::SchemaAdd {
+            name: "foo_bar".into(),
+            file,
+        }))
+        .unwrap_err();
+    assert_fail(err, "exists");
+    let list = h.run_ok(Cmd::SchemaList);
+    assert!(list.contains("foo.bar\tfalse"));
+    assert!(!list.contains("foo_bar"));
 }
 
 #[test]
 fn add_rejects_empty_segments() {
     let mut h = harness();
-    for name in ["meal.", ".meal", "foo..bar"] {
+    for name in ["meal.", ".meal", "foo..bar", "foo__bar"] {
         let file = h.yaml_file(&format!("{name}.yaml"), MEAL);
         let err = h
             .run(Cmd::SchemaAdd(cmd::SchemaAdd {
@@ -437,22 +439,22 @@ fn yaml_canonicalize_rejects() {
             "duplicate field",
         ),
         (
-            "enum-none",
+            "enum_none",
             "fields:\n  - name: when\n    type: enum\n    required: true\n",
             "needs values",
         ),
         (
-            "enum-dup",
+            "enum_dup",
             "fields:\n  - name: when\n    type: enum\n    required: true\n    values: [A, a]\n",
             "duplicate enum value",
         ),
         (
-            "text-values",
+            "text_values",
             "fields:\n  - name: what\n    type: text\n    required: false\n    values: [x]\n",
             "only apply to enum",
         ),
         (
-            "empty-enum",
+            "empty_enum",
             "fields:\n  - name: when\n    type: enum\n    required: true\n    values: ['']\n",
             "empty enum value",
         ),
@@ -460,7 +462,7 @@ fn yaml_canonicalize_rejects() {
         let file = h.yaml_file(&format!("{name}.yaml"), yaml);
         let err = h
             .run(Cmd::SchemaAdd(cmd::SchemaAdd {
-                name: name.replace('-', "."),
+                name: name.into(),
                 file,
             }))
             .unwrap_err();

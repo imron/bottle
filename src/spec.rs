@@ -141,8 +141,9 @@ pub struct SchemaName(String);
 
 impl SchemaName {
     pub fn parse(s: &str) -> Result<Self, Error> {
-        if is_schema_name(s) {
-            Ok(Self(s.to_string()))
+        let folded = s.replace('_', ".");
+        if is_schema_name(&folded) {
+            Ok(Self(folded))
         } else {
             Err(Error::Fail(Fail::InvalidSchemaName(s.to_string())))
         }

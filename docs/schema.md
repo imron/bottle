@@ -7,9 +7,9 @@ type.
 ## One table per schema
 
 Each type has its own columns. `schema add nutrition.meal`
-creates `nutrition_meal`. Dots in the schema name become
-underscores in the table name. Schema segments may not
-contain `_`, so that mapping cannot collide.
+creates `nutrition_meal`. `_` in a schema name is `.`
+(`nutrition_meal` is `nutrition.meal`). The stored name
+uses dots. The table name uses underscores.
 
 ```sql
 CREATE TABLE schemas (
@@ -145,9 +145,10 @@ Types: `text`, `number`, `enum`.
 - Field names: `^[a-z][a-z0-9_]*$`.
 - Schema names: one or more segments joined by `.`
   (`meal`, `nutrition.meal`, `fitness.strength.set`).
-  Each segment is `^[a-z][a-z0-9]*$` (no `_`). Empty
-  segments are rejected (`meal.`, `.meal`, `foo..bar`).
-  Dots are a namespace convention only.
+  Each segment is `^[a-z][a-z0-9]*$`. `_` is accepted as
+  `.` (`nutrition_meal` is `nutrition.meal`). Empty
+  segments are rejected (`meal.`, `.meal`, `foo..bar`,
+  `foo__bar`). Dots are a namespace convention only.
 - Link names use the field-name regex. A link name may not
   be a field on that schema, and may not be reserved.
 - Reserved: `id`, `at`, `agent`, `ignored`, `links`.

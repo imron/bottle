@@ -18,9 +18,10 @@ entries of that type.
 `<name>` is one or more lowercase segments separated by
 dots, for example `meal`, `nutrition.meal`, or
 `fitness.strength.set`. Each segment is
-`^[a-z][a-z0-9]*$` (no `_`). Empty segments are not
-allowed (`meal.`, `.meal`, `foo..bar`). It must not
-already exist.
+`^[a-z][a-z0-9]*$`. `_` is `.` (`nutrition_meal` is
+`nutrition.meal`). Empty segments are not allowed
+(`meal.`, `.meal`, `foo..bar`). It must not already
+exist.
 
 The YAML is a field list:
 
