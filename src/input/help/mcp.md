@@ -41,6 +41,10 @@ unless that entry overrides them.
 `links` is an object of name to `schema/id`. `unlink` is a
 list of names.
 
+Field values are strings or JSON numbers. The number's
+text is what `log` would take on the CLI. `null` is an
+empty cell. Booleans and nested objects are rejected.
+
 ## See also
 
 overview, log, help

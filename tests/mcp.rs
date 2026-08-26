@@ -79,6 +79,25 @@ async fn proto_err(
     }
 }
 
+async fn param_err(
+    client: &RunningService<RoleClient, ()>,
+    name: &'static str,
+    args: rmcp::model::JsonObject,
+) -> String {
+    match client.call_tool(params(name, args)).await {
+        Err(ServiceError::McpError(err)) => err.to_string(),
+        Err(err) => panic!("{name}: expected param error, got {err}"),
+        Ok(result) => {
+            let body = text_of(&result);
+            assert!(
+                result.is_error == Some(true) || body.contains("deserialize"),
+                "{name}: expected param error, got {body}"
+            );
+            body
+        }
+    }
+}
+
 const MEAL: &str = r#"
 fields:
   - name: when
@@ -294,7 +313,7 @@ async fn mcp_tools_cover_the_surface() {
                 "what": "eggs",
                 "kcal": 568,
                 "fat": null,
-                "note": true,
+                "note": "hi",
                 "extra": 0
             }
         }),
@@ -641,8 +660,11 @@ async fn mcp_rejects_bad_field_type_and_value_shape() {
         }),
     )
     .await;
-    assert!(bad_type.contains("unknown type"), "{bad_type}");
-    let bad_cell = proto_err(
+    assert!(
+        bad_type.contains("nope") && (bad_type.contains("unknown") || bad_type.contains("variant")),
+        "{bad_type}"
+    );
+    let bad_cell = param_err(
         &client,
         "log",
         rmcp::object!({
@@ -651,8 +673,15 @@ async fn mcp_rejects_bad_field_type_and_value_shape() {
         }),
     )
     .await;
-    assert!(
-        bad_cell.contains("strings, numbers, or booleans"),
-        "{bad_cell}"
-    );
+    assert!(bad_cell.contains("strings or numbers"), "{bad_cell}");
+    let bad_bool = param_err(
+        &client,
+        "log",
+        rmcp::object!({
+            "schema": "nutrition.meal",
+            "fields": { "when": true }
+        }),
+    )
+    .await;
+    assert!(bad_bool.contains("strings or numbers"), "{bad_bool}");
 }

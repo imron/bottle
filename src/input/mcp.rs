@@ -12,8 +12,55 @@ use serde::Deserialize;
 
 use crate::error::{Error, Fail};
 use crate::input::cmd;
-use crate::spec::FieldType;
 use crate::{Bottle, Cmd};
+
+fn pairs(map: HashMap<String, String>) -> Vec<(String, String)> {
+    map.into_iter().collect()
+}
+
+#[derive(Debug, schemars::JsonSchema)]
+#[serde(untagged)]
+enum FieldCell {
+    String(String),
+    Number(serde_json::Number),
+    Null,
+}
+
+impl<'de> Deserialize<'de> for FieldCell {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        match value {
+            serde_json::Value::String(s) => Ok(Self::String(s)),
+            serde_json::Value::Number(n) => Ok(Self::Number(n)),
+            serde_json::Value::Null => Ok(Self::Null),
+            _ => Err(serde::de::Error::custom(
+                "field values must be strings or numbers",
+            )),
+        }
+    }
+}
+
+fn cells(map: HashMap<String, FieldCell>) -> Vec<(String, String)> {
+    map.into_iter()
+        .map(|(k, v)| {
+            let value = match v {
+                FieldCell::String(s) => s,
+                FieldCell::Number(n) => n.to_string(),
+                FieldCell::Null => String::new(),
+            };
+            (k, value)
+        })
+        .collect()
+}
+
+fn filters(p: FilterParams) -> cmd::Filters {
+    cmd::Filters {
+        schema: p.schema,
+        agent: p.agent,
+        wheres: pairs(p.wheres),
+        links: pairs(p.links),
+    }
+}
 
 #[derive(Clone)]
 struct Server {
@@ -45,32 +92,6 @@ fn tool_result(result: Result<String, Error>) -> Result<CallToolResult, McpError
     }
 }
 
-fn pairs(map: HashMap<String, String>) -> Vec<(String, String)> {
-    map.into_iter().collect()
-}
-
-fn cells(map: HashMap<String, serde_json::Value>) -> Result<Vec<(String, String)>, McpError> {
-    map.into_iter().map(|(k, v)| Ok((k, cell(&v)?))).collect()
-}
-
-fn cell(value: &serde_json::Value) -> Result<String, McpError> {
-    match value {
-        serde_json::Value::String(s) => Ok(s.clone()),
-        serde_json::Value::Number(n) => Ok(n.to_string()),
-        serde_json::Value::Bool(b) => Ok(b.to_string()),
-        serde_json::Value::Null => Ok(String::new()),
-        _ => Err(McpError::invalid_params(
-            "field values must be strings, numbers, or booleans",
-            None,
-        )),
-    }
-}
-
-fn field_type(raw: &str) -> Result<FieldType, McpError> {
-    raw.parse()
-        .map_err(|e: String| McpError::invalid_params(e, None))
-}
-
 impl Server {
     fn run(&self, cmd: Cmd) -> Result<CallToolResult, McpError> {
         let mut bottle = self
@@ -82,11 +103,13 @@ impl Server {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct HelpParams {
     command: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SchemaShowParams {
     name: String,
     #[serde(default)]
@@ -94,12 +117,14 @@ struct SchemaShowParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SchemaAddParams {
     name: String,
     file: String,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SchemaAddFieldParams {
     schema: String,
     name: String,
@@ -110,6 +135,7 @@ struct SchemaAddFieldParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SchemaAddValueParams {
     schema: String,
     field: String,
@@ -117,6 +143,7 @@ struct SchemaAddValueParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SchemaNameParams {
     name: String,
 }
@@ -127,21 +154,23 @@ struct LogEntry {
     agent: Option<String>,
     links: Option<HashMap<String, String>>,
     #[serde(flatten)]
-    fields: HashMap<String, serde_json::Value>,
+    fields: HashMap<String, FieldCell>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct LogParams {
     schema: String,
     at: Option<String>,
     agent: Option<String>,
     #[serde(default)]
     links: HashMap<String, String>,
-    fields: Option<HashMap<String, serde_json::Value>>,
+    fields: Option<HashMap<String, FieldCell>>,
     entries: Option<Vec<LogEntry>>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct LsParams {
     schema: String,
     from: Option<String>,
@@ -156,12 +185,14 @@ struct LsParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct IdParams {
     schema: String,
     id: i64,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SumParams {
     schema: String,
     field: String,
@@ -176,6 +207,7 @@ struct SumParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct FilterParams {
     schema: String,
     agent: Option<String>,
@@ -186,6 +218,7 @@ struct FilterParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct AmendParams {
     schema: String,
     id: i64,
@@ -196,7 +229,7 @@ struct AmendParams {
     #[serde(default)]
     unlink: Vec<String>,
     #[serde(default)]
-    fields: HashMap<String, serde_json::Value>,
+    fields: HashMap<String, FieldCell>,
 }
 
 #[tool_router]
@@ -241,7 +274,10 @@ impl Server {
         self.run(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
             schema: p.schema,
             name: p.name,
-            type_: field_type(&p.type_)?,
+            type_: p
+                .type_
+                .parse()
+                .map_err(|e: String| McpError::invalid_params(e, None))?,
             values: p.values,
             default: p.default,
         })))
@@ -295,7 +331,7 @@ impl Server {
                 at: p.at,
                 agent: p.agent,
                 links: pairs(p.links),
-                fields: cells(fields)?,
+                fields: cells(fields),
             })),
             (None, Some(entries)) => {
                 if entries.is_empty() {
@@ -308,7 +344,7 @@ impl Server {
                         at: entry.at.or_else(|| p.at.clone()),
                         agent: entry.agent.or_else(|| p.agent.clone()),
                         links: pairs(entry.links.unwrap_or_else(|| p.links.clone())),
-                        fields: cells(entry.fields)?,
+                        fields: cells(entry.fields),
                     });
                 }
                 self.run(Cmd::Logs(logs))
@@ -357,22 +393,12 @@ impl Server {
 
     #[tool(description = "Print the most recent entry of a schema")]
     fn last(&self, Parameters(p): Parameters<FilterParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Last(cmd::Filters {
-            schema: p.schema,
-            agent: p.agent,
-            wheres: pairs(p.wheres),
-            links: pairs(p.links),
-        }))
+        self.run(Cmd::Last(filters(p)))
     }
 
     #[tool(description = "List entries for the current civil day")]
     fn today(&self, Parameters(p): Parameters<FilterParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Today(cmd::Filters {
-            schema: p.schema,
-            agent: p.agent,
-            wheres: pairs(p.wheres),
-            links: pairs(p.links),
-        }))
+        self.run(Cmd::Today(filters(p)))
     }
 
     #[tool(description = "Change an existing entry in place")]
@@ -384,7 +410,7 @@ impl Server {
             agent: p.agent,
             links: pairs(p.links),
             unlinks: p.unlink,
-            fields: cells(p.fields)?,
+            fields: cells(p.fields),
         }))
     }
 
@@ -402,5 +428,16 @@ impl ServerHandler for Server {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(include_str!("help/mcp.md"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn json_number_keeps_decimal_text() {
+        let n: serde_json::Number = serde_json::from_str("1.10").unwrap();
+        assert_eq!(n.to_string(), "1.10");
+        let n: serde_json::Number = serde_json::from_str("9007199254740993").unwrap();
+        assert_eq!(n.to_string(), "9007199254740993");
     }
 }
