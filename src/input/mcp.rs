@@ -67,15 +67,8 @@ fn cell(value: &serde_json::Value) -> Result<String, McpError> {
 }
 
 fn field_type(raw: &str) -> Result<FieldType, McpError> {
-    match raw {
-        "text" => Ok(FieldType::Text),
-        "number" => Ok(FieldType::Number),
-        "enum" => Ok(FieldType::Enum),
-        other => Err(McpError::invalid_params(
-            format!("unknown type: {other}"),
-            None,
-        )),
-    }
+    raw.parse()
+        .map_err(|e: String| McpError::invalid_params(e, None))
 }
 
 impl Server {

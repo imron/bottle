@@ -56,15 +56,6 @@ fn parse_kv(s: &str) -> Result<(String, String), String> {
     }
 }
 
-fn parse_field_type(s: &str) -> Result<FieldType, String> {
-    match s {
-        "text" => Ok(FieldType::Text),
-        "number" => Ok(FieldType::Number),
-        "enum" => Ok(FieldType::Enum),
-        other => Err(format!("unknown type: {other}")),
-    }
-}
-
 fn parse_values(s: &str) -> Result<Vec<String>, std::convert::Infallible> {
     Ok(s.split(',').map(str::to_string).collect())
 }
@@ -120,7 +111,7 @@ enum SchemaCommand {
         schema: String,
         #[arg(long)]
         name: String,
-        #[arg(long = "type", value_parser = parse_field_type)]
+        #[arg(long = "type")]
         type_: FieldType,
         #[arg(long, value_parser = parse_values)]
         values: Option<Vec<String>>,

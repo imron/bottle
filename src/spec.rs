@@ -112,6 +112,29 @@ pub enum FieldType {
     Enum,
 }
 
+impl std::fmt::Display for FieldType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Text => "text",
+            Self::Number => "number",
+            Self::Enum => "enum",
+        })
+    }
+}
+
+impl std::str::FromStr for FieldType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "text" => Ok(Self::Text),
+            "number" => Ok(Self::Number),
+            "enum" => Ok(Self::Enum),
+            other => Err(format!("unknown type: {other}")),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct SpecDoc {
     fields: Vec<FieldDoc>,
