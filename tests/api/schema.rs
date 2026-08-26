@@ -67,6 +67,32 @@ fn add_accepts_one_segment_and_many() {
 }
 
 #[test]
+fn add_catalog_names_are_usable() {
+    let mut h = harness();
+    h.add_schema("links", SESSION);
+    h.add_schema("schemas", SESSION);
+    h.log(
+        "links",
+        &[("title", "x")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    let list = h.run_ok(Cmd::SchemaList);
+    assert!(list.contains("links\tfalse"));
+    assert!(list.contains("schemas\tfalse"));
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        schema: "links".into(),
+        from: None,
+        to: None,
+        agent: None,
+        wheres: vec![],
+        include_ignored: false,
+    }));
+    let lines = tsv_lines(&ls);
+    assert_eq!(lines[1][3], "x");
+}
+
+#[test]
 fn add_underscore_is_the_dotted_name() {
     let mut h = harness();
     h.add_schema("foo.bar", MEAL);

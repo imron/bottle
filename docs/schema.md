@@ -7,9 +7,9 @@ type.
 ## One table per schema
 
 Each type has its own columns. `schema add nutrition.meal`
-creates `nutrition_meal`. `_` in a schema name is `.`
+creates `entry_nutrition_meal`. `_` in a schema name is `.`
 (`nutrition_meal` is `nutrition.meal`). The stored name
-uses dots. The table name uses underscores.
+uses dots. The table name is `entry_` plus underscores.
 
 ```sql
 CREATE TABLE schemas (
@@ -38,7 +38,7 @@ fields from the spec, in spec order. Links are not columns.
 They live in a side table.
 
 ```sql
-CREATE TABLE fitness_set (
+CREATE TABLE entry_fitness_set (
   id       INTEGER PRIMARY KEY,
   at       TEXT NOT NULL,
   agent    TEXT,
@@ -55,8 +55,8 @@ CREATE TABLE fitness_set (
 Numbers are `TEXT` decimals. Enums are `TEXT` checked on
 write.
 
-`id` is per table. `fitness_set.id = 7` is not
-`fitness_session.id = 7`.
+`id` is per table. `entry_fitness_set.id = 7` is not
+`entry_fitness_session.id = 7`.
 
 ## Links
 

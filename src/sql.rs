@@ -39,7 +39,7 @@ pub fn sql_type(t: FieldType) -> &'static str {
 }
 
 pub fn table_name(schema: &SchemaName) -> String {
-    schema.as_str().replace('.', "_")
+    format!("entry_{}", schema.as_str().replace('.', "_"))
 }
 
 pub fn quote_ident(name: &str) -> String {
