@@ -11,7 +11,7 @@ use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, Entries, Entry, FieldInput, FieldValue, Get, GroupedLink, GroupedTime, Ignore,
     Last, List, Log, Op, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop,
-    SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Today, Total,
+    SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Today, Total,
 };
 use crate::spec::{
     EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier, Link,
@@ -168,11 +168,8 @@ fn log(cmd: cmd::Log, tz: &TimeZone) -> Result<Log, Error> {
 
 fn ls(cmd: cmd::Ls, tz: &TimeZone) -> Result<List, Error> {
     Ok(List {
-        schema: SchemaName::parse(&cmd.schema)?,
+        scope: scope(cmd.schema, cmd.agent, cmd.wheres, cmd.links)?,
         range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
-        agent: parse_agent(cmd.agent)?,
-        fields: parse_wheres(cmd.wheres)?,
-        links: parse_links(cmd.links)?,
         include_ignored: cmd.include_ignored,
     })
 }
@@ -186,31 +183,36 @@ fn get(cmd: cmd::Get) -> Result<Get, Error> {
 
 fn sum(cmd: cmd::Sum, tz: &TimeZone) -> Result<Sum, Error> {
     Ok(Sum {
-        schema: SchemaName::parse(&cmd.schema)?,
+        scope: scope(cmd.schema, cmd.agent, cmd.wheres, cmd.links)?,
         field: FieldName::parse(&cmd.field)?,
         range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
-        agent: parse_agent(cmd.agent)?,
-        fields: parse_wheres(cmd.wheres)?,
-        links: parse_links(cmd.links)?,
         group: cmd.group.as_deref().map(Group::parse).transpose()?,
     })
 }
 
 fn last(cmd: cmd::Last) -> Result<Last, Error> {
     Ok(Last {
-        schema: SchemaName::parse(&cmd.schema)?,
-        agent: parse_agent(cmd.agent)?,
-        fields: parse_wheres(cmd.wheres)?,
-        links: parse_links(cmd.links)?,
+        scope: scope(cmd.schema, cmd.agent, cmd.wheres, cmd.links)?,
     })
 }
 
 fn today(cmd: cmd::Today) -> Result<Today, Error> {
     Ok(Today {
-        schema: SchemaName::parse(&cmd.schema)?,
-        agent: parse_agent(cmd.agent)?,
-        fields: parse_wheres(cmd.wheres)?,
-        links: parse_links(cmd.links)?,
+        scope: scope(cmd.schema, cmd.agent, cmd.wheres, cmd.links)?,
+    })
+}
+
+fn scope(
+    schema: String,
+    agent: Option<String>,
+    wheres: Vec<(String, String)>,
+    links: Vec<(String, String)>,
+) -> Result<Scope, Error> {
+    Ok(Scope {
+        schema: SchemaName::parse(&schema)?,
+        agent: parse_agent(agent)?,
+        fields: parse_wheres(wheres)?,
+        links: parse_links(links)?,
     })
 }
 

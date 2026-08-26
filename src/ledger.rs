@@ -168,12 +168,17 @@ pub struct Log {
 }
 
 #[derive(Debug, Clone)]
-pub struct List {
+pub struct Scope {
     pub schema: SchemaName,
-    pub range: Range,
     pub agent: Option<Agent>,
     pub fields: Vec<FieldInput>,
     pub links: Vec<Link>,
+}
+
+#[derive(Debug, Clone)]
+pub struct List {
+    pub scope: Scope,
+    pub range: Range,
     pub include_ignored: bool,
 }
 
@@ -185,29 +190,20 @@ pub struct Get {
 
 #[derive(Debug, Clone)]
 pub struct Sum {
-    pub schema: SchemaName,
+    pub scope: Scope,
     pub field: FieldName,
     pub range: Range,
-    pub agent: Option<Agent>,
-    pub fields: Vec<FieldInput>,
-    pub links: Vec<Link>,
     pub group: Option<Group>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Last {
-    pub schema: SchemaName,
-    pub agent: Option<Agent>,
-    pub fields: Vec<FieldInput>,
-    pub links: Vec<Link>,
+    pub scope: Scope,
 }
 
 #[derive(Debug, Clone)]
 pub struct Today {
-    pub schema: SchemaName,
-    pub agent: Option<Agent>,
-    pub fields: Vec<FieldInput>,
-    pub links: Vec<Link>,
+    pub scope: Scope,
 }
 
 #[derive(Debug, Clone)]

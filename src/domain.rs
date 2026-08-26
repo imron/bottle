@@ -5,10 +5,10 @@ use crate::error::{Error, Fail};
 use crate::ledger::{
     Agent, Amend, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink, GroupedTime,
     Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue,
-    SchemaDrop, SchemaRetire, SchemaShow, Schemas, Stamp, Sum, Summed, Today, Total,
+    SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed, Today, Total,
 };
 use crate::mutable_store;
-use crate::spec::{FieldKind, FieldName, Group, Link, SchemaName, Spec};
+use crate::spec::{FieldKind, FieldName, Group, Link, Spec};
 use crate::store;
 use crate::time::{Instant, Range};
 use jiff::tz::TimeZone;
@@ -211,11 +211,8 @@ fn last(db: &mut Db, op: Last) -> Result<Outcome, Error> {
     let outcome = find_entries(
         db,
         Query {
-            schema: &op.schema,
+            scope: &op.scope,
             range: Range::default(),
-            agent: op.agent.as_ref().map(Agent::as_str),
-            fields: &op.fields,
-            links: &op.links,
             include_ignored: false,
             order: Order::Newest,
             limit: Some(1),
@@ -233,11 +230,8 @@ fn today(db: &mut Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
     find_entries(
         db,
         Query {
-            schema: &op.schema,
+            scope: &op.scope,
             range: Range::today(tz)?,
-            agent: op.agent.as_ref().map(Agent::as_str),
-            fields: &op.fields,
-            links: &op.links,
             include_ignored: false,
             order: Order::Oldest,
             limit: None,
@@ -249,11 +243,8 @@ fn list(db: &mut Db, op: List) -> Result<Outcome, Error> {
     find_entries(
         db,
         Query {
-            schema: &op.schema,
+            scope: &op.scope,
             range: op.range,
-            agent: op.agent.as_ref().map(Agent::as_str),
-            fields: &op.fields,
-            links: &op.links,
             include_ignored: op.include_ignored,
             order: Order::Oldest,
             limit: None,
@@ -262,11 +253,8 @@ fn list(db: &mut Db, op: List) -> Result<Outcome, Error> {
 }
 
 struct Query<'a> {
-    schema: &'a SchemaName,
+    scope: &'a Scope,
     range: Range,
-    agent: Option<&'a str>,
-    fields: &'a [FieldInput],
-    links: &'a [Link],
     include_ignored: bool,
     order: Order,
     limit: Option<usize>,
@@ -274,15 +262,15 @@ struct Query<'a> {
 
 fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
     db.read(|tx| {
-        let spec = store::load_schema(tx, q.schema)?.spec;
-        let resolved = resolve_filters(&spec, q.fields, q.links)?;
+        let spec = store::load_schema(tx, &q.scope.schema)?.spec;
+        let resolved = resolve_filters(&spec, &q.scope.fields, &q.scope.links)?;
         let entries = store::find(
             tx,
             Find {
-                schema: q.schema,
+                schema: &q.scope.schema,
                 spec: &spec,
                 range: q.range,
-                agent: q.agent,
+                agent: q.scope.agent.as_ref().map(Agent::as_str),
                 include_ignored: q.include_ignored,
                 filters: &resolved,
                 order: q.order,
@@ -295,19 +283,19 @@ fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
 
 fn sum(db: &mut Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
     db.read(|tx| {
-        let spec = store::load_schema(tx, &op.schema)?.spec;
+        let spec = store::load_schema(tx, &op.scope.schema)?.spec;
         let Some(f) = spec.field(&op.field) else {
             return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
         };
         if !matches!(f.kind, FieldKind::Number) {
             return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
         }
-        let resolved = resolve_filters(&spec, &op.fields, &op.links)?;
+        let resolved = resolve_filters(&spec, &op.scope.fields, &op.scope.links)?;
         let q = Find {
-            schema: &op.schema,
+            schema: &op.scope.schema,
             spec: &spec,
             range: op.range,
-            agent: op.agent.as_ref().map(Agent::as_str),
+            agent: op.scope.agent.as_ref().map(Agent::as_str),
             include_ignored: false,
             filters: &resolved,
             order: Order::Oldest,
