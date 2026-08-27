@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use bottle::{Bottle, Cmd, Error, execute, help, parse};
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 fn main() -> ExitCode {
     match run_cli(Cli::parse()) {
@@ -19,7 +19,7 @@ fn main() -> ExitCode {
 
 fn run_cli(cli: Cli) -> Result<String, Error> {
     match cli.command {
-        Cmd::Help { topic } => {
+        Command::Help { topic } => {
             let topic = if topic.is_empty() {
                 None
             } else {
@@ -27,7 +27,7 @@ fn run_cli(cli: Cli) -> Result<String, Error> {
             };
             help(topic.as_deref())
         }
-        Cmd::Mcp => {
+        Command::Mcp => {
             let db = match cli.db {
                 Some(path) => path,
                 None => bottle::default_db_path()?,
@@ -38,7 +38,7 @@ fn run_cli(cli: Cli) -> Result<String, Error> {
             rt.block_on(bottle::mcp(&db, None, None))?;
             Ok(String::new())
         }
-        command => {
+        Command::Ledger(command) => {
             let db = match cli.db {
                 Some(path) => path,
                 None => bottle::default_db_path()?,
@@ -60,5 +60,15 @@ struct Cli {
     #[arg(long, global = true)]
     db: Option<PathBuf>,
     #[command(subcommand)]
-    command: Cmd,
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Print the long explanation of a command
+    Help { topic: Vec<String> },
+    /// Run bottle as an MCP server on stdio
+    Mcp,
+    #[command(flatten)]
+    Ledger(Cmd),
 }

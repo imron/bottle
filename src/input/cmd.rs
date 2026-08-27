@@ -153,12 +153,6 @@ pub struct Ignore {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Cmd {
-    /// Print the long explanation of a command
-    Help {
-        topic: Vec<String>,
-    },
-    /// Run bottle as an MCP server on stdio
-    Mcp,
     #[command(subcommand)]
     Schema(SchemaCmd),
     Log(Log),

@@ -95,9 +95,6 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Request, Error> {
 
 fn op(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
     Ok(match cmd {
-        Cmd::Help { .. } | Cmd::Mcp => {
-            unreachable!("help and mcp are handled by the binary")
-        }
         Cmd::Schema(cmd::SchemaCmd::List) => Op::SchemaList,
         Cmd::Schema(cmd::SchemaCmd::Show(cmd)) => Op::SchemaShow(schema_show(cmd.name)?),
         Cmd::Schema(cmd::SchemaCmd::Add(cmd)) => {
