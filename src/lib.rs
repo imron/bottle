@@ -4,6 +4,7 @@ mod error;
 mod input;
 mod ledger;
 mod mutable_store;
+mod output;
 mod spec;
 mod sql;
 mod store;
@@ -16,8 +17,9 @@ use jiff::tz::TimeZone;
 pub use db::default_db_path;
 pub use error::{Error, Fail, Usage};
 pub use input::cmd;
-pub use input::{Cmd, Request, Style, parse};
+pub use input::{Cmd, Request, parse};
 pub use ledger::Agent;
+pub use output::Style;
 pub use spec::FieldType;
 
 pub struct Bottle {
@@ -71,7 +73,7 @@ pub fn run(
 
 pub fn execute(bottle: &mut Bottle, request: Request) -> Result<String, Error> {
     let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, request.op)?;
-    input::render(request.style, request.show_ignored, &outcome, &bottle.tz)
+    output::render(request.style, request.show_ignored, &outcome, &bottle.tz)
 }
 
 #[cfg(test)]

@@ -21,8 +21,8 @@
 input → domain → store
 
 - **input** is CLI and MCP. Parse user values into domain types.
-  Domain returns structured results. Input renders TSV, YAML, or
-  help. Input never talks to store.
+  Help pages live here. Input never talks to store.
+- **output** renders domain results as TSV or YAML.
 - **domain** is the ledger: schemas, entries, links, instants.
   Ledgers have entries, not rows. Domain does not import rusqlite,
   Cmd, or TSV. It does not return rendered output. Domain owns
