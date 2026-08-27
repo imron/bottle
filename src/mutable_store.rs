@@ -6,7 +6,7 @@ use crate::db::{Tx, UniqueConstraint};
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, FieldValue};
 use crate::spec::{Field, FieldName, Link, LinkName, SchemaName, Spec};
-use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, sql_type, table_name};
+use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, table_name};
 use crate::time::Instant;
 
 pub fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
@@ -30,16 +30,15 @@ pub fn add_column(
     default: Option<&FieldValue>,
 ) -> Result<(), Error> {
     let table = quote_ident(&table_name(schema));
-    let col_type = sql_type(&field.kind);
     let alter = if let Some(def) = default {
         let sql_def = sql_default(def);
         format!(
-            "ALTER TABLE {table} ADD COLUMN {} {col_type} NOT NULL DEFAULT {sql_def}",
+            "ALTER TABLE {table} ADD COLUMN {} TEXT NOT NULL DEFAULT {sql_def}",
             quote_ident(field.name.as_str())
         )
     } else {
         format!(
-            "ALTER TABLE {table} ADD COLUMN {} {col_type}",
+            "ALTER TABLE {table} ADD COLUMN {} TEXT",
             quote_ident(field.name.as_str())
         )
     };
@@ -250,11 +249,7 @@ fn create_columns(spec: &Spec) -> String {
         "ignored INTEGER NOT NULL DEFAULT 0".to_string(),
     ];
     for field in &spec.fields {
-        let mut col = format!(
-            "{} {}",
-            quote_ident(field.name.as_str()),
-            sql_type(&field.kind)
-        );
+        let mut col = format!("{} TEXT", quote_ident(field.name.as_str()));
         if field.required {
             col.push_str(" NOT NULL");
         }
