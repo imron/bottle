@@ -82,7 +82,7 @@ bottle log crm.touch who=ada channel=email
 
 ```
 id	at	links
-1	2026-08-22T08:14:00+10:00
+1	2026-08-22T08:14:00+10:00	
 ```
 
 ```
