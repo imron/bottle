@@ -394,6 +394,28 @@ fn where_invalid_ident() {
 }
 
 #[test]
+fn where_empty_value_is_usage() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    for field in ["what", "fat", "when"] {
+        let err = h
+            .run(Cmd::Ls(cmd::Ls {
+                filters: cmd::Filters {
+                    schema: "nutrition.meal".into(),
+                    agent: None,
+                    wheres: vec![(field.into(), String::new())],
+                    links: vec![],
+                },
+                from: None,
+                to: None,
+                include_ignored: false,
+            }))
+            .unwrap_err();
+        assert_usage(err, &format!("empty {field} filter"));
+    }
+}
+
+#[test]
 fn where_unknown_field() {
     let mut h = harness();
     seed_meals(&mut h);

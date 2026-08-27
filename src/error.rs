@@ -15,6 +15,7 @@ pub enum Usage {
     DuplicateUnlink(LinkName),
     LinkAndUnlink(LinkName),
     ReservedWhere(Identifier),
+    EmptyFilter(FieldName),
     DuplicateLinkName(LinkName),
     DuplicateField(FieldName),
     InvalidLinkTarget(String),

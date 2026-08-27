@@ -41,9 +41,10 @@ change daylight saving time are 23 or 25 hours long.
 
 `--where field=value` — may repeat; all clauses are AND.
 The name must be a declared field (`enum` values folded
-lowercase, `text` exact and case-sensitive). `--where` on
-`id`, `at`, `agent`, `ignored`, or `links` is an error;
-use `--agent`, `get`, or `--from` / `--to`.
+lowercase, `text` exact and case-sensitive). The value
+may not be empty. `--where` on `id`, `at`, `agent`,
+`ignored`, or `links` is an error; use `--agent`, `get`,
+or `--from` / `--to`.
 
 `--link name=SCHEMA/ID` — may repeat; all clauses are AND.
 Entries that have that named pointer. Same spelling as

@@ -20,6 +20,7 @@ fn usage_message(err: &Usage) -> String {
         Usage::ReservedWhere(name) => {
             format!("{name} is reserved; use agent, get, or from/to")
         }
+        Usage::EmptyFilter(name) => format!("empty {name} filter"),
         Usage::DuplicateLinkName(name) => format!("duplicate link name: {name}"),
         Usage::DuplicateField(name) => format!("duplicate field: {name}"),
         Usage::InvalidLinkTarget(s) => format!("invalid link target: {s}"),
