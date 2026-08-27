@@ -167,7 +167,8 @@ struct SchemaNameParams {
 struct LogEntry {
     at: Option<String>,
     agent: Option<String>,
-    links: Option<HashMap<String, String>>,
+    #[serde(default)]
+    links: HashMap<String, String>,
     #[serde(flatten)]
     fields: HashMap<String, FieldCell>,
 }
@@ -176,12 +177,7 @@ struct LogEntry {
 #[serde(deny_unknown_fields)]
 struct LogParams {
     schema: String,
-    at: Option<String>,
-    agent: Option<String>,
-    #[serde(default)]
-    links: HashMap<String, String>,
-    fields: Option<HashMap<String, FieldCell>>,
-    entries: Option<Vec<LogEntry>>,
+    entries: Vec<LogEntry>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -332,39 +328,20 @@ impl Server {
 
     #[tool(description = "Write one entry, or many in one transaction")]
     fn log(&self, Parameters(p): Parameters<LogParams>) -> Result<CallToolResult, McpError> {
-        match (p.fields, p.entries) {
-            (Some(_), Some(_)) => Err(McpError::invalid_params(
-                "do not send both fields and entries",
-                None,
-            )),
-            (None, None) => Err(McpError::invalid_params(
-                "log requires fields or entries",
-                None,
-            )),
-            (Some(fields), None) => self.run(Cmd::Log(cmd::Log {
-                schema: p.schema,
-                at: p.at,
-                agent: p.agent,
-                links: pairs(p.links),
-                fields: cells(fields),
-            })),
-            (None, Some(entries)) => {
-                if entries.is_empty() {
-                    return Err(McpError::invalid_params("entries is empty", None));
-                }
-                let mut logs = Vec::new();
-                for entry in entries {
-                    logs.push(cmd::Log {
-                        schema: p.schema.clone(),
-                        at: entry.at.or_else(|| p.at.clone()),
-                        agent: entry.agent.or_else(|| p.agent.clone()),
-                        links: pairs(entry.links.unwrap_or_else(|| p.links.clone())),
-                        fields: cells(entry.fields),
-                    });
-                }
-                self.run(Cmd::Logs(logs))
-            }
+        if p.entries.is_empty() {
+            return Err(McpError::invalid_params("entries is empty", None));
         }
+        let mut logs = Vec::new();
+        for entry in p.entries {
+            logs.push(cmd::Log {
+                schema: p.schema.clone(),
+                at: entry.at,
+                agent: entry.agent,
+                links: pairs(entry.links),
+                fields: cells(entry.fields),
+            });
+        }
+        self.run(Cmd::Logs(logs))
     }
 
     #[tool(description = "List entries of a schema")]

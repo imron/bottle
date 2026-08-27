@@ -33,11 +33,11 @@ not a TSV body.
 
 `help` takes an optional `command` (`log`, `schema add`).
 
-`log` accepts `fields` (one entry) or `entries` (a list of
-field objects). Do not send both. All `entries` share one
-schema and run in one transaction: all succeed or none do.
-Shared `at`, `agent`, and `links` apply to every entry
-unless that entry overrides them.
+`log` takes `entries`, a list of field objects. One
+entry is a one-element list. All entries share one schema
+and run in one transaction: all succeed or none do.
+Put `at`, `agent`, and `links` on the entry they belong
+to.
 
 `links` is an object of name to `schema/id`. `unlink` is a
 list of names.

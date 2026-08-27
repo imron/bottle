@@ -23,11 +23,10 @@ target. `unlink` is a list of names.
 
 ## One entry or many
 
-`log` accepts `fields` (one entry) or `entries` (a list of
-field objects). Do not send both. All `entries` share one
-schema and run in one transaction: all succeed or none do.
-Shared `at`, `agent`, and `links` apply to every entry
-unless an entry overrides them.
+`log` takes `entries`, a list of field objects. One entry
+is a one-element list. All entries share one schema and
+run in one transaction: all succeed or none do. Put `at`,
+`agent`, and `links` on the entry they belong to.
 
 Callers that have a compact form (for example `4x8x24`)
 expand it before calling. bottle stores entries, not that

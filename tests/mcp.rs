@@ -297,16 +297,16 @@ async fn mcp_tools_cover_the_surface() {
         "log",
         rmcp::object!({
             "schema": "nutrition.meal",
-            "at": "2026-08-22T08:14:00Z",
-            "agent": "tester",
-            "fields": {
+            "entries": [{
+                "at": "2026-08-22T08:14:00Z",
+                "agent": "tester",
                 "when": "breakfast",
                 "what": "eggs",
                 "kcal": 568,
                 "fat": null,
                 "note": "hi",
                 "extra": 0
-            }
+            }]
         }),
     )
     .await;
@@ -317,8 +317,7 @@ async fn mcp_tools_cover_the_surface() {
         "log",
         rmcp::object!({
             "schema": "fitness.session",
-            "at": "2026-08-22T08:00:00Z",
-            "fields": { "title": "upper" }
+            "entries": [{ "at": "2026-08-22T08:00:00Z", "title": "upper" }]
         }),
     )
     .await;
@@ -328,47 +327,54 @@ async fn mcp_tools_cover_the_surface() {
         "log",
         rmcp::object!({
             "schema": "fitness.set",
-            "at": "2026-08-22T08:01:00Z",
-            "links": { "session": "fitness.session/1" },
-            "fields": { "movement": "squat", "reps": 8 }
+            "entries": [{
+                "at": "2026-08-22T08:01:00Z",
+                "links": { "session": "fitness.session/1" },
+                "movement": "squat",
+                "reps": 8
+            }]
         }),
     )
     .await;
     assert!(set_row.contains("session=fitness.session/1"), "{set_row}");
 
-    let inherited = ok(
+    let batch = ok(
         &client,
         "log",
         rmcp::object!({
             "schema": "fitness.set",
-            "at": "2026-08-22T08:02:00Z",
-            "links": { "session": "fitness.session/1" },
             "entries": [
-                { "movement": "press", "reps": 5 },
+                {
+                    "movement": "press",
+                    "reps": 5,
+                    "at": "2026-08-22T08:02:00Z",
+                    "links": { "session": "fitness.session/1" }
+                },
                 {
                     "movement": "plank",
                     "reps": 1,
                     "at": "2026-08-22T08:03:00Z",
-                    "agent": "coach",
-                    "links": {}
+                    "agent": "coach"
                 }
             ]
         }),
     )
     .await;
-    assert_eq!(inherited.lines().count(), 3, "{inherited}");
-    assert!(
-        inherited.contains("session=fitness.session/1"),
-        "{inherited}"
-    );
+    assert_eq!(batch.lines().count(), 3, "{batch}");
+    assert!(batch.contains("session=fitness.session/1"), "{batch}");
 
     let lunch = ok(
         &client,
         "log",
         rmcp::object!({
             "schema": "nutrition.meal",
-            "at": "2026-08-23T12:00:00Z",
-            "fields": { "when": "lunch", "what": "rice", "kcal": 200, "extra": 0 }
+            "entries": [{
+                "at": "2026-08-23T12:00:00Z",
+                "when": "lunch",
+                "what": "rice",
+                "kcal": 200,
+                "extra": 0
+            }]
         }),
     )
     .await;
@@ -379,7 +385,7 @@ async fn mcp_tools_cover_the_surface() {
         "log",
         rmcp::object!({
             "schema": "nutrition.meal",
-            "fields": { "when": "lunch", "what": "now", "kcal": 1, "extra": 0 }
+            "entries": [{ "when": "lunch", "what": "now", "kcal": 1, "extra": 0 }]
         }),
     )
     .await;
@@ -530,7 +536,7 @@ async fn mcp_tools_cover_the_surface() {
         "log",
         rmcp::object!({
             "schema": "nutrition.meal",
-            "fields": { "when": "lunch", "what": "x", "kcal": 1, "extra": 0 }
+            "entries": [{ "when": "lunch", "what": "x", "kcal": 1, "extra": 0 }]
         }),
     )
     .await;
@@ -590,10 +596,9 @@ async fn mcp_log_entries_is_one_transaction() {
         "log",
         rmcp::object!({
             "schema": "nutrition.meal",
-            "at": "2026-08-22T08:14:00Z",
             "entries": [
-                { "when": "breakfast", "what": "eggs", "kcal": 1 },
-                { "when": "lunch", "what": "rice", "kcal": 2 }
+                { "when": "breakfast", "what": "eggs", "kcal": 1, "at": "2026-08-22T08:14:00Z" },
+                { "when": "lunch", "what": "rice", "kcal": 2, "at": "2026-08-22T08:14:00Z" }
             ]
         }),
     )
@@ -606,24 +611,23 @@ async fn mcp_log_entries_is_one_transaction() {
 async fn mcp_log_shape_errors_are_protocol() {
     let dir = TempDir::new().unwrap();
     let client = connect(&dir).await;
-    let both = proto_err(
+    let unknown = param_err(
         &client,
         "log",
         rmcp::object!({
             "schema": "nutrition.meal",
-            "fields": { "when": "breakfast" },
-            "entries": [{ "when": "lunch" }]
+            "fields": { "when": "breakfast" }
         }),
     )
     .await;
-    assert!(both.contains("do not send both"), "{both}");
-    let neither = proto_err(
+    assert!(unknown.contains("fields"), "{unknown}");
+    let missing = param_err(
         &client,
         "log",
         rmcp::object!({ "schema": "nutrition.meal" }),
     )
     .await;
-    assert!(neither.contains("fields or entries"), "{neither}");
+    assert!(missing.contains("entries"), "{missing}");
     let empty = proto_err(
         &client,
         "log",
@@ -659,7 +663,7 @@ async fn mcp_rejects_bad_field_type_and_value_shape() {
         "log",
         rmcp::object!({
             "schema": "nutrition.meal",
-            "fields": { "when": ["breakfast"] }
+            "entries": [{ "when": ["breakfast"] }]
         }),
     )
     .await;
@@ -669,7 +673,7 @@ async fn mcp_rejects_bad_field_type_and_value_shape() {
         "log",
         rmcp::object!({
             "schema": "nutrition.meal",
-            "fields": { "when": true }
+            "entries": [{ "when": true }]
         }),
     )
     .await;
