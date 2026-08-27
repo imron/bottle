@@ -13,6 +13,7 @@ use serde::Deserialize;
 use crate::error::{Error, Fail};
 use crate::ledger::Op;
 use crate::{Bottle, Request, Style, execute};
+use rmcp::service::ServerInitializeError;
 
 use super::{
     AmendInput, ScopeInput, SpecSource, amend as parse_amend, get as parse_get,
@@ -73,15 +74,21 @@ pub async fn serve(path: &Path, agent: Option<String>, tz: Option<&str>) -> Resu
     let server = Server {
         bottle: Arc::new(Mutex::new(bottle)),
     };
-    let running = server
-        .serve(stdio())
-        .await
-        .map_err(|e| Error::Fail(Fail::Io(e.to_string())))?;
-    running
-        .waiting()
-        .await
-        .map_err(|e| Error::Fail(Fail::Io(e.to_string())))?;
+    let running = server.serve(stdio()).await?;
+    running.waiting().await?;
     Ok(())
+}
+
+impl From<ServerInitializeError> for Error {
+    fn from(err: ServerInitializeError) -> Self {
+        Self::Fail(Fail::Io(err.to_string()))
+    }
+}
+
+impl From<tokio::task::JoinError> for Error {
+    fn from(err: tokio::task::JoinError) -> Self {
+        Self::Fail(Fail::Io(err.to_string()))
+    }
 }
 
 fn tool_result(result: Result<String, Error>) -> Result<CallToolResult, McpError> {
