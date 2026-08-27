@@ -11,11 +11,18 @@ use rmcp::{
 use serde::Deserialize;
 
 use crate::error::{Error, Fail};
-use crate::input::cmd;
 use crate::ledger::Op;
-use crate::{Bottle, Cmd, Request, Style, execute, parse};
+use crate::{Bottle, Request, Style, execute};
 
-use super::{SpecSource, schema_add as parse_schema_add};
+use super::{
+    AmendInput, ScopeInput, SpecSource, amend as parse_amend, get as parse_get,
+    ignore as parse_ignore, last as parse_last, log as parse_log, ls as parse_ls,
+    schema_add as parse_schema_add, schema_add_field as parse_schema_add_field,
+    schema_add_value as parse_schema_add_value, schema_drop as parse_schema_drop,
+    schema_retire as parse_schema_retire, schema_show as parse_schema_show, sum as parse_sum,
+    today as parse_today,
+};
+use jiff::tz::TimeZone;
 
 fn pairs(map: HashMap<String, String>) -> Vec<(String, String)> {
     map.into_iter().collect()
@@ -56,15 +63,6 @@ fn cells(map: HashMap<String, FieldCell>) -> Vec<(String, String)> {
         .collect()
 }
 
-fn filters(p: FilterParams) -> cmd::Filters {
-    cmd::Filters {
-        schema: p.schema,
-        agent: p.agent,
-        wheres: pairs(p.wheres),
-        links: pairs(p.links),
-    }
-}
-
 #[derive(Clone)]
 struct Server {
     bottle: Arc<Mutex<Bottle>>,
@@ -96,18 +94,15 @@ fn tool_result(result: Result<String, Error>) -> Result<CallToolResult, McpError
 }
 
 impl Server {
-    fn execute(&self, request: Request) -> Result<CallToolResult, McpError> {
+    fn execute_parsed(
+        &self,
+        f: impl FnOnce(&TimeZone) -> Result<Request, Error>,
+    ) -> Result<CallToolResult, McpError> {
         let mut bottle = self.bottle.lock().unwrap_or_else(|e| e.into_inner());
-        tool_result(execute(&mut bottle, request))
-    }
-
-    fn run(&self, cmd: Cmd) -> Result<CallToolResult, McpError> {
-        let mut bottle = self.bottle.lock().unwrap_or_else(|e| e.into_inner());
-        let request = match parse(cmd, bottle.tz()) {
-            Ok(request) => request,
-            Err(err) => return tool_result(Err(err)),
-        };
-        tool_result(execute(&mut bottle, request))
+        match f(bottle.tz()) {
+            Ok(request) => tool_result(execute(&mut bottle, request)),
+            Err(err) => tool_result(Err(err)),
+        }
     }
 }
 
@@ -246,7 +241,7 @@ impl Server {
 
     #[tool(description = "List registered schemas")]
     fn schema_list(&self) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Schema(cmd::SchemaCmd::List))
+        self.execute_parsed(|_| Ok(Request::new(Op::SchemaList, Style::Tsv)))
     }
 
     #[tool(description = "Print the field list of a schema")]
@@ -254,10 +249,13 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaShowParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow {
-            name: p.name,
-            yaml: p.yaml,
-        })))
+        let style = if p.yaml { Style::Yaml } else { Style::Tsv };
+        self.execute_parsed(|_| {
+            Ok(Request::new(
+                Op::SchemaShow(parse_schema_show(p.name)?),
+                style,
+            ))
+        })
     }
 
     #[tool(description = "Register a type from a YAML spec")]
@@ -265,10 +263,12 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaAddParams>,
     ) -> Result<CallToolResult, McpError> {
-        match parse_schema_add(p.name, SpecSource::Yaml(p.spec)) {
-            Ok(op) => self.execute(Request::new(Op::SchemaAdd(op), Style::Tsv)),
-            Err(err) => tool_result(Err(err)),
-        }
+        self.execute_parsed(|_| {
+            Ok(Request::new(
+                Op::SchemaAdd(parse_schema_add(p.name, SpecSource::Yaml(p.spec))?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Add one field to an existing schema")]
@@ -276,16 +276,15 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaAddFieldParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
-            schema: p.schema,
-            name: p.name,
-            type_: p
-                .type_
-                .parse()
-                .map_err(|e: String| McpError::invalid_params(e, None))?,
-            values: p.values,
-            default: p.default,
-        })))
+        self.execute_parsed(|_| {
+            let type_ = p.type_.parse()?;
+            Ok(Request::new(
+                Op::SchemaAddField(parse_schema_add_field(
+                    p.schema, p.name, type_, p.values, p.default,
+                )?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Append one value to an enum field")]
@@ -293,11 +292,12 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaAddValueParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Schema(cmd::SchemaCmd::AddValue(cmd::SchemaAddValue {
-            schema: p.schema,
-            field: p.field,
-            value: p.value,
-        })))
+        self.execute_parsed(|_| {
+            Ok(Request::new(
+                Op::SchemaAddValue(parse_schema_add_value(p.schema, p.field, p.value)?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Retire a schema so log fails and reads still work")]
@@ -305,9 +305,12 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaNameParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Schema(cmd::SchemaCmd::Retire(cmd::SchemaRetire {
-            name: p.name,
-        })))
+        self.execute_parsed(|_| {
+            Ok(Request::new(
+                Op::SchemaRetire(parse_schema_retire(p.name)?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Drop a schema and its entries")]
@@ -315,9 +318,12 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaNameParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Schema(cmd::SchemaCmd::Drop(cmd::SchemaDrop {
-            name: p.name,
-        })))
+        self.execute_parsed(|_| {
+            Ok(Request::new(
+                Op::SchemaDrop(parse_schema_drop(p.name)?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Write one entry, or many in one transaction")]
@@ -325,87 +331,134 @@ impl Server {
         if p.entries.is_empty() {
             return Err(McpError::invalid_params("entries is empty", None));
         }
-        let mut logs = Vec::new();
-        for entry in p.entries {
-            logs.push(cmd::Log {
-                schema: p.schema.clone(),
-                at: entry.at,
-                agent: entry.agent,
-                links: pairs(entry.links),
-                fields: cells(entry.fields),
-            });
-        }
-        self.run(Cmd::Logs(logs))
+        self.execute_parsed(|tz| {
+            let mut logs = Vec::new();
+            for entry in p.entries {
+                logs.push(parse_log(
+                    p.schema.clone(),
+                    entry.at,
+                    entry.agent,
+                    pairs(entry.links),
+                    cells(entry.fields),
+                    tz,
+                )?);
+            }
+            Ok(Request::new(Op::Log(logs), Style::Tsv))
+        })
     }
 
     #[tool(description = "List entries of a schema")]
     fn ls(&self, Parameters(p): Parameters<LsParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Ls(cmd::Ls {
-            filters: cmd::Filters {
-                schema: p.schema,
-                agent: p.agent,
-                wheres: pairs(p.wheres),
-                links: pairs(p.links),
-            },
-            from: p.from,
-            to: p.to,
-            include_ignored: p.include_ignored,
-        }))
+        self.execute_parsed(|tz| {
+            Ok(Request::new(
+                Op::List(parse_ls(
+                    ScopeInput {
+                        schema: p.schema,
+                        agent: p.agent,
+                        wheres: pairs(p.wheres),
+                        links: pairs(p.links),
+                    },
+                    p.from,
+                    p.to,
+                    p.include_ignored,
+                    tz,
+                )?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Print one entry by schema and id")]
     fn get(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Get(cmd::Get {
-            schema: p.schema,
-            id: p.id,
-        }))
+        self.execute_parsed(|_| {
+            Ok(Request::new(
+                Op::Get(parse_get(p.schema, p.id)?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Total a number field")]
     fn sum(&self, Parameters(p): Parameters<SumParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Sum(cmd::Sum {
-            filters: cmd::Filters {
-                schema: p.schema,
-                agent: p.agent,
-                wheres: pairs(p.wheres),
-                links: pairs(p.links),
-            },
-            field: p.field,
-            from: p.from,
-            to: p.to,
-            group: p.group,
-        }))
+        self.execute_parsed(|tz| {
+            Ok(Request::new(
+                Op::Sum(parse_sum(
+                    ScopeInput {
+                        schema: p.schema,
+                        agent: p.agent,
+                        wheres: pairs(p.wheres),
+                        links: pairs(p.links),
+                    },
+                    p.field,
+                    p.from,
+                    p.to,
+                    p.group,
+                    tz,
+                )?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Print the most recent entry of a schema")]
     fn last(&self, Parameters(p): Parameters<FilterParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Last(filters(p)))
+        self.execute_parsed(|_| {
+            Ok(Request::new(
+                Op::Last(parse_last(ScopeInput {
+                    schema: p.schema,
+                    agent: p.agent,
+                    wheres: pairs(p.wheres),
+                    links: pairs(p.links),
+                })?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "List entries for the current civil day")]
     fn today(&self, Parameters(p): Parameters<FilterParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Today(filters(p)))
+        self.execute_parsed(|_| {
+            Ok(Request::new(
+                Op::Today(parse_today(ScopeInput {
+                    schema: p.schema,
+                    agent: p.agent,
+                    wheres: pairs(p.wheres),
+                    links: pairs(p.links),
+                })?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Change an existing entry in place")]
     fn amend(&self, Parameters(p): Parameters<AmendParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Amend(cmd::Amend {
-            schema: p.schema,
-            id: p.id,
-            at: p.at,
-            agent: p.agent,
-            links: pairs(p.links),
-            unlinks: p.unlink,
-            fields: cells(p.fields),
-        }))
+        self.execute_parsed(|tz| {
+            Ok(Request::new(
+                Op::Amend(parse_amend(
+                    AmendInput {
+                        schema: p.schema,
+                        id: p.id,
+                        at: p.at,
+                        agent: p.agent,
+                        links: pairs(p.links),
+                        unlinks: p.unlink,
+                        fields: cells(p.fields),
+                    },
+                    tz,
+                )?),
+                Style::Tsv,
+            ))
+        })
     }
 
     #[tool(description = "Hide an entry from lists and totals")]
     fn ignore(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Ignore(cmd::Ignore {
-            schema: p.schema,
-            id: p.id,
-        }))
+        self.execute_parsed(|_| {
+            Ok(Request::new(
+                Op::Ignore(parse_ignore(p.schema, p.id)?),
+                Style::Tsv,
+            ))
+        })
     }
 }
 

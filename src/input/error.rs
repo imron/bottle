@@ -29,6 +29,7 @@ fn usage_message(err: &Usage) -> String {
         Usage::InvalidTime(input) => format!("invalid time: {input}"),
         Usage::OffsetNeedsColon => "offset must include a colon (+10:00)".into(),
         Usage::UnknownHelpTopic(topic) => format!("unknown help topic: {topic}"),
+        Usage::UnknownType(t) => format!("unknown type: {t}"),
     }
 }
 

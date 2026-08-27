@@ -1,7 +1,7 @@
 pub mod cmd;
 mod error;
-pub(crate) mod help;
-pub(crate) mod mcp;
+pub mod help;
+pub mod mcp;
 mod tsv;
 
 use std::collections::HashSet;
@@ -52,9 +52,37 @@ impl Request {
     }
 }
 
-pub(crate) enum SpecSource {
+pub enum SpecSource {
     File(PathBuf),
     Yaml(String),
+}
+
+pub struct ScopeInput {
+    pub schema: String,
+    pub agent: Option<String>,
+    pub wheres: Vec<(String, String)>,
+    pub links: Vec<(String, String)>,
+}
+
+impl From<cmd::Filters> for ScopeInput {
+    fn from(filters: cmd::Filters) -> Self {
+        Self {
+            schema: filters.schema,
+            agent: filters.agent,
+            wheres: filters.wheres,
+            links: filters.links,
+        }
+    }
+}
+
+pub struct AmendInput {
+    pub schema: String,
+    pub id: i64,
+    pub at: Option<String>,
+    pub agent: Option<String>,
+    pub links: Vec<(String, String)>,
+    pub unlinks: Vec<String>,
+    pub fields: Vec<(String, String)>,
 }
 
 pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Request, Error> {
@@ -71,42 +99,78 @@ fn op(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
             unreachable!("help and mcp are handled by the binary")
         }
         Cmd::Schema(cmd::SchemaCmd::List) => Op::SchemaList,
-        Cmd::Schema(cmd::SchemaCmd::Show(cmd)) => Op::SchemaShow(schema_show(cmd)?),
+        Cmd::Schema(cmd::SchemaCmd::Show(cmd)) => Op::SchemaShow(schema_show(cmd.name)?),
         Cmd::Schema(cmd::SchemaCmd::Add(cmd)) => {
             Op::SchemaAdd(schema_add(cmd.name, SpecSource::File(cmd.file))?)
         }
-        Cmd::Schema(cmd::SchemaCmd::AddField(cmd)) => Op::SchemaAddField(schema_add_field(cmd)?),
-        Cmd::Schema(cmd::SchemaCmd::AddValue(cmd)) => Op::SchemaAddValue(schema_add_value(cmd)?),
-        Cmd::Schema(cmd::SchemaCmd::Retire(cmd)) => Op::SchemaRetire(schema_retire(cmd)?),
-        Cmd::Schema(cmd::SchemaCmd::Drop(cmd)) => Op::SchemaDrop(schema_drop(cmd)?),
-        Cmd::Log(cmd) => Op::Log(vec![log(cmd, tz)?]),
+        Cmd::Schema(cmd::SchemaCmd::AddField(cmd)) => Op::SchemaAddField(schema_add_field(
+            cmd.schema,
+            cmd.name,
+            cmd.type_,
+            cmd.values,
+            cmd.default,
+        )?),
+        Cmd::Schema(cmd::SchemaCmd::AddValue(cmd)) => {
+            Op::SchemaAddValue(schema_add_value(cmd.schema, cmd.field, cmd.value)?)
+        }
+        Cmd::Schema(cmd::SchemaCmd::Retire(cmd)) => Op::SchemaRetire(schema_retire(cmd.name)?),
+        Cmd::Schema(cmd::SchemaCmd::Drop(cmd)) => Op::SchemaDrop(schema_drop(cmd.name)?),
+        Cmd::Log(cmd) => Op::Log(vec![log(
+            cmd.schema, cmd.at, cmd.agent, cmd.links, cmd.fields, tz,
+        )?]),
         Cmd::Logs(cmds) => {
             if cmds.is_empty() {
                 return Err(Error::Usage(Usage::EmptyLog));
             }
             let mut ops = Vec::with_capacity(cmds.len());
             for cmd in cmds {
-                ops.push(log(cmd, tz)?);
+                ops.push(log(
+                    cmd.schema, cmd.at, cmd.agent, cmd.links, cmd.fields, tz,
+                )?);
             }
             Op::Log(ops)
         }
-        Cmd::Ls(cmd) => Op::List(ls(cmd, tz)?),
-        Cmd::Get(cmd) => Op::Get(get(cmd)?),
-        Cmd::Sum(cmd) => Op::Sum(sum(cmd, tz)?),
-        Cmd::Last(cmd) => Op::Last(last(cmd)?),
-        Cmd::Today(cmd) => Op::Today(today(cmd)?),
-        Cmd::Amend(cmd) => Op::Amend(amend(cmd, tz)?),
-        Cmd::Ignore(cmd) => Op::Ignore(ignore(cmd)?),
+        Cmd::Ls(cmd) => Op::List(ls(
+            cmd.filters.into(),
+            cmd.from,
+            cmd.to,
+            cmd.include_ignored,
+            tz,
+        )?),
+        Cmd::Get(cmd) => Op::Get(get(cmd.schema, cmd.id)?),
+        Cmd::Sum(cmd) => Op::Sum(sum(
+            cmd.filters.into(),
+            cmd.field,
+            cmd.from,
+            cmd.to,
+            cmd.group,
+            tz,
+        )?),
+        Cmd::Last(cmd) => Op::Last(last(cmd.into())?),
+        Cmd::Today(cmd) => Op::Today(today(cmd.into())?),
+        Cmd::Amend(cmd) => Op::Amend(amend(
+            AmendInput {
+                schema: cmd.schema,
+                id: cmd.id,
+                at: cmd.at,
+                agent: cmd.agent,
+                links: cmd.links,
+                unlinks: cmd.unlinks,
+                fields: cmd.fields,
+            },
+            tz,
+        )?),
+        Cmd::Ignore(cmd) => Op::Ignore(ignore(cmd.schema, cmd.id)?),
     })
 }
 
-fn schema_show(cmd: cmd::SchemaShow) -> Result<SchemaShow, Error> {
+pub fn schema_show(name: String) -> Result<SchemaShow, Error> {
     Ok(SchemaShow {
-        name: SchemaName::parse(&cmd.name)?,
+        name: SchemaName::parse(&name)?,
     })
 }
 
-pub(crate) fn schema_add(name: String, source: SpecSource) -> Result<SchemaAdd, Error> {
+pub fn schema_add(name: String, source: SpecSource) -> Result<SchemaAdd, Error> {
     let raw = match source {
         SpecSource::File(path) => match std::fs::read_to_string(&path) {
             Ok(raw) => raw,
@@ -123,10 +187,16 @@ pub(crate) fn schema_add(name: String, source: SpecSource) -> Result<SchemaAdd, 
     })
 }
 
-fn schema_add_field(cmd: cmd::SchemaAddField) -> Result<SchemaAddField, Error> {
-    let name = FieldName::parse(&cmd.name)?;
-    let kind = field_kind(cmd.type_, cmd.values)?;
-    let default = match cmd.default.as_deref() {
+pub fn schema_add_field(
+    schema: String,
+    name: String,
+    type_: FieldType,
+    values: Option<Vec<String>>,
+    default: Option<String>,
+) -> Result<SchemaAddField, Error> {
+    let name = FieldName::parse(&name)?;
+    let kind = field_kind(type_, values)?;
+    let default = match default.as_deref() {
         None => None,
         Some(raw) => Some(FieldValue::parse(
             &Field {
@@ -138,7 +208,7 @@ fn schema_add_field(cmd: cmd::SchemaAddField) -> Result<SchemaAddField, Error> {
         )?),
     };
     Ok(SchemaAddField {
-        schema: SchemaName::parse(&cmd.schema)?,
+        schema: SchemaName::parse(&schema)?,
         name,
         kind,
         default,
@@ -163,96 +233,123 @@ fn field_kind(type_: FieldType, values: Option<Vec<String>>) -> Result<FieldKind
     })
 }
 
-fn schema_add_value(cmd: cmd::SchemaAddValue) -> Result<SchemaAddValue, Error> {
+pub fn schema_add_value(
+    schema: String,
+    field: String,
+    value: String,
+) -> Result<SchemaAddValue, Error> {
     Ok(SchemaAddValue {
-        schema: SchemaName::parse(&cmd.schema)?,
-        field: FieldName::parse(&cmd.field)?,
-        value: EnumValue::parse(&cmd.value)?,
+        schema: SchemaName::parse(&schema)?,
+        field: FieldName::parse(&field)?,
+        value: EnumValue::parse(&value)?,
     })
 }
 
-fn schema_retire(cmd: cmd::SchemaRetire) -> Result<SchemaRetire, Error> {
+pub fn schema_retire(name: String) -> Result<SchemaRetire, Error> {
     Ok(SchemaRetire {
-        name: SchemaName::parse(&cmd.name)?,
+        name: SchemaName::parse(&name)?,
     })
 }
 
-fn schema_drop(cmd: cmd::SchemaDrop) -> Result<SchemaDrop, Error> {
+pub fn schema_drop(name: String) -> Result<SchemaDrop, Error> {
     Ok(SchemaDrop {
-        name: SchemaName::parse(&cmd.name)?,
+        name: SchemaName::parse(&name)?,
     })
 }
 
-fn log(cmd: cmd::Log, tz: &TimeZone) -> Result<Log, Error> {
+pub fn log(
+    schema: String,
+    at: Option<String>,
+    agent: Option<String>,
+    links: Vec<(String, String)>,
+    fields: Vec<(String, String)>,
+    tz: &TimeZone,
+) -> Result<Log, Error> {
     Ok(Log {
-        schema: SchemaName::parse(&cmd.schema)?,
-        at: cmd
-            .at
+        schema: SchemaName::parse(&schema)?,
+        at: at
             .as_deref()
             .map(|s| time::parse_instant(s, tz))
             .transpose()?,
-        agent: parse_agent(cmd.agent)?,
-        links: parse_links(cmd.links)?,
-        fields: parse_fields(cmd.fields)?,
+        agent: parse_agent(agent)?,
+        links: parse_links(links)?,
+        fields: parse_fields(fields)?,
     })
 }
 
-fn ls(cmd: cmd::Ls, tz: &TimeZone) -> Result<List, Error> {
+pub fn ls(
+    input: ScopeInput,
+    from: Option<String>,
+    to: Option<String>,
+    include_ignored: bool,
+    tz: &TimeZone,
+) -> Result<List, Error> {
     Ok(List {
-        scope: scope(cmd.filters)?,
-        range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
-        include_ignored: cmd.include_ignored,
+        scope: scope(input)?,
+        range: Range::parse(from.as_deref(), to.as_deref(), tz)?,
+        include_ignored,
     })
 }
 
-fn get(cmd: cmd::Get) -> Result<Get, Error> {
+pub fn get(schema: String, id: i64) -> Result<Get, Error> {
     Ok(Get {
-        schema: SchemaName::parse(&cmd.schema)?,
-        id: cmd.id,
+        schema: SchemaName::parse(&schema)?,
+        id,
     })
 }
 
-fn sum(cmd: cmd::Sum, tz: &TimeZone) -> Result<Sum, Error> {
+pub fn sum(
+    input: ScopeInput,
+    field: String,
+    from: Option<String>,
+    to: Option<String>,
+    group: Option<String>,
+    tz: &TimeZone,
+) -> Result<Sum, Error> {
     Ok(Sum {
-        scope: scope(cmd.filters)?,
-        field: FieldName::parse(&cmd.field)?,
-        range: Range::parse(cmd.from.as_deref(), cmd.to.as_deref(), tz)?,
-        group: cmd.group.as_deref().map(Group::parse).transpose()?,
+        scope: scope(input)?,
+        field: FieldName::parse(&field)?,
+        range: Range::parse(from.as_deref(), to.as_deref(), tz)?,
+        group: group.as_deref().map(Group::parse).transpose()?,
     })
 }
 
-fn last(cmd: cmd::Filters) -> Result<Last, Error> {
-    Ok(Last { scope: scope(cmd)? })
+pub fn last(input: ScopeInput) -> Result<Last, Error> {
+    Ok(Last {
+        scope: scope(input)?,
+    })
 }
 
-fn today(cmd: cmd::Filters) -> Result<Today, Error> {
-    Ok(Today { scope: scope(cmd)? })
+pub fn today(input: ScopeInput) -> Result<Today, Error> {
+    Ok(Today {
+        scope: scope(input)?,
+    })
 }
 
-fn scope(filters: cmd::Filters) -> Result<Scope, Error> {
+fn scope(input: ScopeInput) -> Result<Scope, Error> {
     Ok(Scope {
-        schema: SchemaName::parse(&filters.schema)?,
-        agent: parse_agent(filters.agent)?,
-        fields: parse_wheres(filters.wheres)?,
-        links: parse_links(filters.links)?,
+        schema: SchemaName::parse(&input.schema)?,
+        agent: parse_agent(input.agent)?,
+        fields: parse_wheres(input.wheres)?,
+        links: parse_links(input.links)?,
     })
 }
 
-fn amend(cmd: cmd::Amend, tz: &TimeZone) -> Result<Amend, Error> {
-    let links = parse_links(cmd.links)?;
-    let unlinks = parse_unlinks(cmd.unlinks)?;
+pub fn amend(input: AmendInput, tz: &TimeZone) -> Result<Amend, Error> {
+    let links = parse_links(input.links)?;
+    let unlinks = parse_unlinks(input.unlinks)?;
     for name in &unlinks {
         if links.iter().any(|l| &l.name == name) {
             return Err(Error::Usage(Usage::LinkAndUnlink(name.clone())));
         }
     }
-    let fields = parse_fields(cmd.fields)?;
-    let at = cmd
+    let fields = parse_fields(input.fields)?;
+    let at = input
         .at
         .as_deref()
         .map(|s| time::parse_instant(s, tz))
         .transpose()?;
-    let agent = parse_agent(cmd.agent)?;
+    let agent = parse_agent(input.agent)?;
     if at.is_none()
         && agent.is_none()
         && links.is_empty()
@@ -262,8 +359,8 @@ fn amend(cmd: cmd::Amend, tz: &TimeZone) -> Result<Amend, Error> {
         return Err(Error::Usage(Usage::AmendEmpty));
     }
     Ok(Amend {
-        schema: SchemaName::parse(&cmd.schema)?,
-        id: cmd.id,
+        schema: SchemaName::parse(&input.schema)?,
+        id: input.id,
         at,
         agent,
         links,
@@ -272,10 +369,10 @@ fn amend(cmd: cmd::Amend, tz: &TimeZone) -> Result<Amend, Error> {
     })
 }
 
-fn ignore(cmd: cmd::Ignore) -> Result<Ignore, Error> {
+pub fn ignore(schema: String, id: i64) -> Result<Ignore, Error> {
     Ok(Ignore {
-        schema: SchemaName::parse(&cmd.schema)?,
-        id: cmd.id,
+        schema: SchemaName::parse(&schema)?,
+        id,
     })
 }
 

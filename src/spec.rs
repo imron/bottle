@@ -123,14 +123,14 @@ impl std::fmt::Display for FieldType {
 }
 
 impl std::str::FromStr for FieldType {
-    type Err = String;
+    type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, Error> {
         match s {
             "text" => Ok(Self::Text),
             "number" => Ok(Self::Number),
             "enum" => Ok(Self::Enum),
-            other => Err(format!("unknown type: {other}")),
+            other => Err(Error::Usage(Usage::UnknownType(other.to_string()))),
         }
     }
 }

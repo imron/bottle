@@ -24,6 +24,7 @@ pub enum Usage {
     InvalidTime(String),
     OffsetNeedsColon,
     UnknownHelpTopic(String),
+    UnknownType(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

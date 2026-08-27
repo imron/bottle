@@ -644,7 +644,7 @@ async fn mcp_log_shape_errors_are_protocol() {
 async fn mcp_rejects_bad_field_type_and_value_shape() {
     let dir = TempDir::new().unwrap();
     let client = connect(&dir).await;
-    let bad_type = proto_err(
+    let bad_type = tool_err(
         &client,
         "schema_add_field",
         rmcp::object!({
@@ -655,7 +655,7 @@ async fn mcp_rejects_bad_field_type_and_value_shape() {
     )
     .await;
     assert!(
-        bad_type.contains("nope") && (bad_type.contains("unknown") || bad_type.contains("variant")),
+        bad_type.contains("nope") && bad_type.contains("unknown"),
         "{bad_type}"
     );
     let bad_cell = param_err(
