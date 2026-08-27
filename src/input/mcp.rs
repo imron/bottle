@@ -97,18 +97,12 @@ fn tool_result(result: Result<String, Error>) -> Result<CallToolResult, McpError
 
 impl Server {
     fn execute(&self, request: Request) -> Result<CallToolResult, McpError> {
-        let mut bottle = self
-            .bottle
-            .lock()
-            .map_err(|_| McpError::internal_error("lock poisoned", None))?;
+        let mut bottle = self.bottle.lock().unwrap_or_else(|e| e.into_inner());
         tool_result(execute(&mut bottle, request))
     }
 
     fn run(&self, cmd: Cmd) -> Result<CallToolResult, McpError> {
-        let mut bottle = self
-            .bottle
-            .lock()
-            .map_err(|_| McpError::internal_error("lock poisoned", None))?;
+        let mut bottle = self.bottle.lock().unwrap_or_else(|e| e.into_inner());
         let request = match parse(cmd, bottle.tz()) {
             Ok(request) => request,
             Err(err) => return tool_result(Err(err)),
