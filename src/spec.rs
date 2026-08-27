@@ -171,8 +171,12 @@ impl Spec {
         self.fields.iter().find(|f| &f.name == name)
     }
 
-    pub fn has_field_named(&self, name: &LinkName) -> bool {
-        self.fields.iter().any(|f| f.name.as_str() == name.as_str())
+    pub fn ensure_link_name(&self, name: &LinkName) -> Result<(), Error> {
+        if self.fields.iter().any(|f| f.name.as_str() == name.as_str()) {
+            Err(Error::Fail(Fail::LinkNameCollidesWithField(name.clone())))
+        } else {
+            Ok(())
+        }
     }
 
     fn from_doc(doc: SpecDoc) -> Result<Self, Error> {

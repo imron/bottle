@@ -308,10 +308,8 @@ fn sum(db: &mut Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
             order: Order::Oldest,
             limit: None,
         };
-        if let Some(Group::Link(name)) = &op.group
-            && spec.has_field_named(name)
-        {
-            return Err(Error::Fail(Fail::LinkNameCollidesWithField(name.clone())));
+        if let Some(Group::Link(name)) = &op.group {
+            spec.ensure_link_name(name)?;
         }
         Ok(match store::sum(tx, q, &op.field, op.group, tz)? {
             Summed::Total(value) => Outcome::Total(Total {
@@ -340,11 +338,7 @@ fn resolve_filters(
         });
     }
     for link in links {
-        if spec.has_field_named(&link.name) {
-            return Err(Error::Fail(Fail::LinkNameCollidesWithField(
-                link.name.clone(),
-            )));
-        }
+        spec.ensure_link_name(&link.name)?;
         out.push(Filter::Link {
             name: link.name.clone(),
             to: link.to.clone(),
@@ -355,11 +349,7 @@ fn resolve_filters(
 
 fn ensure_links(conn: &impl Connection, spec: &Spec, links: &[Link]) -> Result<(), Error> {
     for link in links {
-        if spec.has_field_named(&link.name) {
-            return Err(Error::Fail(Fail::LinkNameCollidesWithField(
-                link.name.clone(),
-            )));
-        }
+        spec.ensure_link_name(&link.name)?;
         let target = store::load_schema(conn, &link.to.schema)?;
         if store::get_entry(conn, &link.to.schema, &target.spec, link.to.id)?.is_none() {
             return Err(Error::Fail(Fail::LinkTargetMissing(link.to.clone())));
