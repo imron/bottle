@@ -12,7 +12,10 @@ use serde::Deserialize;
 
 use crate::error::{Error, Fail};
 use crate::input::cmd;
-use crate::{Bottle, Cmd, execute, parse};
+use crate::ledger::Op;
+use crate::{Bottle, Cmd, Request, Style, execute, parse};
+
+use super::{SpecSource, schema_add as parse_schema_add};
 
 fn pairs(map: HashMap<String, String>) -> Vec<(String, String)> {
     map.into_iter().collect()
@@ -93,6 +96,14 @@ fn tool_result(result: Result<String, Error>) -> Result<CallToolResult, McpError
 }
 
 impl Server {
+    fn execute(&self, request: Request) -> Result<CallToolResult, McpError> {
+        let mut bottle = self
+            .bottle
+            .lock()
+            .map_err(|_| McpError::internal_error("lock poisoned", None))?;
+        tool_result(execute(&mut bottle, request))
+    }
+
     fn run(&self, cmd: Cmd) -> Result<CallToolResult, McpError> {
         let mut bottle = self
             .bottle
@@ -124,7 +135,7 @@ struct SchemaShowParams {
 #[serde(deny_unknown_fields)]
 struct SchemaAddParams {
     name: String,
-    file: String,
+    spec: String,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -259,15 +270,15 @@ impl Server {
         })))
     }
 
-    #[tool(description = "Register a type from a YAML file")]
+    #[tool(description = "Register a type from a YAML spec")]
     fn schema_add(
         &self,
         Parameters(p): Parameters<SchemaAddParams>,
     ) -> Result<CallToolResult, McpError> {
-        self.run(Cmd::Schema(cmd::SchemaCmd::Add(cmd::SchemaAdd {
-            name: p.name,
-            file: p.file.into(),
-        })))
+        match parse_schema_add(p.name, SpecSource::Yaml(p.spec)) {
+            Ok(op) => self.execute(Request::new(Op::SchemaAdd(op), Style::Tsv)),
+            Err(err) => tool_result(Err(err)),
+        }
     }
 
     #[tool(description = "Add one field to an existing schema")]

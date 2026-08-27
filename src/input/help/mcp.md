@@ -17,6 +17,7 @@ same commands as the CLI. Use this when a bot should talk
 to bottle without a shell.
 
 The schema name is an argument on tools that need one.
+`schema_add` takes the YAML as `spec`, not a file path.
 
 Each tool result is the same bytes the CLI would print:
 TSV for entry commands, prose for `help`, YAML for

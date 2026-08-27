@@ -132,12 +132,6 @@ fields:
     required: true
 "#;
 
-fn write_yaml(dir: &TempDir, name: &str, body: &str) -> String {
-    let path = dir.path().join(name);
-    std::fs::write(&path, body).unwrap();
-    path.to_string_lossy().into_owned()
-}
-
 #[tokio::test]
 async fn mcp_lists_tools_and_schema_list() {
     let dir = TempDir::new().unwrap();
@@ -178,9 +172,6 @@ async fn mcp_lists_tools_and_schema_list() {
 #[tokio::test]
 async fn mcp_tools_cover_the_surface() {
     let dir = TempDir::new().unwrap();
-    let meal = write_yaml(&dir, "meal.yaml", MEAL);
-    let session = write_yaml(&dir, "session.yaml", SESSION);
-    let set = write_yaml(&dir, "set.yaml", SET);
     let client = connect(&dir).await;
 
     let overview = client
@@ -204,7 +195,7 @@ async fn mcp_tools_cover_the_surface() {
         ok(
             &client,
             "schema_add",
-            rmcp::object!({ "name": "nutrition.meal", "file": meal }),
+            rmcp::object!({ "name": "nutrition.meal", "spec": MEAL }),
         )
         .await
         .is_empty()
@@ -213,7 +204,7 @@ async fn mcp_tools_cover_the_surface() {
         ok(
             &client,
             "schema_add",
-            rmcp::object!({ "name": "fitness.session", "file": session }),
+            rmcp::object!({ "name": "fitness.session", "spec": SESSION }),
         )
         .await
         .is_empty()
@@ -222,7 +213,7 @@ async fn mcp_tools_cover_the_surface() {
         ok(
             &client,
             "schema_add",
-            rmcp::object!({ "name": "fitness.set", "file": set }),
+            rmcp::object!({ "name": "fitness.set", "spec": SET }),
         )
         .await
         .is_empty()
@@ -587,12 +578,11 @@ async fn mcp_tools_cover_the_surface() {
 #[tokio::test]
 async fn mcp_log_entries_is_one_transaction() {
     let dir = TempDir::new().unwrap();
-    let meal = write_yaml(&dir, "meal.yaml", MEAL);
     let client = connect(&dir).await;
     ok(
         &client,
         "schema_add",
-        rmcp::object!({ "name": "nutrition.meal", "file": meal }),
+        rmcp::object!({ "name": "nutrition.meal", "spec": MEAL }),
     )
     .await;
     let result = ok(

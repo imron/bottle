@@ -5,6 +5,7 @@ pub(crate) mod mcp;
 mod tsv;
 
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 use jiff::tz::TimeZone;
 
@@ -51,6 +52,11 @@ impl Request {
     }
 }
 
+pub(crate) enum SpecSource {
+    File(PathBuf),
+    Yaml(String),
+}
+
 pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Request, Error> {
     let style = match &cmd {
         Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow { yaml: true, .. })) => Style::Yaml,
@@ -66,7 +72,9 @@ fn op(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
         }
         Cmd::Schema(cmd::SchemaCmd::List) => Op::SchemaList,
         Cmd::Schema(cmd::SchemaCmd::Show(cmd)) => Op::SchemaShow(schema_show(cmd)?),
-        Cmd::Schema(cmd::SchemaCmd::Add(cmd)) => Op::SchemaAdd(schema_add(cmd)?),
+        Cmd::Schema(cmd::SchemaCmd::Add(cmd)) => {
+            Op::SchemaAdd(schema_add(cmd.name, SpecSource::File(cmd.file))?)
+        }
         Cmd::Schema(cmd::SchemaCmd::AddField(cmd)) => Op::SchemaAddField(schema_add_field(cmd)?),
         Cmd::Schema(cmd::SchemaCmd::AddValue(cmd)) => Op::SchemaAddValue(schema_add_value(cmd)?),
         Cmd::Schema(cmd::SchemaCmd::Retire(cmd)) => Op::SchemaRetire(schema_retire(cmd)?),
@@ -98,18 +106,19 @@ fn schema_show(cmd: cmd::SchemaShow) -> Result<SchemaShow, Error> {
     })
 }
 
-fn schema_add(cmd: cmd::SchemaAdd) -> Result<SchemaAdd, Error> {
-    let raw = match std::fs::read_to_string(&cmd.file) {
-        Ok(raw) => raw,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            return Err(Error::Fail(Fail::FileNotFound(
-                cmd.file.display().to_string(),
-            )));
-        }
-        Err(err) => return Err(err.into()),
+pub(crate) fn schema_add(name: String, source: SpecSource) -> Result<SchemaAdd, Error> {
+    let raw = match source {
+        SpecSource::File(path) => match std::fs::read_to_string(&path) {
+            Ok(raw) => raw,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                return Err(Error::Fail(Fail::FileNotFound(path.display().to_string())));
+            }
+            Err(err) => return Err(err.into()),
+        },
+        SpecSource::Yaml(raw) => raw,
     };
     Ok(SchemaAdd {
-        name: SchemaName::parse(&cmd.name)?,
+        name: SchemaName::parse(&name)?,
         spec: Spec::parse_yaml(&raw)?,
     })
 }
