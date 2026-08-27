@@ -140,7 +140,7 @@ fn parse(input: &str, tz: &TimeZone) -> Result<Parsed, Error> {
     let Some((date, rest)) = input.split_once('T') else {
         return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
     };
-    if !looks_like_date(date) || !looks_like_hms(&rest[..rest.len().min(8)]) {
+    if !looks_like_date(date) || !looks_like_hms(rest.get(..8).unwrap_or("")) {
         return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
     }
     if rest.len() == 8 {
@@ -193,4 +193,26 @@ fn looks_like_hms(s: &str) -> bool {
 
 fn date_midnight(date: Date, tz: &TimeZone) -> Result<Timestamp, Error> {
     Ok(date.to_zoned(tz.clone())?.timestamp())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn non_ascii_time_tail_is_invalid_not_panic() {
+        let tz = TimeZone::UTC;
+        for input in ["2026-08-22T08:14:0µ", "2026-08-22T08:14:🎉"] {
+            let err = parse_instant(input, &tz).unwrap_err();
+            assert!(
+                matches!(err, Error::Usage(Usage::InvalidTime(ref s)) if s == input),
+                "{input}: {err}"
+            );
+            let err = Range::parse(Some(input), None, &tz).unwrap_err();
+            assert!(
+                matches!(err, Error::Usage(Usage::InvalidTime(ref s)) if s == input),
+                "{input}: {err}"
+            );
+        }
+    }
 }
