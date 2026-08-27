@@ -34,8 +34,7 @@ fn run_cli(cli: Cli) -> Result<String, Error> {
             };
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
-                .build()
-                .map_err(|e| bottle::Error::Fail(bottle::Fail::Io(e.to_string())))?;
+                .build()?;
             rt.block_on(bottle::mcp(&db, None, None))?;
             Ok(String::new())
         }
