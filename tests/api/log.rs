@@ -249,8 +249,7 @@ fn unset_agent_defaults_to_bottle() {
     h.add_schema("nutrition.meal", MEAL);
     let db = h.dir.path().join("bottle.db");
     let mut bottle = Bottle::open(&db, None, Some(common::TZ)).unwrap();
-    bottle::execute(
-        &mut bottle,
+    let request = bottle::parse(
         Cmd::Log(cmd::Log {
             schema: "nutrition.meal".into(),
             at: Some("2026-08-22T08:14:00Z".into()),
@@ -264,8 +263,10 @@ fn unset_agent_defaults_to_bottle() {
                 ("carbs".into(), "0".into()),
             ],
         }),
+        bottle.tz(),
     )
     .unwrap();
+    bottle::execute(&mut bottle, request).unwrap();
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
         filters: cmd::Filters {
             schema: "nutrition.meal".into(),

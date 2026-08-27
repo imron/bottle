@@ -15,8 +15,8 @@ use jiff::tz::TimeZone;
 
 pub use db::default_db_path;
 pub use error::{Error, Fail, Usage};
-pub use input::Cmd;
 pub use input::cmd;
+pub use input::{Cmd, Request, Style, parse};
 pub use ledger::Agent;
 pub use spec::FieldType;
 
@@ -36,6 +36,10 @@ impl Bottle {
             )?,
             tz: time::zone(tz)?,
         })
+    }
+
+    pub fn tz(&self) -> &TimeZone {
+        &self.tz
     }
 }
 
@@ -58,15 +62,14 @@ pub fn run(
     db: Option<&Path>,
     agent: Option<String>,
     tz: Option<&str>,
-    cmd: Cmd,
+    request: Request,
 ) -> Result<String, Error> {
     let path = db.ok_or(Error::Fail(Fail::DbPathRequired))?;
     let mut bottle = Bottle::open(path, agent, tz)?;
-    execute(&mut bottle, cmd)
+    execute(&mut bottle, request)
 }
 
-pub fn execute(bottle: &mut Bottle, cmd: Cmd) -> Result<String, Error> {
-    let request = input::parse(cmd, &bottle.tz)?;
+pub fn execute(bottle: &mut Bottle, request: Request) -> Result<String, Error> {
     let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, request.op)?;
     input::render(request.style, request.show_ignored, &outcome, &bottle.tz)
 }

@@ -19,7 +19,8 @@ pub fn harness() -> Harness {
 
 impl Harness {
     pub fn run(&mut self, cmd: Cmd) -> Result<String, Error> {
-        bottle::execute(&mut self.bottle, cmd)
+        let request = bottle::parse(cmd, self.bottle.tz())?;
+        bottle::execute(&mut self.bottle, request)
     }
 
     pub fn run_ok(&mut self, cmd: Cmd) -> String {

@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use crate::error::{Error, Fail};
 use crate::input::cmd;
-use crate::{Bottle, Cmd};
+use crate::{Bottle, Cmd, execute, parse};
 
 fn pairs(map: HashMap<String, String>) -> Vec<(String, String)> {
     map.into_iter().collect()
@@ -98,7 +98,11 @@ impl Server {
             .bottle
             .lock()
             .map_err(|_| McpError::internal_error("lock poisoned", None))?;
-        tool_result(crate::execute(&mut bottle, cmd))
+        let request = match parse(cmd, bottle.tz()) {
+            Ok(request) => request,
+            Err(err) => return tool_result(Err(err)),
+        };
+        tool_result(execute(&mut bottle, request))
     }
 }
 

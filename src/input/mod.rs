@@ -22,6 +22,7 @@ use crate::time::{self, Period, Range};
 
 pub use cmd::Cmd;
 
+#[derive(Debug, Clone, Copy)]
 pub enum Style {
     Tsv,
     Yaml,
@@ -33,24 +34,29 @@ pub struct Request {
     pub show_ignored: bool,
 }
 
+impl Request {
+    pub fn new(op: Op, style: Style) -> Self {
+        Self {
+            show_ignored: matches!(
+                &op,
+                Op::Get(_)
+                    | Op::List(List {
+                        include_ignored: true,
+                        ..
+                    })
+            ),
+            style,
+            op,
+        }
+    }
+}
+
 pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Request, Error> {
     let style = match &cmd {
         Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow { yaml: true, .. })) => Style::Yaml,
         _ => Style::Tsv,
     };
-    let show_ignored = matches!(
-        &cmd,
-        Cmd::Get(_)
-            | Cmd::Ls(cmd::Ls {
-                include_ignored: true,
-                ..
-            })
-    );
-    Ok(Request {
-        op: op(cmd, tz)?,
-        style,
-        show_ignored,
-    })
+    Ok(Request::new(op(cmd, tz)?, style))
 }
 
 fn op(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {

@@ -1,6 +1,15 @@
-use bottle::{Cmd, cmd, help, run};
+use bottle::{Cmd, cmd, help, parse, run};
+use jiff::tz::TimeZone;
 
 use crate::common::{self, MEAL};
+
+fn request(cmd: Cmd) -> bottle::Request {
+    parse(cmd, &TimeZone::UTC).unwrap()
+}
+
+fn request_tz(cmd: Cmd, tz: &str) -> bottle::Request {
+    parse(cmd, &TimeZone::get(tz).unwrap()).unwrap()
+}
 
 #[test]
 fn overview_is_prose_not_tsv() {
@@ -36,7 +45,7 @@ fn help_does_not_need_a_db() {
 
 #[test]
 fn other_commands_need_a_db() {
-    let err = run(None, None, None, Cmd::Schema(cmd::SchemaCmd::List)).unwrap_err();
+    let err = run(None, None, None, request(Cmd::Schema(cmd::SchemaCmd::List))).unwrap_err();
     common::assert_fail(err, "db path required");
 }
 
@@ -44,7 +53,13 @@ fn other_commands_need_a_db() {
 fn run_opens_db_when_path_given() {
     let dir = tempfile::TempDir::new().unwrap();
     let db = dir.path().join("bottle.db");
-    let out = run(Some(&db), None, None, Cmd::Schema(cmd::SchemaCmd::List)).unwrap();
+    let out = run(
+        Some(&db),
+        None,
+        None,
+        request(Cmd::Schema(cmd::SchemaCmd::List)),
+    )
+    .unwrap();
     assert_eq!(out, "name\tretired\n");
 }
 
@@ -58,46 +73,55 @@ fn run_uses_given_timezone() {
         Some(&db),
         Some("test".into()),
         Some(common::TZ),
-        Cmd::Schema(cmd::SchemaCmd::Add(cmd::SchemaAdd {
-            name: "nutrition.meal".into(),
-            file,
-        })),
+        request_tz(
+            Cmd::Schema(cmd::SchemaCmd::Add(cmd::SchemaAdd {
+                name: "nutrition.meal".into(),
+                file,
+            })),
+            common::TZ,
+        ),
     )
     .unwrap();
     run(
         Some(&db),
         Some("test".into()),
         Some(common::TZ),
-        Cmd::Log(cmd::Log {
-            schema: "nutrition.meal".into(),
-            at: Some("2026-08-22T08:14:00".into()),
-            agent: None,
-            links: vec![],
-            fields: vec![
-                ("when".into(), "breakfast".into()),
-                ("what".into(), "eggs".into()),
-                ("kcal".into(), "1".into()),
-                ("protein".into(), "1".into()),
-                ("carbs".into(), "0".into()),
-            ],
-        }),
+        request_tz(
+            Cmd::Log(cmd::Log {
+                schema: "nutrition.meal".into(),
+                at: Some("2026-08-22T08:14:00".into()),
+                agent: None,
+                links: vec![],
+                fields: vec![
+                    ("when".into(), "breakfast".into()),
+                    ("what".into(), "eggs".into()),
+                    ("kcal".into(), "1".into()),
+                    ("protein".into(), "1".into()),
+                    ("carbs".into(), "0".into()),
+                ],
+            }),
+            common::TZ,
+        ),
     )
     .unwrap();
     let out = run(
         Some(&db),
         None,
         Some(common::TZ),
-        Cmd::Ls(cmd::Ls {
-            filters: cmd::Filters {
-                schema: "nutrition.meal".into(),
-                agent: None,
-                wheres: vec![],
-                links: vec![],
-            },
-            from: None,
-            to: None,
-            include_ignored: false,
-        }),
+        request_tz(
+            Cmd::Ls(cmd::Ls {
+                filters: cmd::Filters {
+                    schema: "nutrition.meal".into(),
+                    agent: None,
+                    wheres: vec![],
+                    links: vec![],
+                },
+                from: None,
+                to: None,
+                include_ignored: false,
+            }),
+            common::TZ,
+        ),
     )
     .unwrap();
     assert!(out.contains("2026-08-22T08:14:00+10:00"), "{out}");
