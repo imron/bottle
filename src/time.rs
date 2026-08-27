@@ -199,6 +199,10 @@ fn date_midnight(date: Date, tz: &TimeZone) -> Result<Timestamp, Error> {
 mod tests {
     use super::*;
 
+    fn melbourne() -> TimeZone {
+        TimeZone::get("Australia/Melbourne").unwrap()
+    }
+
     #[test]
     fn non_ascii_time_tail_is_invalid_not_panic() {
         let tz = TimeZone::UTC;
@@ -211,6 +215,97 @@ mod tests {
             let err = Range::parse(Some(input), None, &tz).unwrap_err();
             assert!(
                 matches!(err, Error::Usage(Usage::InvalidTime(ref s)) if s == input),
+                "{input}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn z_offset_and_naive_local_are_one_instant() {
+        let tz = melbourne();
+        let z = parse_instant("2026-08-21T22:14:00Z", &tz).unwrap();
+        let offset = parse_instant("2026-08-22T08:14:00+10:00", &tz).unwrap();
+        let naive = parse_instant("2026-08-22T08:14:00", &tz).unwrap();
+        assert_eq!(z, offset);
+        assert_eq!(z, naive);
+        assert_eq!(display_local(z, &tz).unwrap(), "2026-08-22T08:14:00+10:00");
+    }
+
+    #[test]
+    fn negative_offset_is_an_instant() {
+        let tz = melbourne();
+        let at = parse_instant("2026-08-22T08:14:00-05:00", &tz).unwrap();
+        let utc = parse_instant("2026-08-22T13:14:00Z", &tz).unwrap();
+        assert_eq!(at, utc);
+    }
+
+    #[test]
+    fn date_only_is_a_query_bound() {
+        let tz = melbourne();
+        assert!(matches!(
+            parse_instant("2026-08-22", &tz).unwrap_err(),
+            Error::Usage(Usage::DateOnlyNotInstant)
+        ));
+        let range = Range::parse(Some("2026-08-22"), Some("2026-08-22"), &tz).unwrap();
+        let from = range.from.unwrap();
+        let Some(ToBound::Exclusive(to)) = range.to else {
+            panic!("{:?}", range.to);
+        };
+        assert_eq!(
+            display_local(from, &tz).unwrap(),
+            "2026-08-22T00:00:00+10:00"
+        );
+        assert_eq!(display_local(to, &tz).unwrap(), "2026-08-23T00:00:00+10:00");
+    }
+
+    #[test]
+    fn dst_civil_days_are_23_or_25_hours() {
+        let tz = melbourne();
+        let hours = |day: &str| -> i64 {
+            let range = Range::parse(Some(day), Some(day), &tz).unwrap();
+            let from = range.from.unwrap();
+            let Some(ToBound::Exclusive(to)) = range.to else {
+                panic!("{day}: {:?}", range.to);
+            };
+            (to.timestamp().as_second() - from.timestamp().as_second()) / 3600
+        };
+        assert_eq!(hours("2026-10-04"), 23);
+        assert_eq!(hours("2026-04-05"), 25);
+        assert_eq!(hours("2026-08-22"), 24);
+    }
+
+    #[test]
+    fn dst_gap_naive_time_is_the_later_instant() {
+        let tz = melbourne();
+        let gap = parse_instant("2026-10-04T02:30:00", &tz).unwrap();
+        let later = parse_instant("2026-10-04T03:30:00", &tz).unwrap();
+        assert_eq!(gap, later);
+        assert_eq!(
+            display_local(gap, &tz).unwrap(),
+            "2026-10-04T03:30:00+11:00"
+        );
+    }
+
+    #[test]
+    fn rejects_bad_time_and_date_shapes() {
+        let tz = melbourne();
+        for input in [
+            "2026-08-22T08:14",
+            "2026-08-22t08:14:00",
+            "2026-08-22T08:14:00z",
+            "2026-08-22T25:00:00",
+            "2026-08-22T08:61:00",
+        ] {
+            let err = parse_instant(input, &tz).unwrap_err();
+            assert!(
+                matches!(err, Error::Usage(Usage::InvalidTime(ref s)) if s == input),
+                "{input}: {err}"
+            );
+        }
+        for input in ["2026-02-30", "2025-02-29"] {
+            let err = parse_instant(input, &tz).unwrap_err();
+            assert!(
+                matches!(err, Error::Usage(Usage::InvalidDate(ref s)) if s == input),
                 "{input}: {err}"
             );
         }
