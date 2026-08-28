@@ -72,6 +72,7 @@ pub enum Fail {
     CorruptStoredNumber(String),
     CorruptStoredEnum(String),
     CorruptStoredAgent(String),
+    CorruptStoredText(String),
     CorruptStoredId(i64),
     HomeNotSet,
     FileNotFound(String),

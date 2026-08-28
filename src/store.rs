@@ -14,7 +14,7 @@ use crate::spec::{
 };
 use crate::sql::{
     SqlVal, StoredAgent, StoredEntryId, StoredEnum, StoredLinkName, StoredLinkSchema, StoredNumber,
-    StoredSchemaName, StoredTime, instant_to_sql, quote_ident, table_name,
+    StoredSchemaName, StoredText, StoredTime, instant_to_sql, quote_ident, table_name,
 };
 use crate::time::{Instant, Period, ToBound, period};
 use jiff::tz::TimeZone;
@@ -391,7 +391,7 @@ fn read_field_value(field: &Field, r: &rusqlite::Row<'_>, i: usize) -> Result<Fi
             _ => FieldValue::Empty,
         },
         FieldKind::Text => match v {
-            Some(s) if !s.is_empty() => FieldValue::Text(s),
+            Some(s) if !s.is_empty() => FieldValue::Text(String::try_from(StoredText(s))?),
             _ => FieldValue::Empty,
         },
     })

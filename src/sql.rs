@@ -61,6 +61,7 @@ pub struct StoredLinkSchema(pub String);
 pub struct StoredNumber(pub String);
 pub struct StoredEnum(pub String);
 pub struct StoredAgent(pub String);
+pub struct StoredText(pub String);
 pub struct StoredEntryId(pub i64);
 
 macro_rules! try_from_stored_name {
@@ -100,6 +101,18 @@ try_from_stored_name!(StoredLinkName, LinkName, CorruptLinkName);
 try_from_stored_name!(StoredLinkSchema, SchemaName, CorruptLinkSchema);
 try_from_stored_name!(StoredEnum, EnumValue, CorruptStoredEnum);
 try_from_stored_name!(StoredAgent, Agent, CorruptStoredAgent);
+
+impl TryFrom<StoredText> for String {
+    type Error = Error;
+
+    fn try_from(StoredText(raw): StoredText) -> Result<Self, Error> {
+        if raw.contains('\t') || raw.contains('\n') {
+            Err(Error::Fail(Fail::CorruptStoredText(raw)))
+        } else {
+            Ok(raw)
+        }
+    }
+}
 
 impl TryFrom<StoredEntryId> for EntryId {
     type Error = Error;
@@ -185,6 +198,18 @@ mod tests {
             "corrupt stored agent: "
         );
         assert_eq!(
+            String::try_from(StoredText("a\tb".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored text: a\tb"
+        );
+        assert_eq!(
+            String::try_from(StoredText("a\nb".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored text: a\nb"
+        );
+        assert_eq!(
             EntryId::try_from(StoredEntryId(0)).unwrap_err().to_string(),
             "corrupt stored id: 0"
         );
@@ -267,6 +292,10 @@ mod tests {
                 .unwrap()
                 .as_str(),
             "coach"
+        );
+        assert_eq!(
+            String::try_from(StoredText("4 eggs".into())).unwrap(),
+            "4 eggs"
         );
         assert_eq!(
             Decimal::try_from(StoredNumber("39.60".into()))

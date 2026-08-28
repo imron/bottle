@@ -84,6 +84,7 @@ fn fail_message(err: &Fail) -> String {
         Fail::CorruptStoredNumber(raw) => format!("corrupt stored number: {raw}"),
         Fail::CorruptStoredEnum(raw) => format!("corrupt stored enum: {raw}"),
         Fail::CorruptStoredAgent(raw) => format!("corrupt stored agent: {raw}"),
+        Fail::CorruptStoredText(raw) => format!("corrupt stored text: {raw}"),
         Fail::CorruptStoredId(id) => format!("corrupt stored id: {id}"),
         Fail::HomeNotSet => "HOME is not set".into(),
     }
