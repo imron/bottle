@@ -5,29 +5,23 @@ use jiff::tz::TimeZone;
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, FieldInput, FieldValue, Get, Ignore, Last, List, Log, Op, SchemaAdd,
-    SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Scope, Sum, Today,
+    SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Scope, Style, Sum, Today,
 };
-use crate::output::Style;
 use crate::spec::{
     EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier, Link,
     LinkName, SchemaName, Spec, is_reserved,
 };
 use crate::time::{self, Range};
 
-use super::{AmendInput, Cmd, Request, ScopeInput, SpecSource, cmd};
+use super::{AmendInput, Cmd, ScopeInput, SpecSource, cmd};
 
-pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Request, Error> {
-    let style = match &cmd {
-        Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow { yaml: true, .. })) => Style::Yaml,
-        _ => Style::Tsv,
-    };
-    Ok(Request::new(op(cmd, tz)?, style))
-}
-
-fn op(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
+pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
     Ok(match cmd {
         Cmd::Schema(cmd::SchemaCmd::List) => Op::SchemaList,
-        Cmd::Schema(cmd::SchemaCmd::Show(cmd)) => Op::SchemaShow(schema_show(cmd.name)?),
+        Cmd::Schema(cmd::SchemaCmd::Show(cmd)) => {
+            let style = if cmd.yaml { Style::Yaml } else { Style::Tsv };
+            Op::SchemaShow(schema_show(cmd.name, style)?)
+        }
         Cmd::Schema(cmd::SchemaCmd::Add(cmd)) => {
             Op::SchemaAdd(schema_add(cmd.name, SpecSource::File(cmd.file))?)
         }
@@ -92,9 +86,10 @@ fn op(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
     })
 }
 
-pub fn schema_show(name: String) -> Result<SchemaShow, Error> {
+pub fn schema_show(name: String, style: Style) -> Result<SchemaShow, Error> {
     Ok(SchemaShow {
         name: SchemaName::parse(&name)?,
+        style,
     })
 }
 

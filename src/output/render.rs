@@ -2,15 +2,15 @@ use jiff::tz::TimeZone;
 
 use crate::error::Error;
 use crate::ledger::{
-    Agent, Entries, Entry, FieldValue, GroupedLink, GroupedTime, Outcome, Posted, Schemas, Stamp,
-    Total,
+    Agent, Entries, Entry, FieldValue, GroupedLink, GroupedTime, Outcome, Posted, Schemas,
+    ShownSpec, Stamp, Style, Total,
 };
 use crate::spec::{EnumValue, FieldKind, Link, Spec};
 use crate::time::{self, Period};
 
-use super::{Style, tsv};
+use super::tsv;
 
-pub fn render(style: Style, outcome: &Outcome, tz: &TimeZone) -> Result<String, Error> {
+pub fn render(outcome: &Outcome, tz: &TimeZone) -> Result<String, Error> {
     match outcome {
         Outcome::Empty => Ok(String::new()),
         Outcome::Schemas(Schemas { schemas }) => {
@@ -20,7 +20,7 @@ pub fn render(style: Style, outcome: &Outcome, tz: &TimeZone) -> Result<String, 
                 .collect();
             Ok(tsv::table(&["name", "retired"], &rows))
         }
-        Outcome::Spec(spec) => match style {
+        Outcome::Spec(ShownSpec { spec, style }) => match style {
             Style::Yaml => spec.to_yaml(),
             Style::Tsv => render_spec(spec),
         },

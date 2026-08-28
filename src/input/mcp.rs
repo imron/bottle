@@ -13,7 +13,7 @@ use serde::Deserialize;
 use crate::error::{Error, Fail, Usage};
 use crate::help as bottle_help;
 use crate::ledger::Op;
-use crate::{Bottle, Request, Style, execute};
+use crate::{Bottle, Style, execute};
 use rmcp::service::ServerInitializeError;
 
 use super::{
@@ -103,13 +103,13 @@ fn output(result: Result<String, Error>) -> CallToolResult {
 }
 
 impl Server {
-    fn run(&self, op: Result<Op, Error>, style: Style) -> CallToolResult {
+    fn run(&self, op: Result<Op, Error>) -> CallToolResult {
         let op = match op {
             Ok(op) => op,
             Err(err) => return output(Err(err)),
         };
         let mut bottle = self.bottle.lock().unwrap_or_else(|e| e.into_inner());
-        output(execute(&mut bottle, Request::new(op, style)))
+        output(execute(&mut bottle, op))
     }
 }
 
@@ -251,7 +251,7 @@ impl Server {
 
     #[tool(description = "List registered schemas")]
     fn schema_list(&self) -> Result<CallToolResult, McpError> {
-        Ok(self.run(Ok(Op::SchemaList), Style::Tsv))
+        Ok(self.run(Ok(Op::SchemaList)))
     }
 
     #[tool(description = "Print the field list of a schema")]
@@ -260,8 +260,8 @@ impl Server {
         Parameters(p): Parameters<SchemaShowParams>,
     ) -> Result<CallToolResult, McpError> {
         let style = if p.yaml { Style::Yaml } else { Style::Tsv };
-        let show = parse_schema_show(p.name);
-        Ok(self.run(show.map(Op::SchemaShow), style))
+        let show = parse_schema_show(p.name, style);
+        Ok(self.run(show.map(Op::SchemaShow)))
     }
 
     #[tool(description = "Register a type from a YAML spec")]
@@ -270,7 +270,7 @@ impl Server {
         Parameters(p): Parameters<SchemaAddParams>,
     ) -> Result<CallToolResult, McpError> {
         let spec = parse_schema_add(p.name, SpecSource::Yaml(p.spec));
-        Ok(self.run(spec.map(Op::SchemaAdd), Style::Tsv))
+        Ok(self.run(spec.map(Op::SchemaAdd)))
     }
 
     #[tool(description = "Add one field to an existing schema")]
@@ -281,7 +281,7 @@ impl Server {
         let type_ = p.type_.parse();
         let field = type_
             .and_then(|type_| parse_schema_add_field(p.schema, p.name, type_, p.values, p.default));
-        Ok(self.run(field.map(Op::SchemaAddField), Style::Tsv))
+        Ok(self.run(field.map(Op::SchemaAddField)))
     }
 
     #[tool(description = "Append one value to an enum field")]
@@ -290,7 +290,7 @@ impl Server {
         Parameters(p): Parameters<SchemaAddValueParams>,
     ) -> Result<CallToolResult, McpError> {
         let value = parse_schema_add_value(p.schema, p.field, p.value);
-        Ok(self.run(value.map(Op::SchemaAddValue), Style::Tsv))
+        Ok(self.run(value.map(Op::SchemaAddValue)))
     }
 
     #[tool(description = "Retire a schema so log fails and reads still work")]
@@ -299,7 +299,7 @@ impl Server {
         Parameters(p): Parameters<SchemaNameParams>,
     ) -> Result<CallToolResult, McpError> {
         let retire = parse_schema_retire(p.name);
-        Ok(self.run(retire.map(Op::SchemaRetire), Style::Tsv))
+        Ok(self.run(retire.map(Op::SchemaRetire)))
     }
 
     #[tool(description = "Drop a schema and its entries")]
@@ -308,13 +308,13 @@ impl Server {
         Parameters(p): Parameters<SchemaNameParams>,
     ) -> Result<CallToolResult, McpError> {
         let drop = parse_schema_drop(p.name);
-        Ok(self.run(drop.map(Op::SchemaDrop), Style::Tsv))
+        Ok(self.run(drop.map(Op::SchemaDrop)))
     }
 
     #[tool(description = "Write one entry, or many in one transaction")]
     fn log(&self, Parameters(p): Parameters<LogParams>) -> Result<CallToolResult, McpError> {
         if p.entries.is_empty() {
-            return Ok(self.run(Err(Error::Usage(Usage::EmptyLog)), Style::Tsv));
+            return Ok(self.run(Err(Error::Usage(Usage::EmptyLog))));
         }
         let mut logs = Vec::new();
         for entry in p.entries {
@@ -327,10 +327,10 @@ impl Server {
                 &self.tz,
             ) {
                 Ok(log) => logs.push(log),
-                Err(err) => return Ok(self.run(Err(err), Style::Tsv)),
+                Err(err) => return Ok(self.run(Err(err))),
             }
         }
-        Ok(self.run(Ok(Op::Log(logs)), Style::Tsv))
+        Ok(self.run(Ok(Op::Log(logs))))
     }
 
     #[tool(description = "List entries of a schema")]
@@ -342,13 +342,13 @@ impl Server {
             p.include_ignored,
             &self.tz,
         );
-        Ok(self.run(list.map(Op::List), Style::Tsv))
+        Ok(self.run(list.map(Op::List)))
     }
 
     #[tool(description = "Print one entry by schema and id")]
     fn get(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
         let get = parse_get(p.schema, p.id);
-        Ok(self.run(get.map(Op::Get), Style::Tsv))
+        Ok(self.run(get.map(Op::Get)))
     }
 
     #[tool(description = "Total a number field")]
@@ -361,19 +361,19 @@ impl Server {
             p.group,
             &self.tz,
         );
-        Ok(self.run(sum.map(Op::Sum), Style::Tsv))
+        Ok(self.run(sum.map(Op::Sum)))
     }
 
     #[tool(description = "Print the most recent entry of a schema")]
     fn last(&self, Parameters(p): Parameters<ScopeParams>) -> Result<CallToolResult, McpError> {
         let last = parse_last(p.into_scope());
-        Ok(self.run(last.map(Op::Last), Style::Tsv))
+        Ok(self.run(last.map(Op::Last)))
     }
 
     #[tool(description = "List entries for the current civil day")]
     fn today(&self, Parameters(p): Parameters<ScopeParams>) -> Result<CallToolResult, McpError> {
         let today = parse_today(p.into_scope());
-        Ok(self.run(today.map(Op::Today), Style::Tsv))
+        Ok(self.run(today.map(Op::Today)))
     }
 
     #[tool(description = "Change an existing entry in place")]
@@ -390,13 +390,13 @@ impl Server {
             },
             &self.tz,
         );
-        Ok(self.run(amend.map(Op::Amend), Style::Tsv))
+        Ok(self.run(amend.map(Op::Amend)))
     }
 
     #[tool(description = "Hide an entry from lists and totals")]
     fn ignore(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
         let ignore = parse_ignore(p.schema, p.id);
-        Ok(self.run(ignore.map(Op::Ignore), Style::Tsv))
+        Ok(self.run(ignore.map(Op::Ignore)))
     }
 }
 

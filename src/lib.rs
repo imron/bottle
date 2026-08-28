@@ -17,9 +17,8 @@ use jiff::tz::TimeZone;
 pub use db::default_db_path;
 pub use error::{Error, Fail, Usage};
 pub use input::cmd;
-pub use input::{Cmd, Request, parse};
-pub use ledger::Agent;
-pub use output::Style;
+pub use input::{Cmd, parse};
+pub use ledger::{Agent, Op, Style};
 pub use spec::FieldType;
 
 pub struct Bottle {
@@ -60,9 +59,9 @@ pub async fn mcp(path: &Path, agent: Option<String>, tz: Option<&str>) -> Result
     input::mcp::serve(path, agent, tz).await
 }
 
-pub fn execute(bottle: &mut Bottle, request: Request) -> Result<String, Error> {
-    let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, request.op)?;
-    output::render(request.style, &outcome, &bottle.tz)
+pub fn execute(bottle: &mut Bottle, op: Op) -> Result<String, Error> {
+    let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, op)?;
+    output::render(&outcome, &bottle.tz)
 }
 
 #[cfg(test)]

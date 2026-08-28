@@ -3,11 +3,11 @@ use jiff::tz::TimeZone;
 
 use crate::common::{self, MEAL};
 
-fn request(cmd: Cmd) -> bottle::Request {
+fn request(cmd: Cmd) -> bottle::Op {
     parse(cmd, &TimeZone::UTC).unwrap()
 }
 
-fn request_tz(cmd: Cmd, tz: &str) -> bottle::Request {
+fn request_tz(cmd: Cmd, tz: &str) -> bottle::Op {
     parse(cmd, &TimeZone::get(tz).unwrap()).unwrap()
 }
 
