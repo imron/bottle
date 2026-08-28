@@ -4,8 +4,10 @@ use rusqlite::OptionalExtension;
 use rust_decimal::Decimal;
 
 use crate::db::Connection;
-use crate::error::{Error, Fail, Usage};
-use crate::ledger::{Agent, Entry, FieldValue, Filter, Find, Order, Schema, SchemaInfo, Summed};
+use crate::error::{Error, Fail};
+use crate::ledger::{
+    Agent, Entry, FieldValue, Filter, FilterValue, Find, Order, Schema, SchemaInfo, Summed,
+};
 use crate::spec::{
     EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec,
     TimePeriod,
@@ -250,27 +252,25 @@ fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) ->
     }
     for filter in q.filters {
         match filter {
-            Filter::Field { name, value } => match value {
-                FieldValue::Empty => {
-                    return Err(Error::Usage(Usage::EmptyFilter(name.clone())));
+            Filter::Field { name, value } => {
+                bind.push(SqlVal::from_filter(value));
+                match value {
+                    FilterValue::Number(_) => {
+                        sql.push_str(&format!(
+                            " AND bottle_dec_eq({}, ?{})",
+                            quote_ident(name.as_str()),
+                            bind.len()
+                        ));
+                    }
+                    FilterValue::Text(_) | FilterValue::Enum(_) => {
+                        sql.push_str(&format!(
+                            " AND {} = ?{}",
+                            quote_ident(name.as_str()),
+                            bind.len()
+                        ));
+                    }
                 }
-                FieldValue::Number(_) => {
-                    bind.push(SqlVal::from_field(value));
-                    sql.push_str(&format!(
-                        " AND bottle_dec_eq({}, ?{})",
-                        quote_ident(name.as_str()),
-                        bind.len()
-                    ));
-                }
-                FieldValue::Text(_) | FieldValue::Enum(_) => {
-                    bind.push(SqlVal::from_field(value));
-                    sql.push_str(&format!(
-                        " AND {} = ?{}",
-                        quote_ident(name.as_str()),
-                        bind.len()
-                    ));
-                }
-            },
+            }
             Filter::Link { name, to } => {
                 bind.push(SqlVal::Text(q.schema.to_string()));
                 bind.push(SqlVal::Text(name.to_string()));

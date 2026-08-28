@@ -1,5 +1,5 @@
 use crate::error::{Error, Fail};
-use crate::ledger::{Agent, FieldValue};
+use crate::ledger::{Agent, FieldValue, FilterValue};
 use crate::spec::{EnumValue, LinkName, SchemaName, parse_number};
 use crate::time::Instant;
 use jiff::fmt::strtime;
@@ -29,6 +29,14 @@ impl SqlVal {
             FieldValue::Text(s) => SqlVal::Text(s.clone()),
             FieldValue::Number(n) => SqlVal::Text(n.to_string()),
             FieldValue::Enum(v) => SqlVal::Text(v.to_string()),
+        }
+    }
+
+    pub fn from_filter(value: &FilterValue) -> Self {
+        match value {
+            FilterValue::Text(s) => SqlVal::Text(s.clone()),
+            FilterValue::Number(n) => SqlVal::Text(n.to_string()),
+            FilterValue::Enum(v) => SqlVal::Text(v.to_string()),
         }
     }
 }

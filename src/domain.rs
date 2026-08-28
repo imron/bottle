@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
 use crate::db::{Connection, Db, Tx};
-use crate::error::{Error, Fail, Usage};
+use crate::error::{Error, Fail};
 use crate::ledger::{
-    Agent, Amend, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink, GroupedTime,
-    Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField, SchemaAddValue,
-    SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed, Today, Total,
+    Agent, Amend, Entries, FieldInput, FieldValue, Filter, FilterValue, Find, Get, GroupedLink,
+    GroupedTime, Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField,
+    SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed,
+    Today, Total,
 };
 use crate::mutable_store;
 use crate::spec::{Field, FieldKind, FieldName, Group, Link, Spec};
@@ -332,12 +333,9 @@ fn resolve_filters(
         let Some(spec_field) = spec.field(&field.name) else {
             return Err(Error::Fail(Fail::UnknownField(field.name.clone())));
         };
-        if field.value.is_empty() {
-            return Err(Error::Usage(Usage::EmptyFilter(field.name.clone())));
-        }
         out.push(Filter::Field {
             name: spec_field.name.clone(),
-            value: FieldValue::parse(spec_field, &field.value)?,
+            value: FilterValue::parse(spec_field, &field.value)?,
         });
     }
     for link in links {

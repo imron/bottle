@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use rust_decimal::Decimal;
 
-use crate::error::{Error, Fail};
+use crate::error::{Error, Fail, Usage};
 use crate::spec::{
     self, EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName,
     Spec, TimePeriod, parse_number,
@@ -17,26 +17,30 @@ pub enum FieldValue {
     Enum(EnumValue),
 }
 
+fn parse_text(field: &Field, raw: &str) -> Result<String, Error> {
+    if raw.contains('\t') || raw.contains('\n') {
+        return Err(Error::Fail(Fail::TextHasTabOrNewline(field.name.clone())));
+    }
+    Ok(raw.to_string())
+}
+
+fn parse_enum(field: &Field, values: &[EnumValue], raw: &str) -> Result<EnumValue, Error> {
+    let folded = EnumValue::parse(raw)?;
+    if !values.iter().any(|v| v == &folded) {
+        return Err(Error::Fail(Fail::InvalidEnumValue {
+            field: field.name.clone(),
+            value: raw.to_string(),
+        }));
+    }
+    Ok(folded)
+}
+
 impl FieldValue {
     pub fn parse(field: &Field, raw: &str) -> Result<Self, Error> {
         match &field.kind {
-            FieldKind::Text => {
-                if raw.contains('\t') || raw.contains('\n') {
-                    return Err(Error::Fail(Fail::TextHasTabOrNewline(field.name.clone())));
-                }
-                Ok(Self::Text(raw.to_string()))
-            }
+            FieldKind::Text => Ok(Self::Text(parse_text(field, raw)?)),
             FieldKind::Number => Ok(Self::Number(parse_number(raw)?)),
-            FieldKind::Enum(values) => {
-                let folded = EnumValue::parse(raw)?;
-                if !values.iter().any(|v| v == &folded) {
-                    return Err(Error::Fail(Fail::InvalidEnumValue {
-                        field: field.name.clone(),
-                        value: raw.to_string(),
-                    }));
-                }
-                Ok(Self::Enum(folded))
-            }
+            FieldKind::Enum(values) => Ok(Self::Enum(parse_enum(field, values, raw)?)),
         }
     }
 }
@@ -83,8 +87,28 @@ pub struct SchemaInfo {
 }
 
 #[derive(Debug, Clone)]
+pub enum FilterValue {
+    Text(String),
+    Number(Decimal),
+    Enum(EnumValue),
+}
+
+impl FilterValue {
+    pub fn parse(field: &Field, raw: &str) -> Result<Self, Error> {
+        if raw.is_empty() {
+            return Err(Error::Usage(Usage::EmptyFilter(field.name.clone())));
+        }
+        match &field.kind {
+            FieldKind::Text => Ok(Self::Text(parse_text(field, raw)?)),
+            FieldKind::Number => Ok(Self::Number(parse_number(raw)?)),
+            FieldKind::Enum(values) => Ok(Self::Enum(parse_enum(field, values, raw)?)),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Filter {
-    Field { name: FieldName, value: FieldValue },
+    Field { name: FieldName, value: FilterValue },
     Link { name: LinkName, to: EntryRef },
 }
 
