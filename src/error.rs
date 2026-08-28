@@ -47,6 +47,7 @@ pub enum Fail {
     TextHasTabOrNewline(FieldName),
     EnumHasTabNewlineOrComma,
     AgentHasTabOrNewline,
+    EmptyAgent,
     InvalidEnumValue { field: FieldName, value: String },
     InvalidSpec(String),
     Yaml(String),

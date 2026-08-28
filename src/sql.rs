@@ -169,6 +169,12 @@ mod tests {
                 .to_string(),
             "corrupt stored agent: a\tb"
         );
+        assert_eq!(
+            Agent::try_from(StoredAgent("".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored agent: "
+        );
     }
 
     #[test]

@@ -195,6 +195,22 @@ fn agent_from_open() {
 }
 
 #[test]
+fn agent_rejects_empty() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: Some("   ".into()),
+            links: vec![],
+            fields: meal_fields(),
+        }))
+        .unwrap_err();
+    assert_fail(err, "empty agent");
+}
+
+#[test]
 fn agent_rejects_tab() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);

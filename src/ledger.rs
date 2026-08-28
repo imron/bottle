@@ -51,6 +51,9 @@ pub struct Agent(String);
 impl Agent {
     pub fn parse(s: &str) -> Result<Self, Error> {
         let s = s.trim_matches(' ');
+        if s.is_empty() {
+            return Err(Error::Fail(Fail::EmptyAgent));
+        }
         if s.contains('\t') || s.contains('\n') {
             return Err(Error::Fail(Fail::AgentHasTabOrNewline));
         }
