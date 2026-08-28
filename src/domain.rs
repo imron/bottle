@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::db::{Connection, Db, Tx};
-use crate::error::{Error, Fail, Usage};
+use crate::error::{Error, Fail};
 use crate::ledger::{
     Agent, Amend, Entries, FieldInput, FieldValue, Filter, FilterValue, Find, Get, GroupedLink,
     GroupedTime, Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField,
@@ -333,11 +333,9 @@ fn resolve_filters(
         let Some(spec_field) = spec.field(&field.name) else {
             return Err(Error::Fail(Fail::UnknownField(field.name.clone())));
         };
-        let value = FilterValue::try_from(FieldValue::parse(spec_field, &field.value)?)
-            .map_err(|_| Error::Usage(Usage::EmptyFilter(spec_field.name.clone())))?;
         out.push(Filter::Field {
             name: spec_field.name.clone(),
-            value,
+            value: FilterValue::parse(spec_field, &field.value)?,
         });
     }
     for link in links {

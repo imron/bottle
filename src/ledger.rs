@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use rust_decimal::Decimal;
 
-use crate::error::{Error, Fail};
+use crate::error::{Error, Fail, Usage};
 use crate::spec::{
     self, EntryId, EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName,
     SchemaName, Spec, TimePeriod, parse_number,
@@ -99,14 +99,10 @@ pub enum FilterValue {
     Enum(EnumValue),
 }
 
-pub struct EmptyFilter;
-
-impl TryFrom<FieldValue> for FilterValue {
-    type Error = EmptyFilter;
-
-    fn try_from(value: FieldValue) -> Result<Self, EmptyFilter> {
-        match value {
-            FieldValue::Empty => Err(EmptyFilter),
+impl FilterValue {
+    pub fn parse(field: &Field, raw: &str) -> Result<Self, Error> {
+        match FieldValue::parse(field, raw)? {
+            FieldValue::Empty => Err(Error::Usage(Usage::EmptyFilter(field.name.clone()))),
             FieldValue::Text(s) => Ok(Self::Text(s)),
             FieldValue::Number(n) => Ok(Self::Number(n)),
             FieldValue::Enum(v) => Ok(Self::Enum(v)),
