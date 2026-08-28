@@ -184,7 +184,7 @@ struct LsParams {
     to: Option<String>,
     agent: Option<String>,
     #[serde(rename = "where", default)]
-    wheres: HashMap<String, String>,
+    wheres: HashMap<String, FieldCell>,
     #[serde(default)]
     links: HashMap<String, String>,
     #[serde(default)]
@@ -207,7 +207,7 @@ struct SumParams {
     to: Option<String>,
     agent: Option<String>,
     #[serde(rename = "where", default)]
-    wheres: HashMap<String, String>,
+    wheres: HashMap<String, FieldCell>,
     #[serde(default)]
     links: HashMap<String, String>,
     group: Option<String>,
@@ -219,7 +219,7 @@ struct FilterParams {
     schema: String,
     agent: Option<String>,
     #[serde(rename = "where", default)]
-    wheres: HashMap<String, String>,
+    wheres: HashMap<String, FieldCell>,
     #[serde(default)]
     links: HashMap<String, String>,
 }
@@ -336,7 +336,7 @@ impl Server {
             ScopeInput {
                 schema: p.schema,
                 agent: p.agent,
-                wheres: pairs(p.wheres),
+                wheres: cells(p.wheres),
                 links: pairs(p.links),
             },
             p.from,
@@ -359,7 +359,7 @@ impl Server {
             ScopeInput {
                 schema: p.schema,
                 agent: p.agent,
-                wheres: pairs(p.wheres),
+                wheres: cells(p.wheres),
                 links: pairs(p.links),
             },
             p.field,
@@ -376,7 +376,7 @@ impl Server {
         let last = parse_last(ScopeInput {
             schema: p.schema,
             agent: p.agent,
-            wheres: pairs(p.wheres),
+            wheres: cells(p.wheres),
             links: pairs(p.links),
         });
         Ok(self.run(last.map(Op::Last), Style::Tsv))
@@ -387,7 +387,7 @@ impl Server {
         let today = parse_today(ScopeInput {
             schema: p.schema,
             agent: p.agent,
-            wheres: pairs(p.wheres),
+            wheres: cells(p.wheres),
             links: pairs(p.links),
         });
         Ok(self.run(today.map(Op::Today), Style::Tsv))

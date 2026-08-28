@@ -391,6 +391,18 @@ async fn mcp_tools_cover_the_surface() {
     assert!(filtered.contains("eggs"), "{filtered}");
     assert!(!filtered.contains("rice"), "{filtered}");
 
+    let by_kcal = ok(
+        &client,
+        "ls",
+        rmcp::object!({
+            "schema": "nutrition.meal",
+            "where": { "kcal": 568 }
+        }),
+    )
+    .await;
+    assert!(by_kcal.contains("eggs"), "{by_kcal}");
+    assert!(!by_kcal.contains("rice"), "{by_kcal}");
+
     let linked = ok(
         &client,
         "ls",
@@ -669,4 +681,14 @@ async fn mcp_rejects_bad_field_type_and_value_shape() {
     )
     .await;
     assert!(bad_bool.contains("strings or numbers"), "{bad_bool}");
+    let bad_where = param_err(
+        &client,
+        "ls",
+        rmcp::object!({
+            "schema": "nutrition.meal",
+            "where": { "kcal": true }
+        }),
+    )
+    .await;
+    assert!(bad_where.contains("strings or numbers"), "{bad_where}");
 }

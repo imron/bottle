@@ -43,8 +43,9 @@ to.
 list of names.
 
 Field values are strings or JSON numbers. The number's
-text is what `log` would take on the CLI. `null` is an
-empty cell. Booleans and nested objects are rejected.
+text is what the CLI would take. `log` and `amend` use
+that for cells (`null` is empty). `where` uses it for
+filters. Booleans and nested objects are rejected.
 
 ## See also
 
