@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::db::{Connection, Db, Tx};
-use crate::error::{Error, Fail};
+use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, Entries, FieldInput, FieldValue, Filter, FilterValue, Find, Get, GroupedLink,
     GroupedTime, Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField,
@@ -333,9 +333,11 @@ fn resolve_filters(
         let Some(spec_field) = spec.field(&field.name) else {
             return Err(Error::Fail(Fail::UnknownField(field.name.clone())));
         };
+        let value = FilterValue::try_from(FieldValue::parse(spec_field, &field.value)?)
+            .map_err(|_| Error::Usage(Usage::EmptyFilter(spec_field.name.clone())))?;
         out.push(Filter::Field {
             name: spec_field.name.clone(),
-            value: FilterValue::parse(spec_field, &field.value)?,
+            value,
         });
     }
     for link in links {
@@ -367,17 +369,11 @@ fn given_fields(
         let Some(spec_field) = spec.field(&field.name) else {
             return Err(Error::Fail(Fail::UnknownField(field.name.clone())));
         };
-        if field.value.is_empty() {
-            if spec_field.required {
-                return Err(Error::Fail(Fail::MissingRequiredField(field.name.clone())));
-            }
-            out.insert(field.name.clone(), FieldValue::Empty);
-            continue;
+        let value = FieldValue::parse(spec_field, &field.value)?;
+        if spec_field.required && matches!(value, FieldValue::Empty) {
+            return Err(Error::Fail(Fail::MissingRequiredField(field.name.clone())));
         }
-        out.insert(
-            field.name.clone(),
-            FieldValue::parse(spec_field, &field.value)?,
-        );
+        out.insert(field.name.clone(), value);
     }
     Ok(out)
 }

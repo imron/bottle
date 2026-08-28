@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use rust_decimal::Decimal;
 
-use crate::error::{Error, Fail, Usage};
+use crate::error::{Error, Fail};
 use crate::spec::{
     self, EntryId, EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName,
     SchemaName, Spec, TimePeriod, parse_number,
@@ -37,6 +37,9 @@ fn parse_enum(field: &Field, values: &[EnumValue], raw: &str) -> Result<EnumValu
 
 impl FieldValue {
     pub fn parse(field: &Field, raw: &str) -> Result<Self, Error> {
+        if raw.is_empty() {
+            return Ok(Self::Empty);
+        }
         match &field.kind {
             FieldKind::Text => Ok(Self::Text(parse_text(field, raw)?)),
             FieldKind::Number => Ok(Self::Number(parse_number(raw)?)),
@@ -96,15 +99,17 @@ pub enum FilterValue {
     Enum(EnumValue),
 }
 
-impl FilterValue {
-    pub fn parse(field: &Field, raw: &str) -> Result<Self, Error> {
-        if raw.is_empty() {
-            return Err(Error::Usage(Usage::EmptyFilter(field.name.clone())));
-        }
-        match &field.kind {
-            FieldKind::Text => Ok(Self::Text(parse_text(field, raw)?)),
-            FieldKind::Number => Ok(Self::Number(parse_number(raw)?)),
-            FieldKind::Enum(values) => Ok(Self::Enum(parse_enum(field, values, raw)?)),
+pub struct EmptyFilter;
+
+impl TryFrom<FieldValue> for FilterValue {
+    type Error = EmptyFilter;
+
+    fn try_from(value: FieldValue) -> Result<Self, EmptyFilter> {
+        match value {
+            FieldValue::Empty => Err(EmptyFilter),
+            FieldValue::Text(s) => Ok(Self::Text(s)),
+            FieldValue::Number(n) => Ok(Self::Number(n)),
+            FieldValue::Enum(v) => Ok(Self::Enum(v)),
         }
     }
 }
