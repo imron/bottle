@@ -413,5 +413,8 @@ pub fn parse_number(raw: &str) -> Result<Decimal, Error> {
     if raw.contains(['e', 'E']) {
         return Err(Error::Fail(Fail::InvalidNumber(raw.to_string())));
     }
-    Ok(raw.parse()?)
+    let Ok(n) = raw.parse() else {
+        return Err(Error::Fail(Fail::InvalidNumber(raw.to_string())));
+    };
+    Ok(n)
 }

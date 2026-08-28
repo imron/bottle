@@ -159,7 +159,7 @@ fn scientific_notation_rejected() {
             ],
         }))
         .unwrap_err();
-    assert_fail(err, "invalid number");
+    assert_fail(err, "invalid number: 1e3");
 }
 
 #[test]
@@ -551,7 +551,7 @@ fn invalid_plain_number() {
             },
         }))
         .unwrap_err();
-    assert_fail(err, "invalid number");
+    assert_fail(err, "invalid number: nope");
 }
 
 #[test]
