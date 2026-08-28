@@ -64,21 +64,6 @@ async fn tool_err(
     text_of(&result)
 }
 
-async fn proto_err(
-    client: &RunningService<RoleClient, ()>,
-    name: &'static str,
-    args: rmcp::model::JsonObject,
-) -> String {
-    match client.call_tool(params(name, args)).await {
-        Err(ServiceError::McpError(err)) => err.to_string(),
-        Err(err) => panic!("{name}: expected McpError, got {err}"),
-        Ok(result) => panic!(
-            "{name}: expected protocol error, got tool result {}",
-            text_of(&result)
-        ),
-    }
-}
-
 async fn param_err(
     client: &RunningService<RoleClient, ()>,
     name: &'static str,
@@ -628,7 +613,13 @@ async fn mcp_log_shape_errors_are_protocol() {
     )
     .await;
     assert!(missing.contains("entries"), "{missing}");
-    let empty = proto_err(
+}
+
+#[tokio::test]
+async fn mcp_empty_log_is_tool_error() {
+    let dir = TempDir::new().unwrap();
+    let client = connect(&dir).await;
+    let empty = tool_err(
         &client,
         "log",
         rmcp::object!({
@@ -637,7 +628,7 @@ async fn mcp_log_shape_errors_are_protocol() {
         }),
     )
     .await;
-    assert!(empty.contains("entries is empty"), "{empty}");
+    assert!(empty.contains("log requires at least one entry"), "{empty}");
 }
 
 #[tokio::test]

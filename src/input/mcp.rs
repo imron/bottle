@@ -10,7 +10,7 @@ use rmcp::{
 };
 use serde::Deserialize;
 
-use crate::error::{Error, Fail};
+use crate::error::{Error, Fail, Usage};
 use crate::help as bottle_help;
 use crate::ledger::Op;
 use crate::{Bottle, Request, Style, execute};
@@ -318,7 +318,7 @@ impl Server {
     #[tool(description = "Write one entry, or many in one transaction")]
     fn log(&self, Parameters(p): Parameters<LogParams>) -> Result<CallToolResult, McpError> {
         if p.entries.is_empty() {
-            return Err(McpError::invalid_params("entries is empty", None));
+            return Ok(output(Err(Error::Usage(Usage::EmptyLog))));
         }
         let mut logs = Vec::new();
         for entry in p.entries {
