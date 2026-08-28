@@ -61,6 +61,7 @@ pub enum Fail {
     DuplicateEnumValue(EnumValue),
     DuplicateSpecField(FieldName),
     InvalidNumber(String),
+    NumberOverflow,
     ValuesOnlyForEnum(FieldName),
     EnumNeedsValues(FieldName),
     InvalidIdentifier(String),

@@ -212,7 +212,8 @@ fn dec_add(acc: Decimal, raw: Option<&str>) -> Result<Decimal, Error> {
     if raw.is_empty() {
         return Ok(acc);
     }
-    Ok(acc + Decimal::try_from(StoredNumber(raw.to_string()))?)
+    let n = Decimal::try_from(StoredNumber(raw.to_string()))?;
+    acc.checked_add(n).ok_or(Error::Fail(Fail::NumberOverflow))
 }
 
 fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
@@ -268,5 +269,6 @@ mod tests {
                 .to_string(),
             "49.6"
         );
+        assert!(dec_add(Decimal::MAX, Some("1")).is_err());
     }
 }

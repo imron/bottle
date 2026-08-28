@@ -74,6 +74,7 @@ fn fail_message(err: &Fail) -> String {
         Fail::DuplicateEnumValue(value) => format!("duplicate enum value after fold: {value}"),
         Fail::DuplicateSpecField(name) => format!("duplicate field: {name}"),
         Fail::InvalidNumber(raw) => format!("invalid number: {raw}"),
+        Fail::NumberOverflow => "number overflow".into(),
         Fail::ValuesOnlyForEnum(name) => format!("values only apply to enum, not {name}"),
         Fail::EnumNeedsValues(name) => format!("enum {name} needs values"),
         Fail::CorruptSchemaName(name) => format!("corrupt schema name: {name}"),

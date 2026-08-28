@@ -173,7 +173,10 @@ fn by_time(
         let n_raw: String = r.get(1)?;
         let n = Decimal::try_from(StoredNumber(n_raw))?;
         let k = period(unit, Instant::try_from(StoredTime(at_raw))?, tz);
-        *buckets.entry(k).or_insert(Decimal::ZERO) += n;
+        let slot = buckets.entry(k).or_insert(Decimal::ZERO);
+        *slot = slot
+            .checked_add(n)
+            .ok_or(Error::Fail(Fail::NumberOverflow))?;
     }
     Ok(Summed::Time {
         unit,
