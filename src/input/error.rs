@@ -82,7 +82,6 @@ fn fail_message(err: &Fail) -> String {
         Fail::CorruptStoredEnum(raw) => format!("corrupt stored enum: {raw}"),
         Fail::CorruptStoredAgent(raw) => format!("corrupt stored agent: {raw}"),
         Fail::HomeNotSet => "HOME is not set".into(),
-        Fail::DbPathRequired => "db path required".into(),
     }
 }
 

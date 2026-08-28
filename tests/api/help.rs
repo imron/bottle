@@ -1,4 +1,4 @@
-use bottle::{Cmd, cmd, help, parse, run};
+use bottle::{Bottle, Cmd, cmd, execute, help, parse};
 use jiff::tz::TimeZone;
 
 use crate::common::{self, MEAL};
@@ -44,35 +44,23 @@ fn help_does_not_need_a_db() {
 }
 
 #[test]
-fn other_commands_need_a_db() {
-    let err = run(None, None, None, request(Cmd::Schema(cmd::SchemaCmd::List))).unwrap_err();
-    common::assert_fail(err, "db path required");
-}
-
-#[test]
-fn run_opens_db_when_path_given() {
+fn open_creates_an_empty_db() {
     let dir = tempfile::TempDir::new().unwrap();
     let db = dir.path().join("bottle.db");
-    let out = run(
-        Some(&db),
-        None,
-        None,
-        request(Cmd::Schema(cmd::SchemaCmd::List)),
-    )
-    .unwrap();
+    let mut bottle = Bottle::open(&db, None, None).unwrap();
+    let out = execute(&mut bottle, request(Cmd::Schema(cmd::SchemaCmd::List))).unwrap();
     assert_eq!(out, "name\tretired\n");
 }
 
 #[test]
-fn run_uses_given_timezone() {
+fn execute_uses_the_open_timezone() {
     let dir = tempfile::TempDir::new().unwrap();
     let db = dir.path().join("bottle.db");
     let file = dir.path().join("meal.yaml");
     std::fs::write(&file, MEAL).unwrap();
-    run(
-        Some(&db),
-        Some("test".into()),
-        Some(common::TZ),
+    let mut bottle = Bottle::open(&db, Some("test".into()), Some(common::TZ)).unwrap();
+    execute(
+        &mut bottle,
         request_tz(
             Cmd::Schema(cmd::SchemaCmd::Add(cmd::SchemaAdd {
                 name: "nutrition.meal".into(),
@@ -82,10 +70,8 @@ fn run_uses_given_timezone() {
         ),
     )
     .unwrap();
-    run(
-        Some(&db),
-        Some("test".into()),
-        Some(common::TZ),
+    execute(
+        &mut bottle,
         request_tz(
             Cmd::Log(cmd::Log {
                 schema: "nutrition.meal".into(),
@@ -104,10 +90,8 @@ fn run_uses_given_timezone() {
         ),
     )
     .unwrap();
-    let out = run(
-        Some(&db),
-        None,
-        Some(common::TZ),
+    let out = execute(
+        &mut bottle,
         request_tz(
             Cmd::Ls(cmd::Ls {
                 filters: cmd::Filters {

@@ -60,17 +60,6 @@ pub async fn mcp(path: &Path, agent: Option<String>, tz: Option<&str>) -> Result
     input::mcp::serve(path, agent, tz).await
 }
 
-pub fn run(
-    db: Option<&Path>,
-    agent: Option<String>,
-    tz: Option<&str>,
-    request: Request,
-) -> Result<String, Error> {
-    let path = db.ok_or(Error::Fail(Fail::DbPathRequired))?;
-    let mut bottle = Bottle::open(path, agent, tz)?;
-    execute(&mut bottle, request)
-}
-
 pub fn execute(bottle: &mut Bottle, request: Request) -> Result<String, Error> {
     let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, request.op)?;
     output::render(request.style, &outcome, &bottle.tz)

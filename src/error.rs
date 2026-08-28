@@ -70,7 +70,6 @@ pub enum Fail {
     CorruptStoredEnum(String),
     CorruptStoredAgent(String),
     HomeNotSet,
-    DbPathRequired,
     FileNotFound(String),
     Store(String),
     Io(String),
