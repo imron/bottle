@@ -11,12 +11,7 @@ use crate::time::{self, Period};
 use super::Style;
 use super::tsv;
 
-pub fn render(
-    outcome: &Outcome,
-    tz: &TimeZone,
-    style: Style,
-    show_ignored: bool,
-) -> Result<String, Error> {
+pub fn render(outcome: &Outcome, tz: &TimeZone, style: Style) -> Result<String, Error> {
     match outcome {
         Outcome::Empty => Ok(String::new()),
         Outcome::Schemas(Schemas { schemas }) => {
@@ -30,9 +25,11 @@ pub fn render(
             Style::Yaml => spec.to_yaml(),
             Style::Tsv => render_spec(spec),
         },
-        Outcome::Entries(Entries { spec, entries }) => {
-            render_entries(spec, entries, show_ignored, tz)
-        }
+        Outcome::Entries(Entries {
+            spec,
+            entries,
+            include_ignored,
+        }) => render_entries(spec, entries, *include_ignored, tz),
         Outcome::Posted(rows) => {
             let mut out = Vec::new();
             for Posted { id, at, links } in rows {

@@ -69,13 +69,8 @@ pub fn style(cmd: &Cmd) -> Style {
 }
 
 pub fn execute(bottle: &mut Bottle, op: Op, style: Style) -> Result<String, Error> {
-    let show_ignored = match &op {
-        Op::Get(_) => true,
-        Op::List(list) => list.include_ignored,
-        _ => false,
-    };
     let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, op)?;
-    output::render(&outcome, &bottle.tz, style, show_ignored)
+    output::render(&outcome, &bottle.tz, style)
 }
 
 #[cfg(test)]
