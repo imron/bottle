@@ -5,8 +5,8 @@ use rusqlite::params;
 use crate::db::{Tx, UniqueConstraint};
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, FieldValue};
-use crate::spec::{Field, FieldName, Link, LinkName, SchemaName, Spec};
-use crate::sql::{SqlVal, instant_to_sql, quote_ident, sql_default, table_name};
+use crate::spec::{EntryId, Field, FieldName, Link, LinkName, SchemaName, Spec};
+use crate::sql::{SqlVal, StoredEntryId, instant_to_sql, quote_ident, sql_default, table_name};
 use crate::time::Instant;
 
 pub fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
@@ -88,7 +88,7 @@ pub fn insert_entry(
     agent: Option<&Agent>,
     values: &HashMap<FieldName, FieldValue>,
     links: &[Link],
-) -> Result<i64, Error> {
+) -> Result<EntryId, Error> {
     let mut col_names = vec!["at".to_string(), "agent".to_string()];
     let mut placeholders = vec!["?1".to_string(), "?2".to_string()];
     let mut bind: Vec<SqlVal> = vec![
@@ -124,7 +124,7 @@ pub fn insert_entry(
             bind.iter().map(SqlVal::as_param),
         ))?;
     }
-    let id = tx.as_ref().last_insert_rowid();
+    let id = EntryId::try_from(StoredEntryId(tx.as_ref().last_insert_rowid()))?;
     insert_links(tx, schema, id, links)?;
     Ok(id)
 }
@@ -132,7 +132,7 @@ pub fn insert_entry(
 pub fn update_entry(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
-    id: i64,
+    id: EntryId,
     at: Option<Instant>,
     agent: Option<&Agent>,
     values: &HashMap<FieldName, FieldValue>,
@@ -158,7 +158,7 @@ pub fn update_entry(
     if sets.is_empty() {
         return Ok(());
     }
-    bind.push(SqlVal::Int(id));
+    bind.push(SqlVal::Int(id.as_i64()));
     let sql = format!(
         "UPDATE {} SET {} WHERE id = ?{}",
         quote_ident(&table_name(schema)),
@@ -175,12 +175,12 @@ pub fn update_entry(
 pub fn delete_link(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
-    id: i64,
+    id: EntryId,
     name: &LinkName,
 ) -> Result<(), Error> {
     tx.as_ref().execute(
         "DELETE FROM links WHERE from_schema = ?1 AND from_id = ?2 AND name = ?3",
-        params![schema.as_str(), id, name.as_str()],
+        params![schema.as_str(), id.as_i64(), name.as_str()],
     )?;
     Ok(())
 }
@@ -188,7 +188,7 @@ pub fn delete_link(
 pub fn upsert_link(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
-    id: i64,
+    id: EntryId,
     link: &Link,
 ) -> Result<(), Error> {
     tx.as_ref().execute(
@@ -199,22 +199,22 @@ pub fn upsert_link(
             to_id = excluded.to_id",
         params![
             schema.as_str(),
-            id,
+            id.as_i64(),
             link.name.as_str(),
             link.to.schema.as_str(),
-            link.to.id
+            link.to.id.as_i64()
         ],
     )?;
     Ok(())
 }
 
-pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<(), Error> {
+pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: EntryId) -> Result<(), Error> {
     tx.as_ref().execute(
         &format!(
             "UPDATE {} SET ignored = 1 WHERE id = ?1",
             quote_ident(&table_name(schema))
         ),
-        [id],
+        [id.as_i64()],
     )?;
     Ok(())
 }
@@ -222,7 +222,7 @@ pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: i64) -> Result<(), 
 fn insert_links(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
-    id: i64,
+    id: EntryId,
     links: &[Link],
 ) -> Result<(), Error> {
     for link in links {
@@ -231,10 +231,10 @@ fn insert_links(
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
                 schema.as_str(),
-                id,
+                id.as_i64(),
                 link.name.as_str(),
                 link.to.schema.as_str(),
-                link.to.id
+                link.to.id.as_i64()
             ],
         )?;
     }

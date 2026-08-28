@@ -9,11 +9,11 @@ use crate::ledger::{
     Agent, Entry, FieldValue, Filter, FilterValue, Find, Order, Schema, SchemaInfo, Summed,
 };
 use crate::spec::{
-    EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec,
-    TimePeriod,
+    EntryId, EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName,
+    Spec, TimePeriod,
 };
 use crate::sql::{
-    SqlVal, StoredAgent, StoredEnum, StoredLinkName, StoredLinkSchema, StoredNumber,
+    SqlVal, StoredAgent, StoredEntryId, StoredEnum, StoredLinkName, StoredLinkSchema, StoredNumber,
     StoredSchemaName, StoredTime, instant_to_sql, quote_ident, table_name,
 };
 use crate::time::{Instant, Period, ToBound, period};
@@ -75,7 +75,7 @@ pub fn get_entry(
     conn: &impl Connection,
     schema: &SchemaName,
     spec: &Spec,
-    id: i64,
+    id: EntryId,
 ) -> Result<Option<Entry>, Error> {
     let sql = format!(
         "SELECT {} FROM {} WHERE id = ?1",
@@ -84,7 +84,7 @@ pub fn get_entry(
     );
     let mut entry = {
         let mut stmt = conn.as_ref().prepare(&sql)?;
-        let mut raw = stmt.query([id])?;
+        let mut raw = stmt.query([id.as_i64()])?;
         match raw.next()? {
             Some(r) => read_entry(spec, r)?,
             None => return Ok(None),
@@ -214,7 +214,10 @@ fn by_link(
         let key = match (to_schema, to_id) {
             (Some(schema), Some(id)) => {
                 let schema = SchemaName::try_from(StoredLinkSchema(schema))?;
-                Some(EntryRef { schema, id })
+                Some(EntryRef {
+                    schema,
+                    id: EntryId::try_from(StoredEntryId(id))?,
+                })
             }
             _ => None,
         };
@@ -275,7 +278,7 @@ fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) ->
                 bind.push(SqlVal::Text(q.schema.to_string()));
                 bind.push(SqlVal::Text(name.to_string()));
                 bind.push(SqlVal::Text(to.schema.to_string()));
-                bind.push(SqlVal::Int(to.id));
+                bind.push(SqlVal::Int(to.id.as_i64()));
                 let a = bind.len() - 3;
                 sql.push_str(&format!(
                     " AND id IN (SELECT from_id FROM links WHERE from_schema = ?{a} AND name = ?{} AND to_schema = ?{} AND to_id = ?{})",
@@ -312,7 +315,7 @@ fn read_entry(spec: &Spec, r: &rusqlite::Row<'_>) -> Result<Entry, Error> {
         values.insert(field.name.clone(), read_field_value(field, r, 4 + i)?);
     }
     Ok(Entry {
-        id,
+        id: EntryId::try_from(StoredEntryId(id))?,
         at: Instant::try_from(StoredTime(at_raw))?,
         agent: agent.map(StoredAgent).map(Agent::try_from).transpose()?,
         ignored: ignored != 0,
@@ -349,13 +352,13 @@ fn apply_find_order_limit(sql: &mut String, q: &Find<'_>) {
     }
 }
 
-fn links_for(conn: &impl Connection, schema: &SchemaName, id: i64) -> Result<Vec<Link>, Error> {
+fn links_for(conn: &impl Connection, schema: &SchemaName, id: EntryId) -> Result<Vec<Link>, Error> {
     let mut stmt = conn.as_ref().prepare(
         "SELECT from_id, name, to_schema, to_id FROM links
          WHERE from_schema = ?1 AND from_id = ?2
          ORDER BY name",
     )?;
-    let mut raw = stmt.query(rusqlite::params![schema.as_str(), id])?;
+    let mut raw = stmt.query(rusqlite::params![schema.as_str(), id.as_i64()])?;
     let mut links = Vec::new();
     while let Some(r) = raw.next()? {
         links.push(read_link(r)?.1);
@@ -386,7 +389,7 @@ fn attach_links(conn: &impl Connection, q: &Find<'_>, entries: &mut [Entry]) -> 
     let mut raw = stmt.query(rusqlite::params_from_iter(
         bind.iter().map(SqlVal::as_param),
     ))?;
-    let mut by_id: HashMap<i64, Vec<Link>> = HashMap::new();
+    let mut by_id: HashMap<EntryId, Vec<Link>> = HashMap::new();
     while let Some(r) = raw.next()? {
         let (from_id, link) = read_link(r)?;
         by_id.entry(from_id).or_default().push(link);
@@ -397,18 +400,18 @@ fn attach_links(conn: &impl Connection, q: &Find<'_>, entries: &mut [Entry]) -> 
     Ok(())
 }
 
-fn read_link(r: &rusqlite::Row<'_>) -> Result<(i64, Link), Error> {
+fn read_link(r: &rusqlite::Row<'_>) -> Result<(EntryId, Link), Error> {
     let from_id: i64 = r.get(0)?;
     let name: String = r.get(1)?;
     let to_schema: String = r.get(2)?;
     let to_id: i64 = r.get(3)?;
     Ok((
-        from_id,
+        EntryId::try_from(StoredEntryId(from_id))?,
         Link {
             name: LinkName::try_from(StoredLinkName(name))?,
             to: EntryRef {
                 schema: SchemaName::try_from(StoredLinkSchema(to_schema))?,
-                id: to_id,
+                id: EntryId::try_from(StoredEntryId(to_id))?,
             },
         },
     ))

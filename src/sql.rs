@@ -1,6 +1,6 @@
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, FieldValue, FilterValue};
-use crate::spec::{EnumValue, LinkName, SchemaName, parse_number};
+use crate::spec::{EntryId, EnumValue, LinkName, SchemaName, parse_number};
 use crate::time::Instant;
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
@@ -61,6 +61,7 @@ pub struct StoredLinkSchema(pub String);
 pub struct StoredNumber(pub String);
 pub struct StoredEnum(pub String);
 pub struct StoredAgent(pub String);
+pub struct StoredEntryId(pub i64);
 
 macro_rules! try_from_stored_name {
     ($stored:ident, $ty:ty, $fail:ident) => {
@@ -99,6 +100,14 @@ try_from_stored_name!(StoredLinkName, LinkName, CorruptLinkName);
 try_from_stored_name!(StoredLinkSchema, SchemaName, CorruptLinkSchema);
 try_from_stored_name!(StoredEnum, EnumValue, CorruptStoredEnum);
 try_from_stored_name!(StoredAgent, Agent, CorruptStoredAgent);
+
+impl TryFrom<StoredEntryId> for EntryId {
+    type Error = Error;
+
+    fn try_from(StoredEntryId(raw): StoredEntryId) -> Result<Self, Error> {
+        Self::from_raw(raw).ok_or(Error::Fail(Fail::CorruptStoredId(raw)))
+    }
+}
 
 impl TryFrom<StoredNumber> for Decimal {
     type Error = Error;
@@ -174,6 +183,10 @@ mod tests {
                 .unwrap_err()
                 .to_string(),
             "corrupt stored agent: "
+        );
+        assert_eq!(
+            EntryId::try_from(StoredEntryId(0)).unwrap_err().to_string(),
+            "corrupt stored id: 0"
         );
     }
 

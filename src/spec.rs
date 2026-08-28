@@ -342,10 +342,33 @@ impl Group {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EntryId(i64);
+
+impl EntryId {
+    pub fn parse(n: i64) -> Result<Self, Error> {
+        Self::from_raw(n).ok_or(Error::Usage(Usage::InvalidEntryId(n)))
+    }
+
+    pub fn as_i64(self) -> i64 {
+        self.0
+    }
+
+    pub(crate) fn from_raw(n: i64) -> Option<Self> {
+        (n >= 1).then_some(Self(n))
+    }
+}
+
+impl std::fmt::Display for EntryId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EntryRef {
     pub schema: SchemaName,
-    pub id: i64,
+    pub id: EntryId,
 }
 
 impl EntryRef {
@@ -358,9 +381,8 @@ impl EntryRef {
         let id: i64 = id
             .parse()
             .map_err(|_| Error::Usage(Usage::InvalidLinkTarget(s.to_string())))?;
-        if id < 1 {
-            return Err(Error::Usage(Usage::InvalidLinkTarget(s.to_string())));
-        }
+        let id = EntryId::parse(id)
+            .map_err(|_| Error::Usage(Usage::InvalidLinkTarget(s.to_string())))?;
         Ok(Self { schema, id })
     }
 }

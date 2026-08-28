@@ -1,6 +1,6 @@
 use bottle::{Cmd, cmd};
 
-use crate::common::{MEAL, assert_fail, harness, seed_meals, tsv_lines};
+use crate::common::{MEAL, assert_fail, assert_usage, harness, seed_meals, tsv_lines};
 
 #[test]
 fn get_includes_ignored() {
@@ -29,6 +29,19 @@ fn get_includes_ignored() {
     let lines = tsv_lines(&get);
     assert_eq!(lines[0].last().copied(), Some("ignored"));
     assert_eq!(lines[1].last().copied(), Some("true"));
+}
+
+#[test]
+fn get_rejects_zero_id() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Get(cmd::Get {
+            schema: "nutrition.meal".into(),
+            id: 0,
+        }))
+        .unwrap_err();
+    assert_usage(err, "invalid id");
 }
 
 #[test]

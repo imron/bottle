@@ -24,6 +24,7 @@ fn usage_message(err: &Usage) -> String {
         Usage::DuplicateLinkName(name) => format!("duplicate link name: {name}"),
         Usage::DuplicateField(name) => format!("duplicate field: {name}"),
         Usage::InvalidLinkTarget(s) => format!("invalid link target: {s}"),
+        Usage::InvalidEntryId(id) => format!("invalid id: {id}"),
         Usage::DateOnlyNotInstant => "date-only is a query bound, not an instant".into(),
         Usage::TimeMustUseT => "time must use T, not a space".into(),
         Usage::InvalidDate(input) => format!("invalid date: {input}"),
@@ -82,6 +83,7 @@ fn fail_message(err: &Fail) -> String {
         Fail::CorruptStoredNumber(raw) => format!("corrupt stored number: {raw}"),
         Fail::CorruptStoredEnum(raw) => format!("corrupt stored enum: {raw}"),
         Fail::CorruptStoredAgent(raw) => format!("corrupt stored agent: {raw}"),
+        Fail::CorruptStoredId(id) => format!("corrupt stored id: {id}"),
         Fail::HomeNotSet => "HOME is not set".into(),
     }
 }

@@ -4,8 +4,8 @@ use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail, Usage};
 use crate::spec::{
-    self, EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName,
-    Spec, TimePeriod, parse_number,
+    self, EntryId, EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName,
+    SchemaName, Spec, TimePeriod, parse_number,
 };
 use crate::time::{Instant, Period, Range};
 
@@ -69,7 +69,7 @@ spec::string_newtype!(Agent);
 
 #[derive(Debug, Clone)]
 pub struct Entry {
-    pub id: i64,
+    pub id: EntryId,
     pub at: Instant,
     pub agent: Option<Agent>,
     pub ignored: bool,
@@ -220,7 +220,7 @@ pub struct List {
 #[derive(Debug, Clone)]
 pub struct Get {
     pub schema: SchemaName,
-    pub id: i64,
+    pub id: EntryId,
 }
 
 #[derive(Debug, Clone)]
@@ -244,7 +244,7 @@ pub struct Today {
 #[derive(Debug, Clone)]
 pub struct Amend {
     pub schema: SchemaName,
-    pub id: i64,
+    pub id: EntryId,
     pub at: Option<Instant>,
     pub agent: Option<Agent>,
     pub links: Vec<Link>,
@@ -255,7 +255,7 @@ pub struct Amend {
 #[derive(Debug, Clone)]
 pub struct Ignore {
     pub schema: SchemaName,
-    pub id: i64,
+    pub id: EntryId,
 }
 
 #[derive(Debug, Clone)]
@@ -297,14 +297,14 @@ pub struct Entries {
 
 #[derive(Debug, Clone)]
 pub struct Posted {
-    pub id: i64,
+    pub id: EntryId,
     pub at: Instant,
     pub links: Vec<Link>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Stamp {
-    pub id: i64,
+    pub id: EntryId,
     pub at: Instant,
 }
 

@@ -8,8 +8,8 @@ use crate::ledger::{
     SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Scope, Style, Sum, Today,
 };
 use crate::spec::{
-    EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier, Link,
-    LinkName, SchemaName, Spec, is_reserved,
+    EntryId, EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier,
+    Link, LinkName, SchemaName, Spec, is_reserved,
 };
 use crate::time::{self, Range};
 
@@ -217,7 +217,7 @@ pub fn ls(
 pub fn get(schema: String, id: i64) -> Result<Get, Error> {
     Ok(Get {
         schema: SchemaName::parse(&schema)?,
-        id,
+        id: EntryId::parse(id)?,
     })
 }
 
@@ -283,7 +283,7 @@ pub fn amend(input: AmendInput, tz: &TimeZone) -> Result<Amend, Error> {
     }
     Ok(Amend {
         schema: SchemaName::parse(&input.schema)?,
-        id: input.id,
+        id: EntryId::parse(input.id)?,
         at,
         agent,
         links,
@@ -295,7 +295,7 @@ pub fn amend(input: AmendInput, tz: &TimeZone) -> Result<Amend, Error> {
 pub fn ignore(schema: String, id: i64) -> Result<Ignore, Error> {
     Ok(Ignore {
         schema: SchemaName::parse(&schema)?,
-        id,
+        id: EntryId::parse(id)?,
     })
 }
 

@@ -1,4 +1,4 @@
-use crate::spec::{EntryRef, EnumValue, FieldName, Identifier, LinkName, SchemaName};
+use crate::spec::{EntryId, EntryRef, EnumValue, FieldName, Identifier, LinkName, SchemaName};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -19,6 +19,7 @@ pub enum Usage {
     DuplicateLinkName(LinkName),
     DuplicateField(FieldName),
     InvalidLinkTarget(String),
+    InvalidEntryId(i64),
     DateOnlyNotInstant,
     TimeMustUseT,
     InvalidDate(String),
@@ -38,7 +39,7 @@ pub enum Fail {
     UnknownSchema(SchemaName),
     SchemaHasInboundLinks(SchemaName),
     SchemaExists(SchemaName),
-    EntryNotFound { schema: SchemaName, id: i64 },
+    EntryNotFound { schema: SchemaName, id: EntryId },
     NotFound,
     FieldNotNumber(FieldName),
     LinkNameCollidesWithField(LinkName),
@@ -70,6 +71,7 @@ pub enum Fail {
     CorruptStoredNumber(String),
     CorruptStoredEnum(String),
     CorruptStoredAgent(String),
+    CorruptStoredId(i64),
     HomeNotSet,
     FileNotFound(String),
     Store(String),
