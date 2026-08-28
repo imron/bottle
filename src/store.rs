@@ -62,6 +62,58 @@ pub fn load_schema(conn: &impl Connection, name: &SchemaName) -> Result<Schema, 
     })
 }
 
+fn require_schema(conn: &impl Connection, name: &SchemaName) -> Result<(), Error> {
+    let found: Option<i64> = conn
+        .as_ref()
+        .query_row(
+            "SELECT 1 FROM schemas WHERE name = ?1",
+            [name.as_str()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if found.is_none() {
+        return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
+    }
+    Ok(())
+}
+
+pub fn entry_exists(
+    conn: &impl Connection,
+    schema: &SchemaName,
+    id: EntryId,
+) -> Result<bool, Error> {
+    require_schema(conn, schema)?;
+    let sql = format!(
+        "SELECT 1 FROM {} WHERE id = ?1",
+        quote_ident(&table_name(schema))
+    );
+    let found: Option<i64> = conn
+        .as_ref()
+        .query_row(&sql, [id.as_i64()], |row| row.get(0))
+        .optional()?;
+    Ok(found.is_some())
+}
+
+pub fn entry_at(
+    conn: &impl Connection,
+    schema: &SchemaName,
+    id: EntryId,
+) -> Result<Option<Instant>, Error> {
+    require_schema(conn, schema)?;
+    let sql = format!(
+        "SELECT at FROM {} WHERE id = ?1",
+        quote_ident(&table_name(schema))
+    );
+    let raw: Option<String> = conn
+        .as_ref()
+        .query_row(&sql, [id.as_i64()], |row| row.get(0))
+        .optional()?;
+    match raw {
+        None => Ok(None),
+        Some(raw) => Ok(Some(Instant::try_from(StoredTime(raw))?)),
+    }
+}
+
 pub fn inbound_link_count(conn: &impl Connection, name: &SchemaName) -> Result<i64, Error> {
     let n: i64 = conn.as_ref().query_row(
         "SELECT COUNT(*) FROM links WHERE to_schema = ?1",

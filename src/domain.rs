@@ -188,18 +188,14 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
 
 fn ignore(db: &mut Db, op: Ignore) -> Result<Outcome, Error> {
     db.transaction(|tx| {
-        let spec = store::load_schema(tx, &op.schema)?.spec;
-        let Some(entry) = store::get_entry(tx, &op.schema, &spec, op.id)? else {
+        let Some(at) = store::entry_at(tx, &op.schema, op.id)? else {
             return Err(Error::Fail(Fail::EntryNotFound {
                 schema: op.schema.clone(),
                 id: op.id,
             }));
         };
         mutable_store::set_ignored(tx, &op.schema, op.id)?;
-        Ok(Outcome::Stamp(Stamp {
-            id: op.id,
-            at: entry.at,
-        }))
+        Ok(Outcome::Stamp(Stamp { id: op.id, at }))
     })
 }
 
@@ -355,8 +351,7 @@ fn resolve_filters(
 fn ensure_links(conn: &impl Connection, spec: &Spec, links: &[Link]) -> Result<(), Error> {
     for link in links {
         spec.ensure_link_name(&link.name)?;
-        let target = store::load_schema(conn, &link.to.schema)?;
-        if store::get_entry(conn, &link.to.schema, &target.spec, link.to.id)?.is_none() {
+        if !store::entry_exists(conn, &link.to.schema, link.to.id)? {
             return Err(Error::Fail(Fail::LinkTargetMissing(link.to.clone())));
         }
     }
