@@ -557,6 +557,16 @@ fn yaml_canonicalize_rejects() {
             "fields:\n  - name: when\n    type: enum\n    required: true\n    values: ['a,b']\n",
             "tab, newline, or comma",
         ),
+        (
+            "unknown_field_key",
+            "fields:\n  - name: kcal\n    type: number\n    required: true\n    default: 0\n",
+            "unknown field",
+        ),
+        (
+            "unknown_spec_key",
+            "description: meals\nfields:\n  - name: kcal\n    type: number\n    required: true\n",
+            "unknown field",
+        ),
     ] {
         let file = h.yaml_file(&format!("{name}.yaml"), yaml);
         let err = h

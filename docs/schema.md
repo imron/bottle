@@ -129,9 +129,14 @@ fields:
     required: false
 ```
 
-Types: `text`, `number`, `enum`.
+Types: `text`, `number`, `enum`. Allowed YAML keys on a
+field are `name`, `type`, `required`, and `values`. Other
+keys (`default`, `unit`, …) are rejected. `default` is
+`schema add-field --default`, which backfills existing
+rows. A field named `unit` is a declared field, not a spec
+property.
 
-- Unknown fields are rejected.
+- Unknown fields on `log` are rejected.
 - Missing required fields are rejected.
 - `text` may not contain tab or newline. Compare is
   case-sensitive.

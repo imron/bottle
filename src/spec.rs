@@ -136,11 +136,13 @@ impl std::str::FromStr for FieldType {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct SpecDoc {
     fields: Vec<FieldDoc>,
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct FieldDoc {
     name: FieldName,
     #[serde(rename = "type")]
