@@ -18,7 +18,8 @@ pub use db::default_db_path;
 pub use error::{Error, Fail, Usage};
 pub use input::cmd;
 pub use input::{Cmd, parse};
-pub use ledger::{Agent, Op, Style};
+pub use ledger::{Agent, Op};
+pub use output::Style;
 pub use spec::FieldType;
 
 pub struct Bottle {
@@ -60,9 +61,21 @@ pub async fn mcp(path: &Path, agent: Option<String>, tz: Option<&str>) -> Result
     input::mcp::serve(path, agent, tz).await
 }
 
-pub fn execute(bottle: &mut Bottle, op: Op) -> Result<String, Error> {
+pub fn style(cmd: &Cmd) -> Style {
+    match cmd {
+        Cmd::Schema(cmd::SchemaCmd::Show(show)) if show.yaml => Style::Yaml,
+        _ => Style::Tsv,
+    }
+}
+
+pub fn execute(bottle: &mut Bottle, op: Op, style: Style) -> Result<String, Error> {
+    let show_ignored = match &op {
+        Op::Get(_) => true,
+        Op::List(list) => list.include_ignored,
+        _ => false,
+    };
     let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, op)?;
-    output::render(&outcome, &bottle.tz)
+    output::render(&outcome, &bottle.tz, style, show_ignored)
 }
 
 #[cfg(test)]

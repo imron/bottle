@@ -44,8 +44,9 @@ fn run_cli(cli: Cli) -> Result<String, Error> {
                 None => bottle::default_db_path()?,
             };
             let mut bottle = Bottle::open(&db, None, None)?;
+            let style = bottle::style(&command);
             let request = parse(command, bottle.tz())?;
-            execute(&mut bottle, request)
+            execute(&mut bottle, request, style)
         }
     }
 }

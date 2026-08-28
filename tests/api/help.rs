@@ -1,4 +1,4 @@
-use bottle::{Bottle, Cmd, cmd, execute, help, parse};
+use bottle::{Bottle, Cmd, Style, cmd, execute, help, parse};
 use jiff::tz::TimeZone;
 
 use crate::common::{self, MEAL};
@@ -48,7 +48,12 @@ fn open_creates_an_empty_db() {
     let dir = tempfile::TempDir::new().unwrap();
     let db = dir.path().join("bottle.db");
     let mut bottle = Bottle::open(&db, None, None).unwrap();
-    let out = execute(&mut bottle, request(Cmd::Schema(cmd::SchemaCmd::List))).unwrap();
+    let out = execute(
+        &mut bottle,
+        request(Cmd::Schema(cmd::SchemaCmd::List)),
+        Style::Tsv,
+    )
+    .unwrap();
     assert_eq!(out, "name\tretired\n");
 }
 
@@ -68,6 +73,7 @@ fn execute_uses_the_open_timezone() {
             })),
             common::TZ,
         ),
+        Style::Tsv,
     )
     .unwrap();
     execute(
@@ -88,6 +94,7 @@ fn execute_uses_the_open_timezone() {
             }),
             common::TZ,
         ),
+        Style::Tsv,
     )
     .unwrap();
     let out = execute(
@@ -106,6 +113,7 @@ fn execute_uses_the_open_timezone() {
             }),
             common::TZ,
         ),
+        Style::Tsv,
     )
     .unwrap();
     assert!(out.contains("2026-08-22T08:14:00+10:00"), "{out}");

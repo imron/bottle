@@ -282,7 +282,7 @@ fn unset_agent_defaults_to_bottle() {
         bottle.tz(),
     )
     .unwrap();
-    bottle::execute(&mut bottle, request).unwrap();
+    bottle::execute(&mut bottle, request, bottle::Style::Tsv).unwrap();
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
         filters: cmd::Filters {
             schema: "nutrition.meal".into(),

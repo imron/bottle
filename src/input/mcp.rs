@@ -104,12 +104,16 @@ fn output(result: Result<String, Error>) -> CallToolResult {
 
 impl Server {
     fn run(&self, op: Result<Op, Error>) -> CallToolResult {
+        self.run_style(op, Style::Tsv)
+    }
+
+    fn run_style(&self, op: Result<Op, Error>, style: Style) -> CallToolResult {
         let op = match op {
             Ok(op) => op,
             Err(err) => return output(Err(err)),
         };
         let mut bottle = self.bottle.lock().unwrap_or_else(|e| e.into_inner());
-        output(execute(&mut bottle, op))
+        output(execute(&mut bottle, op, style))
     }
 }
 
@@ -260,8 +264,8 @@ impl Server {
         Parameters(p): Parameters<SchemaShowParams>,
     ) -> Result<CallToolResult, McpError> {
         let style = if p.yaml { Style::Yaml } else { Style::Tsv };
-        let show = parse_schema_show(p.name, style);
-        Ok(self.run(show.map(Op::SchemaShow)))
+        let show = parse_schema_show(p.name);
+        Ok(self.run_style(show.map(Op::SchemaShow), style))
     }
 
     #[tool(description = "Register a type from a YAML spec")]

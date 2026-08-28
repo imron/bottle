@@ -5,7 +5,7 @@ use jiff::tz::TimeZone;
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, FieldInput, FieldValue, Get, Ignore, Last, List, Log, Op, SchemaAdd,
-    SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Scope, Style, Sum, Today,
+    SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Scope, Sum, Today,
 };
 use crate::spec::{
     EntryId, EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier,
@@ -18,10 +18,7 @@ use super::{AmendInput, Cmd, ScopeInput, SpecSource, cmd};
 pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
     Ok(match cmd {
         Cmd::Schema(cmd::SchemaCmd::List) => Op::SchemaList,
-        Cmd::Schema(cmd::SchemaCmd::Show(cmd)) => {
-            let style = if cmd.yaml { Style::Yaml } else { Style::Tsv };
-            Op::SchemaShow(schema_show(cmd.name, style)?)
-        }
+        Cmd::Schema(cmd::SchemaCmd::Show(cmd)) => Op::SchemaShow(schema_show(cmd.name)?),
         Cmd::Schema(cmd::SchemaCmd::Add(cmd)) => {
             Op::SchemaAdd(schema_add(cmd.name, SpecSource::File(cmd.file))?)
         }
@@ -86,10 +83,9 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
     })
 }
 
-pub fn schema_show(name: String, style: Style) -> Result<SchemaShow, Error> {
+pub fn schema_show(name: String) -> Result<SchemaShow, Error> {
     Ok(SchemaShow {
         name: SchemaName::parse(&name)?,
-        style,
     })
 }
 

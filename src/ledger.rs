@@ -150,16 +150,9 @@ pub enum Summed {
     },
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Style {
-    Tsv,
-    Yaml,
-}
-
 #[derive(Debug, Clone)]
 pub struct SchemaShow {
     pub name: SchemaName,
-    pub style: Style,
 }
 
 #[derive(Debug, Clone)]
@@ -278,12 +271,6 @@ pub enum Op {
 }
 
 #[derive(Debug, Clone)]
-pub struct ShownSpec {
-    pub spec: Spec,
-    pub style: Style,
-}
-
-#[derive(Debug, Clone)]
 pub struct Schemas {
     pub schemas: Vec<SchemaInfo>,
 }
@@ -292,7 +279,6 @@ pub struct Schemas {
 pub struct Entries {
     pub spec: Spec,
     pub entries: Vec<Entry>,
-    pub show_ignored: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -330,7 +316,7 @@ pub struct GroupedLink {
 pub enum Outcome {
     Empty,
     Schemas(Schemas),
-    Spec(ShownSpec),
+    Spec(Spec),
     Entries(Entries),
     Posted(Vec<Posted>),
     Stamp(Stamp),

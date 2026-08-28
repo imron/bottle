@@ -5,8 +5,8 @@ use crate::error::{Error, Fail};
 use crate::ledger::{
     Agent, Amend, Entries, FieldInput, FieldValue, Filter, FilterValue, Find, Get, GroupedLink,
     GroupedTime, Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField,
-    SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, ShownSpec, Stamp, Sum,
-    Summed, Today, Total,
+    SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed,
+    Today, Total,
 };
 use crate::mutable_store;
 use crate::spec::{Field, FieldKind, FieldName, Group, Link, Spec};
@@ -52,10 +52,7 @@ pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outc
 }
 
 fn show_schema(db: &Db, op: SchemaShow) -> Result<Outcome, Error> {
-    Ok(Outcome::Spec(ShownSpec {
-        spec: store::load_schema(db, &op.name)?.spec,
-        style: op.style,
-    }))
+    Ok(Outcome::Spec(store::load_schema(db, &op.name)?.spec))
 }
 
 fn add_schema(db: &mut Db, op: SchemaAdd) -> Result<(), Error> {
@@ -218,7 +215,6 @@ fn get(db: &mut Db, op: Get) -> Result<Outcome, Error> {
         Ok(Outcome::Entries(Entries {
             spec,
             entries: vec![entry],
-            show_ignored: true,
         }))
     })
 }
@@ -293,11 +289,7 @@ fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
                 limit: q.limit,
             },
         )?;
-        Ok(Outcome::Entries(Entries {
-            spec,
-            entries,
-            show_ignored: q.include_ignored,
-        }))
+        Ok(Outcome::Entries(Entries { spec, entries }))
     })
 }
 
