@@ -10,15 +10,15 @@ use rmcp::{
 };
 use serde::Deserialize;
 
-use crate::error::{Error, Fail, Usage};
+use crate::error::{Error, Fail};
 use crate::help as bottle_help;
 use crate::ledger::Op;
 use crate::{Bottle, Style, execute};
 use rmcp::service::ServerInitializeError;
 
 use super::{
-    AmendInput, ScopeInput, SpecSource, amend as parse_amend, get as parse_get,
-    ignore as parse_ignore, last as parse_last, log as parse_log, ls as parse_ls,
+    AmendInput, Cmd, ScopeInput, SpecSource, amend as parse_amend, cmd, get as parse_get,
+    ignore as parse_ignore, last as parse_last, ls as parse_ls, parse,
     schema_add as parse_schema_add, schema_add_field as parse_schema_add_field,
     schema_add_value as parse_schema_add_value, schema_drop as parse_schema_drop,
     schema_retire as parse_schema_retire, schema_show as parse_schema_show, sum as parse_sum,
@@ -318,24 +318,18 @@ impl Server {
 
     #[tool(description = "Write one entry, or many in one transaction")]
     fn log(&self, Parameters(p): Parameters<LogParams>) -> Result<CallToolResult, McpError> {
-        if p.entries.is_empty() {
-            return Ok(self.run(Err(Error::Usage(Usage::EmptyLog))));
-        }
-        let mut logs = Vec::new();
-        for entry in p.entries {
-            match parse_log(
-                p.schema.clone(),
-                entry.at,
-                entry.agent,
-                pairs(entry.links),
-                cells(entry.fields),
-                &self.tz,
-            ) {
-                Ok(log) => logs.push(log),
-                Err(err) => return Ok(self.run(Err(err))),
-            }
-        }
-        Ok(self.run(Ok(Op::Log(logs))))
+        let cmds = p
+            .entries
+            .into_iter()
+            .map(|entry| cmd::Log {
+                schema: p.schema.clone(),
+                at: entry.at,
+                agent: entry.agent,
+                links: pairs(entry.links),
+                fields: cells(entry.fields),
+            })
+            .collect();
+        Ok(self.run(parse(Cmd::Logs(cmds), &self.tz)))
     }
 
     #[tool(description = "List entries of a schema")]

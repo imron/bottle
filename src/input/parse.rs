@@ -176,7 +176,7 @@ pub fn schema_drop(name: String) -> Result<SchemaDrop, Error> {
     })
 }
 
-pub fn log(
+fn log(
     schema: String,
     at: Option<String>,
     agent: Option<String>,
