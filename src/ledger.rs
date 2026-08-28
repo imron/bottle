@@ -276,6 +276,7 @@ pub struct Schemas {
 pub struct Entries {
     pub spec: Spec,
     pub entries: Vec<Entry>,
+    pub show_ignored: bool,
 }
 
 #[derive(Debug, Clone)]

@@ -73,7 +73,7 @@ pub fn run(
 
 pub fn execute(bottle: &mut Bottle, request: Request) -> Result<String, Error> {
     let outcome = domain::execute(&mut bottle.db, &bottle.agent, &bottle.tz, request.op)?;
-    output::render(request.style, request.show_ignored, &outcome, &bottle.tz)
+    output::render(request.style, &outcome, &bottle.tz)
 }
 
 #[cfg(test)]

@@ -211,6 +211,7 @@ fn get(db: &mut Db, op: Get) -> Result<Outcome, Error> {
         Ok(Outcome::Entries(Entries {
             spec,
             entries: vec![entry],
+            show_ignored: true,
         }))
     })
 }
@@ -285,7 +286,11 @@ fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
                 limit: q.limit,
             },
         )?;
-        Ok(Outcome::Entries(Entries { spec, entries }))
+        Ok(Outcome::Entries(Entries {
+            spec,
+            entries,
+            show_ignored: q.include_ignored,
+        }))
     })
 }
 

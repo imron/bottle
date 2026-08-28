@@ -6,7 +6,7 @@ mod parse;
 
 use std::path::PathBuf;
 
-use crate::ledger::{List, Op};
+use crate::ledger::Op;
 use crate::output::Style;
 
 pub use cmd::Cmd;
@@ -18,23 +18,11 @@ pub use parse::{
 pub struct Request {
     pub op: Op,
     pub style: Style,
-    pub show_ignored: bool,
 }
 
 impl Request {
     pub fn new(op: Op, style: Style) -> Self {
-        Self {
-            show_ignored: matches!(
-                &op,
-                Op::Get(_)
-                    | Op::List(List {
-                        include_ignored: true,
-                        ..
-                    })
-            ),
-            style,
-            op,
-        }
+        Self { style, op }
     }
 }
 
