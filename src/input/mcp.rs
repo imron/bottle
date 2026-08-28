@@ -178,15 +178,33 @@ struct LogParams {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
-struct LsParams {
+struct ScopeParams {
     schema: String,
-    from: Option<String>,
-    to: Option<String>,
     agent: Option<String>,
     #[serde(rename = "where", default)]
     wheres: HashMap<String, FieldCell>,
     #[serde(default)]
     links: HashMap<String, String>,
+}
+
+impl ScopeParams {
+    fn into_scope(self) -> ScopeInput {
+        ScopeInput {
+            schema: self.schema,
+            agent: self.agent,
+            wheres: cells(self.wheres),
+            links: pairs(self.links),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct LsParams {
+    #[serde(flatten)]
+    scope: ScopeParams,
+    from: Option<String>,
+    to: Option<String>,
     #[serde(default)]
     include_ignored: bool,
 }
@@ -201,27 +219,12 @@ struct IdParams {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SumParams {
-    schema: String,
+    #[serde(flatten)]
+    scope: ScopeParams,
     field: String,
     from: Option<String>,
     to: Option<String>,
-    agent: Option<String>,
-    #[serde(rename = "where", default)]
-    wheres: HashMap<String, FieldCell>,
-    #[serde(default)]
-    links: HashMap<String, String>,
     group: Option<String>,
-}
-
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct FilterParams {
-    schema: String,
-    agent: Option<String>,
-    #[serde(rename = "where", default)]
-    wheres: HashMap<String, FieldCell>,
-    #[serde(default)]
-    links: HashMap<String, String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -333,12 +336,7 @@ impl Server {
     #[tool(description = "List entries of a schema")]
     fn ls(&self, Parameters(p): Parameters<LsParams>) -> Result<CallToolResult, McpError> {
         let list = parse_ls(
-            ScopeInput {
-                schema: p.schema,
-                agent: p.agent,
-                wheres: cells(p.wheres),
-                links: pairs(p.links),
-            },
+            p.scope.into_scope(),
             p.from,
             p.to,
             p.include_ignored,
@@ -356,12 +354,7 @@ impl Server {
     #[tool(description = "Total a number field")]
     fn sum(&self, Parameters(p): Parameters<SumParams>) -> Result<CallToolResult, McpError> {
         let sum = parse_sum(
-            ScopeInput {
-                schema: p.schema,
-                agent: p.agent,
-                wheres: cells(p.wheres),
-                links: pairs(p.links),
-            },
+            p.scope.into_scope(),
             p.field,
             p.from,
             p.to,
@@ -372,24 +365,14 @@ impl Server {
     }
 
     #[tool(description = "Print the most recent entry of a schema")]
-    fn last(&self, Parameters(p): Parameters<FilterParams>) -> Result<CallToolResult, McpError> {
-        let last = parse_last(ScopeInput {
-            schema: p.schema,
-            agent: p.agent,
-            wheres: cells(p.wheres),
-            links: pairs(p.links),
-        });
+    fn last(&self, Parameters(p): Parameters<ScopeParams>) -> Result<CallToolResult, McpError> {
+        let last = parse_last(p.into_scope());
         Ok(self.run(last.map(Op::Last), Style::Tsv))
     }
 
     #[tool(description = "List entries for the current civil day")]
-    fn today(&self, Parameters(p): Parameters<FilterParams>) -> Result<CallToolResult, McpError> {
-        let today = parse_today(ScopeInput {
-            schema: p.schema,
-            agent: p.agent,
-            wheres: cells(p.wheres),
-            links: pairs(p.links),
-        });
+    fn today(&self, Parameters(p): Parameters<ScopeParams>) -> Result<CallToolResult, McpError> {
+        let today = parse_today(p.into_scope());
         Ok(self.run(today.map(Op::Today), Style::Tsv))
     }
 
@@ -427,11 +410,35 @@ impl ServerHandler for Server {
 
 #[cfg(test)]
 mod tests {
+    use rmcp::schemars;
+
+    use super::LsParams;
+
     #[test]
     fn json_number_keeps_decimal_text() {
         let n: serde_json::Number = serde_json::from_str("1.10").unwrap();
         assert_eq!(n.to_string(), "1.10");
         let n: serde_json::Number = serde_json::from_str("9007199254740993").unwrap();
         assert_eq!(n.to_string(), "9007199254740993");
+    }
+
+    #[test]
+    fn ls_flattens_scope_and_rejects_unknown() {
+        let p: LsParams =
+            serde_json::from_str(r#"{"schema":"meal","from":"2026-08-22","where":{"kcal":1}}"#)
+                .unwrap();
+        assert_eq!(p.scope.schema, "meal");
+        assert_eq!(p.from.as_deref(), Some("2026-08-22"));
+        assert!(p.scope.wheres.contains_key("kcal"));
+        let err = serde_json::from_str::<LsParams>(r#"{"schema":"meal","nope":true}"#).unwrap_err();
+        assert!(
+            err.to_string().contains("nope") || err.to_string().contains("unknown"),
+            "{err}"
+        );
+        let schema = serde_json::to_value(schemars::schema_for!(LsParams)).unwrap();
+        let keys = schema["properties"].as_object().unwrap();
+        assert!(keys.contains_key("schema"), "{schema}");
+        assert!(keys.contains_key("from"), "{schema}");
+        assert!(!keys.contains_key("scope"), "{schema}");
     }
 }
