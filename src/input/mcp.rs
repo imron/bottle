@@ -164,12 +164,13 @@ struct SchemaNameParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct LogEntry {
     at: Option<String>,
     agent: Option<String>,
     #[serde(default)]
     links: HashMap<String, String>,
-    #[serde(flatten)]
+    #[serde(default)]
     fields: HashMap<String, FieldCell>,
 }
 

@@ -23,10 +23,11 @@ target. `unlink` is a list of names.
 
 ## One entry or many
 
-`log` takes `entries`, a list of field objects. One entry
-is a one-element list. All entries share one schema and
-run in one transaction: all succeed or none do. Put `at`,
+`log` takes `entries`, a list of objects. One entry is a
+one-element list. All entries share one schema and run in
+one transaction: all succeed or none do. Put `at`,
 `agent`, and `links` on the entry they belong to.
+Declared cells go in `fields`, same as `amend`.
 
 Callers that have a compact form (for example `4x8x24`)
 expand it before calling. bottle stores entries, not that

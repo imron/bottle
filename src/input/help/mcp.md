@@ -33,19 +33,19 @@ not a TSV body.
 
 `help` takes an optional `command` (`log`, `schema add`).
 
-`log` takes `entries`, a list of field objects. One
-entry is a one-element list. All entries share one schema
-and run in one transaction: all succeed or none do.
-Put `at`, `agent`, and `links` on the entry they belong
-to.
+`log` takes `entries`, a list of objects. One entry is a
+one-element list. All entries share one schema and run in
+one transaction: all succeed or none do. Put `at`,
+`agent`, and `links` on the entry they belong to.
+Declared cells go in `fields`, same as `amend`.
 
 `links` is an object of name to `schema/id`. `unlink` is a
 list of names.
 
 Field values are strings or JSON numbers. The number's
 text is what the CLI would take. `log` and `amend` use
-that for cells (`null` is empty). `where` uses it for
-filters. Booleans and nested objects are rejected.
+that for cells in `fields` (`null` is empty). `where` uses
+it for filters. Booleans and nested objects are rejected.
 
 ## See also
 
