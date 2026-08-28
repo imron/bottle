@@ -130,7 +130,8 @@ fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Err
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
-    let values = prepare_fields(&kind.spec, &op.fields, false)?;
+    let values = given_fields(&kind.spec, &op.fields)?;
+    ensure_required(&kind.spec, &values)?;
     ensure_links(tx, &kind.spec, &op.links)?;
     op.links.sort_by(|a, b| a.name.cmp(&b.name));
     let id = mutable_store::insert_entry(
@@ -158,7 +159,7 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
                 id: op.id,
             }));
         }
-        let values = prepare_fields(&kind.spec, &op.fields, true)?;
+        let values = given_fields(&kind.spec, &op.fields)?;
         ensure_links(tx, &kind.spec, &op.links)?;
         mutable_store::update_entry(tx, &op.schema, op.id, op.at, op.agent.as_ref(), &values)?;
         for name in &op.unlinks {
@@ -364,10 +365,9 @@ fn ensure_links(conn: &impl Connection, spec: &Spec, links: &[Link]) -> Result<(
     Ok(())
 }
 
-fn prepare_fields(
+fn given_fields(
     spec: &Spec,
     fields: &[FieldInput],
-    partial: bool,
 ) -> Result<HashMap<FieldName, FieldValue>, Error> {
     let mut out = HashMap::new();
     for field in fields {
@@ -386,14 +386,16 @@ fn prepare_fields(
             FieldValue::parse(spec_field, &field.value)?,
         );
     }
-    if !partial {
-        for spec_field in &spec.fields {
-            if spec_field.required && !out.contains_key(&spec_field.name) {
-                return Err(Error::Fail(Fail::MissingRequiredField(
-                    spec_field.name.clone(),
-                )));
-            }
+    Ok(out)
+}
+
+fn ensure_required(spec: &Spec, values: &HashMap<FieldName, FieldValue>) -> Result<(), Error> {
+    for spec_field in &spec.fields {
+        if spec_field.required && !values.contains_key(&spec_field.name) {
+            return Err(Error::Fail(Fail::MissingRequiredField(
+                spec_field.name.clone(),
+            )));
         }
     }
-    Ok(out)
+    Ok(())
 }
