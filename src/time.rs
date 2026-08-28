@@ -10,12 +10,12 @@ use crate::spec::TimePeriod;
 pub struct Instant(Timestamp);
 
 impl Instant {
-    pub fn now() -> Self {
-        Self(Timestamp::now())
+    pub fn now() -> Result<Self, Error> {
+        Self::from_timestamp(Timestamp::now())
     }
 
-    pub fn from_timestamp(ts: Timestamp) -> Self {
-        Self(ts)
+    pub fn from_timestamp(ts: Timestamp) -> Result<Self, Error> {
+        Ok(Self(Timestamp::from_second(ts.as_second())?))
     }
 
     pub fn timestamp(self) -> Timestamp {
@@ -32,7 +32,7 @@ pub fn zone(name: Option<&str>) -> Result<TimeZone, Error> {
 
 pub fn parse_instant(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
     match parse(input, tz)? {
-        Parsed::Instant(ts) => Ok(Instant(ts)),
+        Parsed::Instant(ts) => Instant::from_timestamp(ts),
         Parsed::Date(_) => Err(Error::Usage(Usage::DateOnlyNotInstant)),
     }
 }
@@ -44,8 +44,8 @@ pub fn display_local(at: Instant, tz: &TimeZone) -> Result<String, Error> {
 
 fn from_bound(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
     match parse(input, tz)? {
-        Parsed::Instant(ts) => Ok(Instant(ts)),
-        Parsed::Date(date) => Ok(Instant(date_midnight(date, tz)?)),
+        Parsed::Instant(ts) => Instant::from_timestamp(ts),
+        Parsed::Date(date) => Instant::from_timestamp(date_midnight(date, tz)?),
     }
 }
 
@@ -71,9 +71,9 @@ impl Range {
 
     pub fn today(tz: &TimeZone) -> Result<Self, Error> {
         let today = Timestamp::now().to_zoned(tz.clone()).date();
-        let start = Instant(date_midnight(today, tz)?);
+        let start = Instant::from_timestamp(date_midnight(today, tz)?)?;
         let next = today.checked_add(jiff::Span::new().days(1))?;
-        let end = Instant(date_midnight(next, tz)?);
+        let end = Instant::from_timestamp(date_midnight(next, tz)?)?;
         Ok(Self {
             from: Some(start),
             to: Some(ToBound::Exclusive(end)),
@@ -83,10 +83,12 @@ impl Range {
 
 fn to_bound(input: &str, tz: &TimeZone) -> Result<ToBound, Error> {
     match parse(input, tz)? {
-        Parsed::Instant(ts) => Ok(ToBound::Inclusive(Instant(ts))),
+        Parsed::Instant(ts) => Ok(ToBound::Inclusive(Instant::from_timestamp(ts)?)),
         Parsed::Date(date) => {
             let next = date.checked_add(jiff::Span::new().days(1))?;
-            Ok(ToBound::Exclusive(Instant(date_midnight(next, tz)?)))
+            Ok(ToBound::Exclusive(Instant::from_timestamp(date_midnight(
+                next, tz,
+            )?)?))
         }
     }
 }
@@ -218,6 +220,21 @@ mod tests {
                 "{input}: {err}"
             );
         }
+    }
+
+    #[test]
+    fn instants_are_whole_seconds() {
+        let ts = Timestamp::new(1_777_000_000, 123_456_789).unwrap();
+        let at = Instant::from_timestamp(ts).unwrap();
+        assert_eq!(
+            at.timestamp(),
+            Timestamp::from_second(1_777_000_000).unwrap()
+        );
+        let now = Instant::now().unwrap();
+        assert_eq!(
+            now.timestamp(),
+            Timestamp::from_second(now.timestamp().as_second()).unwrap()
+        );
     }
 
     #[test]

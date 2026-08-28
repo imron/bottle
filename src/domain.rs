@@ -128,7 +128,10 @@ fn log(db: &mut Db, agent: &Agent, ops: Vec<Log>) -> Result<Outcome, Error> {
 
 fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Error> {
     let agent = op.agent.as_ref().unwrap_or(agent);
-    let at = op.at.unwrap_or_else(Instant::now);
+    let at = match op.at {
+        Some(at) => at,
+        None => Instant::now()?,
+    };
     let kind = store::load_schema(tx, &op.schema)?;
     if kind.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
