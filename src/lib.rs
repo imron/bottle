@@ -16,8 +16,9 @@ use jiff::tz::TimeZone;
 
 pub use db::default_db_path;
 pub use error::{Error, Fail, Usage};
+pub use input::Cmd;
 pub use input::cmd;
-pub use input::{Cmd, parse};
+pub use input::parse::parse;
 pub use ledger::{Agent, Op};
 pub use output::Style;
 pub use spec::FieldType;

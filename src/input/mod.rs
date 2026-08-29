@@ -2,15 +2,11 @@ pub mod cmd;
 mod error;
 pub mod help;
 pub mod mcp;
-mod parse;
+pub mod parse;
 
 use std::path::PathBuf;
 
 pub use cmd::Cmd;
-pub use parse::{
-    amend, get, ignore, last, ls, parse, schema_add, schema_add_field, schema_add_value,
-    schema_drop, schema_retire, schema_show, sum, today,
-};
 
 pub enum SpecSource {
     File(PathBuf),

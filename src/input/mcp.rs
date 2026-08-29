@@ -16,14 +16,7 @@ use crate::ledger::Op;
 use crate::{Bottle, Style, execute};
 use rmcp::service::ServerInitializeError;
 
-use super::{
-    AmendInput, Cmd, ScopeInput, SpecSource, amend as parse_amend, cmd, get as parse_get,
-    ignore as parse_ignore, last as parse_last, ls as parse_ls, parse,
-    schema_add as parse_schema_add, schema_add_field as parse_schema_add_field,
-    schema_add_value as parse_schema_add_value, schema_drop as parse_schema_drop,
-    schema_retire as parse_schema_retire, schema_show as parse_schema_show, sum as parse_sum,
-    today as parse_today,
-};
+use super::{AmendInput, Cmd, ScopeInput, SpecSource, cmd, parse};
 use jiff::tz::TimeZone;
 
 fn pairs(map: HashMap<String, String>) -> Vec<(String, String)> {
@@ -265,7 +258,7 @@ impl Server {
         Parameters(p): Parameters<SchemaShowParams>,
     ) -> Result<CallToolResult, McpError> {
         let style = if p.yaml { Style::Yaml } else { Style::Tsv };
-        let show = parse_schema_show(p.name);
+        let show = parse::schema_show(p.name);
         Ok(self.run_style(show.map(Op::SchemaShow), style))
     }
 
@@ -274,7 +267,7 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaAddParams>,
     ) -> Result<CallToolResult, McpError> {
-        let spec = parse_schema_add(p.name, SpecSource::Yaml(p.spec));
+        let spec = parse::schema_add(p.name, SpecSource::Yaml(p.spec));
         Ok(self.run(spec.map(Op::SchemaAdd)))
     }
 
@@ -284,8 +277,9 @@ impl Server {
         Parameters(p): Parameters<SchemaAddFieldParams>,
     ) -> Result<CallToolResult, McpError> {
         let type_ = p.type_.parse();
-        let field = type_
-            .and_then(|type_| parse_schema_add_field(p.schema, p.name, type_, p.values, p.default));
+        let field = type_.and_then(|type_| {
+            parse::schema_add_field(p.schema, p.name, type_, p.values, p.default)
+        });
         Ok(self.run(field.map(Op::SchemaAddField)))
     }
 
@@ -294,7 +288,7 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaAddValueParams>,
     ) -> Result<CallToolResult, McpError> {
-        let value = parse_schema_add_value(p.schema, p.field, p.value);
+        let value = parse::schema_add_value(p.schema, p.field, p.value);
         Ok(self.run(value.map(Op::SchemaAddValue)))
     }
 
@@ -303,7 +297,7 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaNameParams>,
     ) -> Result<CallToolResult, McpError> {
-        let retire = parse_schema_retire(p.name);
+        let retire = parse::schema_retire(p.name);
         Ok(self.run(retire.map(Op::SchemaRetire)))
     }
 
@@ -312,7 +306,7 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaNameParams>,
     ) -> Result<CallToolResult, McpError> {
-        let drop = parse_schema_drop(p.name);
+        let drop = parse::schema_drop(p.name);
         Ok(self.run(drop.map(Op::SchemaDrop)))
     }
 
@@ -329,12 +323,12 @@ impl Server {
                 fields: cells(entry.fields),
             })
             .collect();
-        Ok(self.run(parse(Cmd::Logs(cmds), &self.tz)))
+        Ok(self.run(parse::parse(Cmd::Logs(cmds), &self.tz)))
     }
 
     #[tool(description = "List entries of a schema")]
     fn ls(&self, Parameters(p): Parameters<LsParams>) -> Result<CallToolResult, McpError> {
-        let list = parse_ls(
+        let list = parse::ls(
             p.scope.into_scope(),
             p.from,
             p.to,
@@ -346,13 +340,13 @@ impl Server {
 
     #[tool(description = "Print one entry by schema and id")]
     fn get(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
-        let get = parse_get(p.schema, p.id);
+        let get = parse::get(p.schema, p.id);
         Ok(self.run(get.map(Op::Get)))
     }
 
     #[tool(description = "Total a number field")]
     fn sum(&self, Parameters(p): Parameters<SumParams>) -> Result<CallToolResult, McpError> {
-        let sum = parse_sum(
+        let sum = parse::sum(
             p.scope.into_scope(),
             p.field,
             p.from,
@@ -365,19 +359,19 @@ impl Server {
 
     #[tool(description = "Print the most recent entry of a schema")]
     fn last(&self, Parameters(p): Parameters<ScopeParams>) -> Result<CallToolResult, McpError> {
-        let last = parse_last(p.into_scope());
+        let last = parse::last(p.into_scope());
         Ok(self.run(last.map(Op::Last)))
     }
 
     #[tool(description = "List entries for the current civil day")]
     fn today(&self, Parameters(p): Parameters<ScopeParams>) -> Result<CallToolResult, McpError> {
-        let today = parse_today(p.into_scope());
+        let today = parse::today(p.into_scope());
         Ok(self.run(today.map(Op::Today)))
     }
 
     #[tool(description = "Change an existing entry in place")]
     fn amend(&self, Parameters(p): Parameters<AmendParams>) -> Result<CallToolResult, McpError> {
-        let amend = parse_amend(
+        let amend = parse::amend(
             AmendInput {
                 schema: p.schema,
                 id: p.id,
@@ -394,7 +388,7 @@ impl Server {
 
     #[tool(description = "Hide an entry from lists and totals")]
     fn ignore(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
-        let ignore = parse_ignore(p.schema, p.id);
+        let ignore = parse::ignore(p.schema, p.id);
         Ok(self.run(ignore.map(Op::Ignore)))
     }
 }
