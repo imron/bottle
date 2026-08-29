@@ -1,7 +1,7 @@
 use rmcp::model::CallToolRequestParams;
 use tempfile::TempDir;
 
-use super::common::{MEAL, SESSION, SET, connect, ok, text_of, tool_err};
+use super::common::{MEAL, SESSION, SET, connect, ok, param_err, text_of, tool_err};
 
 #[tokio::test]
 async fn lists_tools_and_empty_schema_list() {
@@ -153,7 +153,7 @@ async fn add_show_list_and_mutate() {
 async fn unknown_add_field_type() {
     let dir = TempDir::new().unwrap();
     let client = connect(&dir).await;
-    let bad_type = tool_err(
+    let bad_type = param_err(
         &client,
         "schema_add_field",
         rmcp::object!({
@@ -164,7 +164,7 @@ async fn unknown_add_field_type() {
     )
     .await;
     assert!(
-        bad_type.contains("nope") && bad_type.contains("unknown"),
+        bad_type.contains("nope") && (bad_type.contains("unknown") || bad_type.contains("invalid")),
         "{bad_type}"
     );
 }

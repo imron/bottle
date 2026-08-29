@@ -13,7 +13,7 @@ use serde::Deserialize;
 use crate::error::{Error, Fail};
 use crate::help as bottle_help;
 use crate::ledger::Op;
-use crate::spec::EntryId;
+use crate::spec::{EntryId, FieldType};
 use crate::{Bottle, Style, execute};
 use rmcp::service::ServerInitializeError;
 
@@ -138,7 +138,7 @@ struct SchemaAddFieldParams {
     schema: String,
     name: String,
     #[serde(rename = "type")]
-    type_: String,
+    type_: FieldType,
     values: Option<Vec<String>>,
     default: Option<String>,
 }
@@ -283,10 +283,7 @@ impl Server {
         &self,
         Parameters(p): Parameters<SchemaAddFieldParams>,
     ) -> Result<CallToolResult, McpError> {
-        let type_ = p.type_.parse();
-        let field = type_.and_then(|type_| {
-            parse::schema_add_field(p.schema, p.name, type_, p.values, p.default)
-        });
+        let field = parse::schema_add_field(p.schema, p.name, p.type_, p.values, p.default);
         Ok(self.run(field.map(Op::SchemaAddField)))
     }
 
