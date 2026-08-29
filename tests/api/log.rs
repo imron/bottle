@@ -973,4 +973,160 @@ fn log_file_wrong_width_and_duplicate_header() {
         }))
         .unwrap_err();
     assert_usage(err, "duplicate column");
+    let short = h.dir.path().join("short.tsv");
+    std::fs::write(&short, "when\twhat\nbreakfast\n").unwrap();
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: None,
+            agent: None,
+            links: vec![],
+            file: Some(short),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_usage(err, "wrong number of columns");
+}
+
+#[test]
+fn log_file_tsv_cells_win_over_command() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let path = h.dir.path().join("meals.tsv");
+    std::fs::write(
+        &path,
+        "at\tagent\twhen\twhat\tkcal\tprotein\tcarbs\n\
+         2026-08-22T08:14:00Z\tfilebot\tbreakfast\teggs\t1\t1\t0\n",
+    )
+    .unwrap();
+    h.run_ok(Cmd::Log(cmd::Log {
+        schema: "nutrition.meal".into(),
+        at: Some("2026-08-22T12:00:00Z".into()),
+        agent: Some("cli".into()),
+        links: vec![],
+        file: Some(path),
+        fields: vec![("kcal".into(), "99".into())],
+    }));
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: true,
+    }));
+    assert!(ls.contains("filebot"), "{ls}");
+    assert!(!ls.contains("cli"), "{ls}");
+    assert!(ls.contains("18:14:00"), "{ls}");
+    assert!(!ls.contains("22:00:00"), "{ls}");
+    assert!(!ls.contains("99"), "{ls}");
+}
+
+#[test]
+fn log_file_command_fields_fill_missing_columns() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let path = h.dir.path().join("meals.tsv");
+    std::fs::write(
+        &path,
+        "when\twhat\tprotein\tcarbs\n\
+         breakfast\teggs\t1\t0\n",
+    )
+    .unwrap();
+    h.run_ok(Cmd::Log(cmd::Log {
+        schema: "nutrition.meal".into(),
+        at: Some("2026-08-22T08:14:00Z".into()),
+        agent: None,
+        links: vec![],
+        file: Some(path),
+        fields: vec![("kcal".into(), "10".into())],
+    }));
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    let lines = tsv_lines(&ls);
+    let kcal = lines[0].iter().position(|c| *c == "kcal").unwrap();
+    assert_eq!(lines[1][kcal], "10");
+}
+
+#[test]
+fn log_file_link_overrides_command_link() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.session",
+        &[("title", "one")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.log(
+        "fitness.session",
+        &[("title", "two")],
+        &[],
+        Some("2026-08-22T09:00:00Z"),
+    );
+    let path = h.dir.path().join("sets.tsv");
+    std::fs::write(
+        &path,
+        "links\tmovement\treps\n\
+         session=fitness.session/2\tsquat\t8\n",
+    )
+    .unwrap();
+    let out = h.run_ok(Cmd::Log(cmd::Log {
+        schema: "fitness.set".into(),
+        at: Some("2026-08-22T08:01:00Z".into()),
+        agent: None,
+        links: vec![("session".into(), "fitness.session/1".into())],
+        file: Some(path),
+        fields: vec![],
+    }));
+    assert!(out.contains("session=fitness.session/2"), "{out}");
+    assert!(!out.contains("session=fitness.session/1"), "{out}");
+}
+
+#[test]
+fn log_file_reserved_header_and_directory() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let reserved = h.dir.path().join("id.tsv");
+    std::fs::write(
+        &reserved,
+        "id\twhen\twhat\tkcal\tprotein\tcarbs\n\
+         1\tbreakfast\teggs\t1\t1\t0\n",
+    )
+    .unwrap();
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: None,
+            agent: None,
+            links: vec![],
+            file: Some(reserved),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_fail(err, "reserved field name");
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: None,
+            agent: None,
+            links: vec![],
+            file: Some(h.dir.path().to_path_buf()),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_fail(err, "io error");
 }

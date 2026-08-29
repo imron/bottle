@@ -43,6 +43,7 @@ pub struct AmendInput {
     pub fields: Vec<(String, String)>,
 }
 
+#[derive(Debug)]
 pub struct LogInput {
     pub schema: String,
     pub at: Option<String>,

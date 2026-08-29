@@ -122,4 +122,53 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].fields, vec![("what".into(), "eggs".into())]);
     }
+
+    #[test]
+    fn empty_header_line_is_usage() {
+        let err = log_rows("meal", "\nwhat\neggs\n").unwrap_err();
+        assert!(matches!(err, Error::Usage(Usage::LogFileNeedsHeader)));
+    }
+
+    #[test]
+    fn empty_header_cell_is_usage() {
+        let err = log_rows("meal", "when\t\tkcal\nbreakfast\tx\t1\n").unwrap_err();
+        assert!(matches!(err, Error::Usage(Usage::LogFileNeedsHeader)));
+    }
+
+    #[test]
+    fn short_row_is_wrong_width() {
+        let err = log_rows("meal", "when\twhat\nbreakfast\n").unwrap_err();
+        assert!(matches!(err, Error::Usage(Usage::TsvRowWidth)));
+    }
+
+    #[test]
+    fn agent_cell_is_kept() {
+        let rows = log_rows("meal", "agent\twhat\ncoach\teggs\n").unwrap();
+        assert_eq!(rows[0].agent.as_deref(), Some("coach"));
+    }
+
+    #[test]
+    fn links_skip_double_space_and_reject_bare_name() {
+        let rows = log_rows(
+            "set",
+            "links\n\
+             session=fitness.session/1  project=work.project/2\n",
+        )
+        .unwrap();
+        assert_eq!(
+            rows[0].links,
+            vec![
+                ("session".into(), "fitness.session/1".into()),
+                ("project".into(), "work.project/2".into())
+            ]
+        );
+        let err = log_rows("set", "links\nsession\n").unwrap_err();
+        assert!(matches!(err, Error::Usage(Usage::InvalidLinkTarget(_))));
+    }
+
+    #[test]
+    fn crlf_rows_parse() {
+        let rows = log_rows("meal", "what\r\neggs\r\n").unwrap();
+        assert_eq!(rows[0].fields, vec![("what".into(), "eggs".into())]);
+    }
 }
