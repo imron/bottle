@@ -27,8 +27,8 @@ Field rules:
 
 - `text` is case-sensitive. It may not contain a tab or a
   newline.
-- `number` is an integer or float, not `1e3`, not
-  infinity.
+- `number` is an integer or float in the form bottle
+  stores (`1`, `1.10`), not `1e3`, `01`, or `+1`.
 - `enum` values are folded to lowercase and must match a
   declared value (`Breakfast` is stored as `breakfast`).
   Tab, newline, and comma are rejected.

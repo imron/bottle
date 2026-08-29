@@ -140,7 +140,9 @@ property.
 - Missing required fields are rejected.
 - `text` may not contain tab or newline. Compare is
   case-sensitive.
-- `number` is an integer or float. Only these can be summed.
+- `number` is an integer or float in stored form (`1`,
+  `1.10`), not `1e3`, `01`, or `+1`. Only these can be
+  summed.
 - `enum` values are stored lowercase. Leading and trailing
   spaces are stripped. On write and `--where`, `Water`
   becomes `water` and must match a declared value.

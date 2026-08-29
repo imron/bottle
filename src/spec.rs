@@ -445,10 +445,10 @@ pub fn parse_number(raw: &str) -> Result<Decimal, Error> {
     if raw.contains(['e', 'E']) {
         return Err(Error::Fail(Fail::InvalidNumber(raw.to_string())));
     }
-    let Ok(n) = raw.parse() else {
-        return Err(Error::Fail(Fail::InvalidNumber(raw.to_string())));
-    };
-    Ok(n)
+    match raw.parse::<Decimal>() {
+        Ok(n) if n.to_string() == raw => Ok(n),
+        _ => Err(Error::Fail(Fail::InvalidNumber(raw.to_string()))),
+    }
 }
 
 #[cfg(test)]
@@ -463,5 +463,21 @@ mod tests {
             EnumValue::parse("   ").unwrap_err(),
             Error::Fail(Fail::EmptyEnumValue)
         ));
+    }
+
+    #[test]
+    fn parse_number_requires_canonical_form() {
+        assert_eq!(parse_number("1").unwrap().to_string(), "1");
+        assert_eq!(parse_number("1.10").unwrap().to_string(), "1.10");
+        assert_eq!(parse_number("-0.5").unwrap().to_string(), "-0.5");
+        for raw in ["01", "+1", "1.", ".5", "1e3"] {
+            assert!(
+                matches!(
+                    parse_number(raw).unwrap_err(),
+                    Error::Fail(Fail::InvalidNumber(ref s)) if s == raw
+                ),
+                "{raw}"
+            );
+        }
     }
 }

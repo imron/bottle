@@ -126,10 +126,7 @@ impl TryFrom<StoredNumber> for Decimal {
     type Error = Error;
 
     fn try_from(StoredNumber(raw): StoredNumber) -> Result<Self, Error> {
-        match parse_number(&raw) {
-            Ok(n) if n.to_string() == raw => Ok(n),
-            _ => Err(Error::Fail(Fail::CorruptStoredNumber(raw))),
-        }
+        parse_number(&raw).map_err(|_| Error::Fail(Fail::CorruptStoredNumber(raw)))
     }
 }
 

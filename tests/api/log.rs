@@ -163,6 +163,28 @@ fn scientific_notation_rejected() {
 }
 
 #[test]
+fn non_canonical_number_rejected() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    for raw in ["01", "+1", "1.", ".5"] {
+        let err = h
+            .run(Cmd::Log(cmd::Log {
+                schema: "nutrition.meal".into(),
+                at: Some("2026-08-22T08:14:00Z".into()),
+                agent: None,
+                links: vec![],
+                fields: {
+                    let mut f = meal_fields();
+                    f[2] = ("kcal".into(), raw.into());
+                    f
+                },
+            }))
+            .unwrap_err();
+        assert_fail(err, &format!("invalid number: {raw}"));
+    }
+}
+
+#[test]
 fn agent_from_open() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
