@@ -12,6 +12,8 @@ use crate::sql::{StoredNumber, StoredTime};
 use crate::time::{self, Instant};
 use jiff::tz::TimeZone;
 
+pub(crate) const USER_VERSION: i32 = 1;
+
 pub trait UniqueConstraint<T> {
     fn unique(self, err: Fail) -> Result<T, Error>;
 }
@@ -79,6 +81,7 @@ impl Db {
                 PRIMARY KEY (from_schema, from_id, name)
              );",
         )?;
+        ensure_user_version(&conn)?;
         register_functions(&conn, tz)?;
         Ok(Self { conn })
     }
@@ -249,6 +252,17 @@ fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
     Ok(left == right)
 }
 
+fn ensure_user_version(conn: &Sqlite) -> Result<(), Error> {
+    let v: i32 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    if v > USER_VERSION {
+        return Err(Error::Fail(Fail::UnsupportedStoreVersion(v)));
+    }
+    if v < USER_VERSION {
+        conn.pragma_update(None, "user_version", USER_VERSION)?;
+    }
+    Ok(())
+}
+
 fn home_dir() -> Result<PathBuf, Error> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
@@ -291,5 +305,36 @@ mod tests {
             "49.6"
         );
         assert!(dec_add(Decimal::MAX, Some("1")).is_err());
+    }
+
+    #[test]
+    fn stamps_user_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bottle.db");
+        let _db = Db::open(&path, TimeZone::UTC).unwrap();
+        let conn = Sqlite::open(&path).unwrap();
+        let v: i32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(v, USER_VERSION);
+    }
+
+    #[test]
+    fn rejects_newer_user_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bottle.db");
+        {
+            let conn = Sqlite::open(&path).unwrap();
+            conn.pragma_update(None, "user_version", USER_VERSION + 1)
+                .unwrap();
+        }
+        let err = match Db::open(&path, TimeZone::UTC) {
+            Ok(_) => panic!("expected unsupported store version"),
+            Err(err) => err,
+        };
+        assert_eq!(
+            err.to_string(),
+            format!("unsupported store version: {}", USER_VERSION + 1)
+        );
     }
 }

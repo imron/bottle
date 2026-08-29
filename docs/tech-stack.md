@@ -52,7 +52,11 @@ On open:
 ```
 PRAGMA journal_mode=WAL;
 PRAGMA busy_timeout=5000;
+PRAGMA user_version=1;
 ```
+
+`user_version` is 1. A file with a higher version is refused.
+Unversioned files (0) are stamped 1; the catalog is the same.
 
 WAL so readers do not block a writer. `busy_timeout` is
 5000 milliseconds: a second writer waits up to that long
