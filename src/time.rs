@@ -10,7 +10,7 @@ use crate::spec::TimePeriod;
 
 /// Unix seconds. Sub-second time is unrepresentable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Instant(i64);
+pub struct Instant(Timestamp);
 
 impl Instant {
     pub fn now() -> Self {
@@ -18,12 +18,18 @@ impl Instant {
     }
 
     pub fn from_timestamp(ts: Timestamp) -> Self {
-        Self(ts.as_second())
+        Self(seconds_only(ts))
     }
 
     pub fn timestamp(self) -> Timestamp {
-        Timestamp::from_second(self.0).unwrap_or(Timestamp::UNIX_EPOCH)
+        self.0
     }
+}
+
+fn seconds_only(ts: Timestamp) -> Timestamp {
+    // as_second() of a Timestamp is always in range for from_second
+    // (jiff semver). Keep ts rather than invent another instant.
+    Timestamp::from_second(ts.as_second()).unwrap_or(ts)
 }
 
 pub fn zone(name: Option<&str>) -> Result<TimeZone, Error> {
@@ -294,6 +300,18 @@ mod tests {
             now.timestamp(),
             Timestamp::from_second(now.timestamp().as_second()).unwrap()
         );
+    }
+
+    #[test]
+    fn instant_does_not_become_epoch() {
+        for ts in [Timestamp::MIN, Timestamp::MAX] {
+            let at = Instant::from_timestamp(ts);
+            assert_eq!(
+                at.timestamp(),
+                Timestamp::from_second(ts.as_second()).unwrap()
+            );
+            assert_ne!(at.timestamp(), Timestamp::UNIX_EPOCH);
+        }
     }
 
     #[test]
