@@ -203,3 +203,19 @@ fn unknown_schema_is_fail_on_stderr() {
     assert!(stdout.is_empty(), "{stdout}");
     assert!(stderr.contains("unknown schema"), "{stderr}");
 }
+
+#[test]
+fn usage_does_not_create_db() {
+    let dir = TempDir::new().unwrap();
+    let db = dir.path().join("bottle.db");
+    let out = bottle()
+        .arg("--db")
+        .arg(&db)
+        .args(["log", "meal", "--at", "2026-08-22", "kcal=1"])
+        .output()
+        .expect("run bottle");
+    assert_eq!(out.status.code().expect("status code"), 2);
+    let stderr = String::from_utf8(out.stderr).expect("stderr utf8");
+    assert!(stderr.contains("date-only"), "{stderr}");
+    assert!(!db.exists(), "usage must not create {}", db.display());
+}

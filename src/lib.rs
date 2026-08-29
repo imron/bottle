@@ -23,6 +23,7 @@ pub use input::parse::{logs, parse};
 pub use ledger::{Agent, Op};
 pub use output::Style;
 pub use spec::FieldType;
+pub use time::zone;
 
 pub struct Bottle {
     db: db::Db,

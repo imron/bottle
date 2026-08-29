@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use bottle::{Bottle, Cmd, Error, execute, help, parse};
+use bottle::{Bottle, Cmd, Error, execute, help, parse, zone};
 use clap::{Parser, Subcommand};
 
 fn main() -> ExitCode {
@@ -43,9 +43,10 @@ fn run_cli(cli: Cli) -> Result<String, Error> {
                 Some(path) => path,
                 None => bottle::default_db_path()?,
             };
-            let mut bottle = Bottle::open(&db, None, None)?;
+            let tz = zone(None)?;
             let style = bottle::style(&command);
-            let request = parse(command, bottle.tz())?;
+            let request = parse(command, &tz)?;
+            let mut bottle = Bottle::open(&db, None, None)?;
             execute(&mut bottle, request, style)
         }
     }
