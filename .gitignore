@@ -1,5 +1,6 @@
 /.crt
 /target
+/tags
 *.swp
 *.swo
 *~
