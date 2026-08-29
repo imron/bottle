@@ -6,7 +6,7 @@ use rust_decimal::Decimal;
 use crate::db::Connection;
 use crate::error::{Error, Fail};
 use crate::ledger::{
-    Agent, Entry, FieldValue, Filter, FilterValue, Find, Order, Schema, SchemaInfo, Summed,
+    Agent, Entry, FieldValue, Filter, Find, NonEmptyFieldValue, Order, Schema, SchemaInfo, Summed,
 };
 use crate::spec::{
     EntryId, EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName,
@@ -310,14 +310,14 @@ fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) ->
             Filter::Field { name, value } => {
                 bind.push(SqlVal::from_filter(value));
                 match value {
-                    FilterValue::Number(_) => {
+                    NonEmptyFieldValue::Number(_) => {
                         sql.push_str(&format!(
                             " AND bottle_dec_eq({}, ?{})",
                             quote_ident(name.as_str()),
                             bind.len()
                         ));
                     }
-                    FilterValue::Text(_) | FilterValue::Enum(_) => {
+                    NonEmptyFieldValue::Text(_) | NonEmptyFieldValue::Enum(_) => {
                         sql.push_str(&format!(
                             " AND {} = ?{}",
                             quote_ident(name.as_str()),

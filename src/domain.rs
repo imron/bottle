@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use crate::db::{Connection, Db, Tx};
 use crate::error::{Error, Fail};
 use crate::ledger::{
-    Agent, Amend, Entries, FieldInput, FieldValue, Filter, FilterValue, Find, Get, GroupedLink,
-    GroupedTime, Ignore, Last, List, Log, Op, Order, Outcome, Posted, SchemaAdd, SchemaAddField,
-    SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed,
-    Today, Total,
+    Agent, Amend, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink, GroupedTime,
+    Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome, Posted, SchemaAdd,
+    SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, Stamp,
+    Sum, Summed, Today, Total,
 };
 use crate::mutable_store;
 use crate::spec::{Field, FieldKind, FieldName, Group, Link, Spec};
@@ -340,7 +340,7 @@ fn resolve_filters(
         };
         out.push(Filter::Field {
             name: spec_field.name.clone(),
-            value: FilterValue::parse(spec_field, &field.value)?,
+            value: NonEmptyFieldValue::parse(spec_field, &field.value)?,
         });
     }
     for link in links {

@@ -4,7 +4,7 @@ use jiff::tz::TimeZone;
 
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
-    Agent, Amend, FieldInput, FieldValue, Get, Ignore, Last, List, Log, Op, SchemaAdd,
+    Agent, Amend, FieldInput, Get, Ignore, Last, List, Log, NonEmptyFieldValue, Op, SchemaAdd,
     SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Scope, Sum, Today,
 };
 use crate::spec::{
@@ -117,7 +117,7 @@ pub fn schema_add_field(
     let kind = field_kind(type_, values)?;
     let default = match default.as_deref() {
         None => None,
-        Some(raw) => Some(FieldValue::parse(
+        Some(raw) => Some(NonEmptyFieldValue::parse(
             &Field {
                 name: name.clone(),
                 kind: kind.clone(),

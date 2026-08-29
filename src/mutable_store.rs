@@ -4,7 +4,7 @@ use rusqlite::params;
 
 use crate::db::{Tx, UniqueConstraint};
 use crate::error::{Error, Fail};
-use crate::ledger::{Agent, FieldValue};
+use crate::ledger::{Agent, FieldValue, NonEmptyFieldValue};
 use crate::spec::{EntryId, Field, FieldName, Link, LinkName, SchemaName, Spec};
 use crate::sql::{SqlVal, StoredEntryId, instant_to_sql, quote_ident, sql_default, table_name};
 use crate::time::Instant;
@@ -27,7 +27,7 @@ pub fn add_column(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
     field: &Field,
-    default: Option<&FieldValue>,
+    default: Option<&NonEmptyFieldValue>,
 ) -> Result<(), Error> {
     let table = quote_ident(&table_name(schema));
     let alter = if let Some(def) = default {

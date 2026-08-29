@@ -93,16 +93,16 @@ pub struct SchemaInfo {
 }
 
 #[derive(Debug, Clone)]
-pub enum FilterValue {
+pub enum NonEmptyFieldValue {
     Text(String),
     Number(Decimal),
     Enum(EnumValue),
 }
 
-impl FilterValue {
+impl NonEmptyFieldValue {
     pub fn parse(field: &Field, raw: &str) -> Result<Self, Error> {
         match FieldValue::parse(field, raw)? {
-            FieldValue::Empty => Err(Error::Usage(Usage::EmptyFilter(field.name.clone()))),
+            FieldValue::Empty => Err(Error::Usage(Usage::EmptyValue(field.name.clone()))),
             FieldValue::Text(s) => Ok(Self::Text(s)),
             FieldValue::Number(n) => Ok(Self::Number(n)),
             FieldValue::Enum(v) => Ok(Self::Enum(v)),
@@ -112,8 +112,14 @@ impl FilterValue {
 
 #[derive(Debug, Clone)]
 pub enum Filter {
-    Field { name: FieldName, value: FilterValue },
-    Link { name: LinkName, to: EntryRef },
+    Field {
+        name: FieldName,
+        value: NonEmptyFieldValue,
+    },
+    Link {
+        name: LinkName,
+        to: EntryRef,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -167,7 +173,7 @@ pub struct SchemaAddField {
     pub schema: SchemaName,
     pub name: FieldName,
     pub kind: FieldKind,
-    pub default: Option<FieldValue>,
+    pub default: Option<NonEmptyFieldValue>,
 }
 
 #[derive(Debug, Clone)]

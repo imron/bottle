@@ -343,6 +343,22 @@ fn add_field_duplicate_and_retired() {
 }
 
 #[test]
+fn add_field_empty_default_is_usage() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
+            schema: "nutrition.meal".into(),
+            name: "note".into(),
+            type_: FieldType::Text,
+            values: None,
+            default: Some("".into()),
+        })))
+        .unwrap_err();
+    assert_usage(err, "empty note");
+}
+
+#[test]
 fn add_field_with_default() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);

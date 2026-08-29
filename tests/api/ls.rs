@@ -411,7 +411,7 @@ fn where_empty_value_is_usage() {
                 include_ignored: false,
             }))
             .unwrap_err();
-        assert_usage(err, &format!("empty {field} filter"));
+        assert_usage(err, &format!("empty {field}"));
     }
 }
 

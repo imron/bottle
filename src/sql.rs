@@ -1,5 +1,5 @@
 use crate::error::{Error, Fail};
-use crate::ledger::{Agent, FieldValue, FilterValue};
+use crate::ledger::{Agent, FieldValue, NonEmptyFieldValue};
 use crate::spec::{EntryId, EnumValue, LinkName, SchemaName, parse_number};
 use crate::time::Instant;
 use jiff::fmt::strtime;
@@ -32,11 +32,11 @@ impl SqlVal {
         }
     }
 
-    pub fn from_filter(value: &FilterValue) -> Self {
+    pub fn from_filter(value: &NonEmptyFieldValue) -> Self {
         match value {
-            FilterValue::Text(s) => SqlVal::Text(s.clone()),
-            FilterValue::Number(n) => SqlVal::Text(n.to_string()),
-            FilterValue::Enum(v) => SqlVal::Text(v.to_string()),
+            NonEmptyFieldValue::Text(s) => SqlVal::Text(s.clone()),
+            NonEmptyFieldValue::Number(n) => SqlVal::Text(n.to_string()),
+            NonEmptyFieldValue::Enum(v) => SqlVal::Text(v.to_string()),
         }
     }
 }
@@ -133,12 +133,11 @@ impl TryFrom<StoredNumber> for Decimal {
     }
 }
 
-pub fn sql_default(value: &FieldValue) -> String {
+pub fn sql_default(value: &NonEmptyFieldValue) -> String {
     let raw = match value {
-        FieldValue::Empty => String::new(),
-        FieldValue::Text(s) => s.clone(),
-        FieldValue::Number(n) => n.to_string(),
-        FieldValue::Enum(v) => v.to_string(),
+        NonEmptyFieldValue::Text(s) => s.clone(),
+        NonEmptyFieldValue::Number(n) => n.to_string(),
+        NonEmptyFieldValue::Enum(v) => v.to_string(),
     };
     format!("'{}'", raw.replace('\'', "''"))
 }
