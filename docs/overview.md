@@ -2,8 +2,8 @@
 
 bottle is a small store for bots. They register a schema, log
 entries, and query with a fixed set of verbs: `ls`, `sum`,
-`last`, `amend`, `ignore`, `unignore`. Output is TSV. The
-file is sqlite.
+`last`, `amend`, `ignore`, `unignore`, `backup`. Output is TSV.
+The file is sqlite.
 
 A bot may still read a specialized system (training log, bank,
 calendar). It writes an entry here so every other bot can

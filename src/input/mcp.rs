@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use rmcp::handler::server::wrapper::Parameters;
@@ -216,6 +216,12 @@ struct IdParams {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+struct BackupParams {
+    path: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SumParams {
     #[serde(flatten)]
     scope: ScopeParams,
@@ -396,6 +402,12 @@ impl Server {
     fn unignore(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
         let unignore = parse::unignore(p.schema, p.id);
         Ok(self.run(unignore.map(Op::Unignore)))
+    }
+
+    #[tool(description = "Copy the ledger to a sqlite file")]
+    fn backup(&self, Parameters(p): Parameters<BackupParams>) -> Result<CallToolResult, McpError> {
+        let backup = parse::backup(PathBuf::from(p.path));
+        Ok(self.run(backup.map(Op::Backup)))
     }
 }
 

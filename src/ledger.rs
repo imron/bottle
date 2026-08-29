@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use rust_decimal::Decimal;
 
@@ -265,6 +266,11 @@ pub struct Unignore {
 }
 
 #[derive(Debug, Clone)]
+pub struct Backup {
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone)]
 pub enum Op {
     SchemaList,
     SchemaShow(SchemaShow),
@@ -282,6 +288,7 @@ pub enum Op {
     Amend(Amend),
     Ignore(Ignore),
     Unignore(Unignore),
+    Backup(Backup),
 }
 
 #[derive(Debug, Clone)]

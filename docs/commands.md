@@ -257,3 +257,16 @@ Clears `ignored`. The entry is again visible to `ls`,
 ignored (still prints `id`, `at`). Prints `id`, `at`.
 Exit 1 if missing. Does not change fields, `at`, `agent`,
 or links.
+
+## backup
+
+```
+bottle backup <path>
+```
+
+Writes a consistent copy of the database to `<path>`.
+The live file is unchanged. The copy is one sqlite file
+(no `-wal` or `-shm`). `<path>` must not already exist.
+No output. Exit 1 if the path exists, its parent is
+missing, or the copy fails. Point `--db` at the copy to
+read it. There is no restore verb.

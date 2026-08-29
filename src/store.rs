@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::path::Path;
 
 use rusqlite::OptionalExtension;
 use rust_decimal::Decimal;
@@ -17,6 +18,25 @@ use crate::sql::{
     StoredSchemaName, StoredText, StoredTime, instant_to_sql, quote_ident, table_name,
 };
 use crate::time::{Instant, Period, ToBound};
+
+pub fn backup(conn: &impl Connection, dest: &Path) -> Result<(), Error> {
+    if dest.exists() {
+        return Err(Error::Fail(Fail::FileExists(dest.display().to_string())));
+    }
+    if let Some(parent) = dest.parent()
+        && !parent.as_os_str().is_empty()
+        && !parent.exists()
+    {
+        return Err(Error::Fail(Fail::FileNotFound(
+            parent.display().to_string(),
+        )));
+    }
+    let dest = dest
+        .to_str()
+        .ok_or_else(|| Error::Fail(Fail::Io(format!("invalid path: {}", dest.display()))))?;
+    conn.as_ref().execute("VACUUM INTO ?1", [dest])?;
+    Ok(())
+}
 
 pub fn list_schemas(conn: &impl Connection) -> Result<Vec<SchemaInfo>, Error> {
     let mut stmt = conn

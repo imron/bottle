@@ -29,6 +29,7 @@ pub enum Usage {
     OffsetNeedsColon,
     UnknownHelpTopic(String),
     UnknownType(String),
+    EmptyBackupPath,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,6 +79,7 @@ pub enum Fail {
     CorruptStoredId(i64),
     HomeNotSet,
     FileNotFound(String),
+    FileExists(String),
     Store(String),
     Io(String),
     Time(String),
@@ -115,6 +117,7 @@ fn usage_message(err: &Usage) -> String {
         Usage::OffsetNeedsColon => "offset must include a colon (+10:00)".into(),
         Usage::UnknownHelpTopic(topic) => format!("unknown help topic: {topic}"),
         Usage::UnknownType(t) => format!("unknown type: {t}"),
+        Usage::EmptyBackupPath => "backup requires a path".into(),
     }
 }
 
@@ -147,6 +150,7 @@ fn fail_message(err: &Fail) -> String {
         Fail::Io(e) => format!("io error: {e}"),
         Fail::Time(e) => format!("time error: {e}"),
         Fail::FileNotFound(path) => format!("file not found: {path}"),
+        Fail::FileExists(path) => format!("file exists: {path}"),
         Fail::InvalidSchemaName(s) => format!("invalid schema name: {s}"),
         Fail::InvalidFieldName(s) => format!("invalid field name: {s}"),
         Fail::ReservedFieldName(s) => format!("reserved field name: {s}"),

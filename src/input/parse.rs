@@ -1,12 +1,13 @@
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 use jiff::tz::TimeZone;
 
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
-    Agent, Amend, FieldInput, Get, Ignore, Last, List, Log, NonEmptyFieldValue, Op, SchemaAdd,
-    SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Scope, Sum, Today,
-    Unignore,
+    Agent, Amend, Backup, FieldInput, Get, Ignore, Last, List, Log, NonEmptyFieldValue, Op,
+    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Scope, Sum,
+    Today, Unignore,
 };
 use crate::spec::{
     EntryId, EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier,
@@ -68,6 +69,7 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
         )?),
         Cmd::Ignore(cmd) => Op::Ignore(ignore(cmd.schema, cmd.id)?),
         Cmd::Unignore(cmd) => Op::Unignore(unignore(cmd.schema, cmd.id)?),
+        Cmd::Backup(cmd) => Op::Backup(backup(cmd.path)?),
     })
 }
 
@@ -293,6 +295,13 @@ pub fn unignore(schema: String, id: i64) -> Result<Unignore, Error> {
         schema: SchemaName::parse(&schema)?,
         id: EntryId::parse(id)?,
     })
+}
+
+pub fn backup(path: PathBuf) -> Result<Backup, Error> {
+    if path.as_os_str().is_empty() {
+        return Err(Error::Usage(Usage::EmptyBackupPath));
+    }
+    Ok(Backup { path })
 }
 
 fn parse_agent(agent: Option<String>) -> Result<Option<Agent>, Error> {

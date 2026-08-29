@@ -29,7 +29,7 @@ not a TSV body.
 `help`, `schema_list`, `schema_show`, `schema_add`,
 `schema_add_field`, `schema_add_value`, `schema_retire`,
 `schema_drop`, `log`, `ls`, `get`, `sum`, `last`,
-`today`, `amend`, `ignore`, `unignore`.
+`today`, `amend`, `ignore`, `unignore`, `backup`.
 
 `help` takes an optional `command` (`log`, `schema add`).
 
@@ -46,6 +46,8 @@ Field values are strings or JSON numbers. The number's
 text is what the CLI would take. `log` and `amend` use
 that for cells in `fields` (`null` is empty). `where` uses
 it for filters. Booleans and nested objects are rejected.
+
+`backup` takes `path` on the machine running bottle.
 
 ## See also
 

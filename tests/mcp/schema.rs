@@ -27,6 +27,7 @@ async fn lists_tools_and_empty_schema_list() {
         "amend",
         "ignore",
         "unignore",
+        "backup",
     ] {
         assert!(
             names.iter().any(|n| n == name),

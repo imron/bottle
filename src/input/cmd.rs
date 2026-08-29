@@ -153,6 +153,11 @@ pub struct Unignore {
     pub id: i64,
 }
 
+#[derive(Debug, Clone, Args)]
+pub struct Backup {
+    pub path: PathBuf,
+}
+
 #[derive(Debug, Clone, Subcommand)]
 pub enum Cmd {
     #[command(subcommand)]
@@ -166,4 +171,5 @@ pub enum Cmd {
     Amend(Amend),
     Ignore(Ignore),
     Unignore(Unignore),
+    Backup(Backup),
 }

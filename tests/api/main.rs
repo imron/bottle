@@ -1,4 +1,5 @@
 mod amend;
+mod backup;
 mod common;
 mod get;
 mod help;

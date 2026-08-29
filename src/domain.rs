@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use crate::db::{Connection, Db, Tx};
 use crate::error::{Error, Fail};
 use crate::ledger::{
-    Agent, Amend, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink, GroupedTime,
-    Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome, Posted, SchemaAdd,
-    SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, Stamp,
-    Sum, Summed, Today, Total, Unignore,
+    Agent, Amend, Backup, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink,
+    GroupedTime, Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome, Posted,
+    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas,
+    Scope, Stamp, Sum, Summed, Today, Total, Unignore,
 };
 use crate::mutable_store;
 use crate::spec::{EntryId, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
@@ -49,6 +49,7 @@ pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outc
         Op::Amend(op) => amend(db, op),
         Op::Ignore(op) => ignore(db, op),
         Op::Unignore(op) => unignore(db, op),
+        Op::Backup(op) => backup(db, op),
     }
 }
 
@@ -198,6 +199,12 @@ fn ignore(db: &mut Db, op: Ignore) -> Result<Outcome, Error> {
 
 fn unignore(db: &mut Db, op: Unignore) -> Result<Outcome, Error> {
     set_ignored(db, op.schema, op.id, false)
+}
+
+fn backup(db: &Db, op: Backup) -> Result<Outcome, Error> {
+    // VACUUM INTO cannot run inside an open transaction.
+    store::backup(db, &op.path)?;
+    Ok(Outcome::Empty)
 }
 
 fn set_ignored(
