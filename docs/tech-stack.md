@@ -52,12 +52,11 @@ On open:
 ```
 PRAGMA journal_mode=WAL;
 PRAGMA busy_timeout=5000;
-PRAGMA user_version=2;
+PRAGMA user_version=1;
 ```
 
-`user_version` is 2: field catalog as rows, not a YAML blob.
-A file with a higher version is refused. Version 0 and 1
-files that still have `schemas.spec` are migrated on open.
+`user_version` is 1: field catalog as rows. A file with a
+higher version is refused. Unversioned files are stamped 1.
 
 WAL so readers do not block a writer. `busy_timeout` is
 5000 milliseconds: a second writer waits up to that long

@@ -2,18 +2,17 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use rusqlite::Connection as Sqlite;
-use rusqlite::OptionalExtension;
 use rusqlite::TransactionBehavior;
 use rusqlite::functions::{Aggregate, FunctionFlags};
 use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
-use crate::spec::{FieldKind, SchemaName, Spec, TimePeriod};
-use crate::sql::{StoredNumber, StoredSchemaName, StoredTime};
+use crate::spec::TimePeriod;
+use crate::sql::{StoredNumber, StoredTime};
 use crate::time::{self, Instant};
 use jiff::tz::TimeZone;
 
-pub(crate) const USER_VERSION: i32 = 2;
+pub(crate) const USER_VERSION: i32 = 1;
 
 const CATALOG_SQL: &str = "
 CREATE TABLE IF NOT EXISTS schemas (
@@ -99,17 +98,8 @@ impl Db {
         let conn = Sqlite::open(path)?;
         conn.busy_timeout(Duration::from_millis(5000))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
-        let v: i32 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
-        if v > USER_VERSION {
-            return Err(Error::Fail(Fail::UnsupportedStoreVersion(v)));
-        }
-        if v < 2 {
-            migrate_yaml_catalog(&conn)?;
-        }
         conn.execute_batch(CATALOG_SQL)?;
-        if v < USER_VERSION {
-            conn.pragma_update(None, "user_version", USER_VERSION)?;
-        }
+        ensure_user_version(&conn)?;
         register_functions(&conn, tz)?;
         Ok(Self { conn })
     }
@@ -280,110 +270,13 @@ fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
     Ok(left == right)
 }
 
-fn table_exists(conn: &Sqlite, name: &str) -> Result<bool, Error> {
-    let found: Option<i64> = conn
-        .query_row(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1",
-            [name],
-            |row| row.get(0),
-        )
-        .optional()?;
-    Ok(found.is_some())
-}
-
-fn schemas_has_spec(conn: &Sqlite) -> Result<bool, Error> {
-    let mut stmt = conn.prepare("PRAGMA table_info(schemas)")?;
-    let mut raw = stmt.query([])?;
-    while let Some(r) = raw.next()? {
-        let name: String = r.get(1)?;
-        if name == "spec" {
-            return Ok(true);
-        }
+fn ensure_user_version(conn: &Sqlite) -> Result<(), Error> {
+    let v: i32 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    if v > USER_VERSION {
+        return Err(Error::Fail(Fail::UnsupportedStoreVersion(v)));
     }
-    Ok(false)
-}
-
-fn migrate_yaml_catalog(conn: &Sqlite) -> Result<(), Error> {
-    if !table_exists(conn, "schemas")? {
-        return Ok(());
-    }
-    if !schemas_has_spec(conn)? {
-        return Ok(());
-    }
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS schema_fields (
-            schema   TEXT NOT NULL,
-            position INTEGER NOT NULL,
-            name     TEXT NOT NULL,
-            kind     TEXT NOT NULL,
-            required INTEGER NOT NULL,
-            PRIMARY KEY (schema, name),
-            UNIQUE (schema, position)
-         );
-         CREATE TABLE IF NOT EXISTS schema_enum_values (
-            schema   TEXT NOT NULL,
-            field    TEXT NOT NULL,
-            position INTEGER NOT NULL,
-            value    TEXT NOT NULL,
-            PRIMARY KEY (schema, field, value),
-            UNIQUE (schema, field, position)
-         );",
-    )?;
-    let rows = {
-        let mut stmt = conn.prepare("SELECT name, spec FROM schemas")?;
-        let mut raw = stmt.query([])?;
-        let mut rows = Vec::new();
-        while let Some(r) = raw.next()? {
-            let name: String = r.get(0)?;
-            let spec: String = r.get(1)?;
-            rows.push((name, spec));
-        }
-        rows
-    };
-    for (name, yaml) in rows {
-        let spec = Spec::parse_yaml(&yaml)?;
-        let name = SchemaName::try_from(StoredSchemaName(name))?;
-        insert_migrated_spec(conn, &name, &spec)?;
-    }
-    conn.execute_batch(
-        "CREATE TABLE schemas_v2 (
-            name    TEXT PRIMARY KEY,
-            retired INTEGER NOT NULL DEFAULT 0
-         );
-         INSERT INTO schemas_v2 (name, retired) SELECT name, retired FROM schemas;
-         DROP TABLE schemas;
-         ALTER TABLE schemas_v2 RENAME TO schemas;",
-    )?;
-    Ok(())
-}
-
-fn insert_migrated_spec(conn: &Sqlite, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
-    for (i, field) in spec.fields.iter().enumerate() {
-        let kind = match &field.kind {
-            FieldKind::Text => "text",
-            FieldKind::Number => "number",
-            FieldKind::Enum(_) => "enum",
-        };
-        conn.execute(
-            "INSERT INTO schema_fields (schema, position, name, kind, required)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            rusqlite::params![
-                name.as_str(),
-                i as i64,
-                field.name.as_str(),
-                kind,
-                field.required as i64
-            ],
-        )?;
-        if let FieldKind::Enum(values) = &field.kind {
-            for (j, value) in values.iter().enumerate() {
-                conn.execute(
-                    "INSERT INTO schema_enum_values (schema, field, position, value)
-                     VALUES (?1, ?2, ?3, ?4)",
-                    rusqlite::params![name.as_str(), field.name.as_str(), j as i64, value.as_str()],
-                )?;
-            }
-        }
+    if v < USER_VERSION {
+        conn.pragma_update(None, "user_version", USER_VERSION)?;
     }
     Ok(())
 }
@@ -461,53 +354,5 @@ mod tests {
             err.to_string(),
             format!("unsupported store version: {}", USER_VERSION + 1)
         );
-    }
-
-    #[test]
-    fn migrates_yaml_spec_column() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("bottle.db");
-        {
-            let conn = Sqlite::open(&path).unwrap();
-            conn.execute_batch(
-                "CREATE TABLE schemas (
-                    name TEXT PRIMARY KEY,
-                    spec TEXT NOT NULL,
-                    retired INTEGER NOT NULL DEFAULT 0
-                 );",
-            )
-            .unwrap();
-            conn.execute(
-                "INSERT INTO schemas (name, spec, retired) VALUES (?1, ?2, 0)",
-                rusqlite::params![
-                    "nutrition.meal",
-                    "fields:\n  - name: kcal\n    type: number\n    required: true\n  - name: when\n    type: enum\n    required: true\n    values: [breakfast, lunch]\n"
-                ],
-            )
-            .unwrap();
-            conn.pragma_update(None, "user_version", 1).unwrap();
-        }
-        let db = Db::open(&path, TimeZone::UTC).unwrap();
-        let schema =
-            crate::store::load_schema(&db, &SchemaName::parse("nutrition.meal").unwrap()).unwrap();
-        assert_eq!(schema.spec.fields.len(), 2);
-        assert!(matches!(schema.spec.fields[0].kind, FieldKind::Number));
-        let FieldKind::Enum(values) = &schema.spec.fields[1].kind else {
-            panic!("expected enum");
-        };
-        assert_eq!(values[0].as_str(), "breakfast");
-        assert_eq!(values[1].as_str(), "lunch");
-        let v: i32 = db
-            .as_ref()
-            .pragma_query_value(None, "user_version", |row| row.get(0))
-            .unwrap();
-        assert_eq!(v, USER_VERSION);
-        let mut info = db.as_ref().prepare("PRAGMA table_info(schemas)").unwrap();
-        let names: Vec<String> = info
-            .query_map([], |row| row.get::<_, String>(1))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
-        assert!(!names.iter().any(|n| n == "spec"), "{names:?}");
     }
 }
