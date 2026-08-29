@@ -134,7 +134,7 @@ fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Err
     let agent = op.agent.as_ref().unwrap_or(agent);
     let at = match op.at {
         Some(at) => at,
-        None => Instant::now()?,
+        None => Instant::now(),
     };
     let loaded = store::load_schema(tx, &op.schema)?;
     if loaded.retired {

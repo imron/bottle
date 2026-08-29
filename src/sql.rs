@@ -86,9 +86,7 @@ impl TryFrom<StoredTime> for Instant {
         let Ok(ts) = raw.parse() else {
             return Err(Error::Fail(Fail::CorruptStoredTime(raw)));
         };
-        let Ok(at) = Instant::from_timestamp(ts) else {
-            return Err(Error::Fail(Fail::CorruptStoredTime(raw)));
-        };
+        let at = Instant::from_timestamp(ts);
         match instant_to_sql(at) {
             Ok(canonical) if canonical == raw => Ok(at),
             _ => Err(Error::Fail(Fail::CorruptStoredTime(raw))),

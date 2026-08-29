@@ -8,20 +8,21 @@ use jiff::tz::TimeZone;
 use crate::error::{Error, Fail, Usage};
 use crate::spec::TimePeriod;
 
+/// Unix seconds. Sub-second time is unrepresentable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Instant(Timestamp);
+pub struct Instant(i64);
 
 impl Instant {
-    pub fn now() -> Result<Self, Error> {
+    pub fn now() -> Self {
         Self::from_timestamp(Timestamp::now())
     }
 
-    pub fn from_timestamp(ts: Timestamp) -> Result<Self, Error> {
-        Ok(Self(Timestamp::from_second(ts.as_second())?))
+    pub fn from_timestamp(ts: Timestamp) -> Self {
+        Self(ts.as_second())
     }
 
     pub fn timestamp(self) -> Timestamp {
-        self.0
+        Timestamp::from_second(self.0).unwrap_or(Timestamp::UNIX_EPOCH)
     }
 }
 
@@ -34,20 +35,20 @@ pub fn zone(name: Option<&str>) -> Result<TimeZone, Error> {
 
 pub fn parse_instant(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
     match parse(input, tz)? {
-        Parsed::Instant(ts) => Instant::from_timestamp(ts),
+        Parsed::Instant(ts) => Ok(Instant::from_timestamp(ts)),
         Parsed::Date(_) => Err(Error::Usage(Usage::DateOnlyNotInstant)),
     }
 }
 
 pub fn display_local(at: Instant, tz: &TimeZone) -> Result<String, Error> {
-    let zoned = at.0.to_zoned(tz.clone());
+    let zoned = at.timestamp().to_zoned(tz.clone());
     Ok(strtime::format("%Y-%m-%dT%H:%M:%S%:z", &zoned)?)
 }
 
 fn from_bound(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
     match parse(input, tz)? {
-        Parsed::Instant(ts) => Instant::from_timestamp(ts),
-        Parsed::Date(date) => Instant::from_timestamp(date_midnight(date, tz)?),
+        Parsed::Instant(ts) => Ok(Instant::from_timestamp(ts)),
+        Parsed::Date(date) => Ok(Instant::from_timestamp(date_midnight(date, tz)?)),
     }
 }
 
@@ -73,9 +74,9 @@ impl Range {
 
     pub fn today(tz: &TimeZone) -> Result<Self, Error> {
         let today = Timestamp::now().to_zoned(tz.clone()).date();
-        let start = Instant::from_timestamp(date_midnight(today, tz)?)?;
+        let start = Instant::from_timestamp(date_midnight(today, tz)?);
         let next = today.checked_add(jiff::Span::new().days(1))?;
-        let end = Instant::from_timestamp(date_midnight(next, tz)?)?;
+        let end = Instant::from_timestamp(date_midnight(next, tz)?);
         Ok(Self {
             from: Some(start),
             to: Some(ToBound::Exclusive(end)),
@@ -85,18 +86,18 @@ impl Range {
 
 fn to_bound(input: &str, tz: &TimeZone) -> Result<ToBound, Error> {
     match parse(input, tz)? {
-        Parsed::Instant(ts) => Ok(ToBound::Inclusive(Instant::from_timestamp(ts)?)),
+        Parsed::Instant(ts) => Ok(ToBound::Inclusive(Instant::from_timestamp(ts))),
         Parsed::Date(date) => {
             let next = date.checked_add(jiff::Span::new().days(1))?;
             Ok(ToBound::Exclusive(Instant::from_timestamp(date_midnight(
                 next, tz,
-            )?)?))
+            )?)))
         }
     }
 }
 
 pub fn local_civil(at: Instant, tz: &TimeZone) -> Date {
-    at.0.to_zoned(tz.clone()).date()
+    at.timestamp().to_zoned(tz.clone()).date()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -283,12 +284,12 @@ mod tests {
     #[test]
     fn instants_are_whole_seconds() {
         let ts = Timestamp::new(1_777_000_000, 123_456_789).unwrap();
-        let at = Instant::from_timestamp(ts).unwrap();
+        let at = Instant::from_timestamp(ts);
         assert_eq!(
             at.timestamp(),
             Timestamp::from_second(1_777_000_000).unwrap()
         );
-        let now = Instant::now().unwrap();
+        let now = Instant::now();
         assert_eq!(
             now.timestamp(),
             Timestamp::from_second(now.timestamp().as_second()).unwrap()
