@@ -452,6 +452,23 @@ pub fn parse_number(raw: &str) -> Result<Decimal, Error> {
     }
 }
 
+pub(crate) fn number_reject_rule(raw: &str) -> &'static str {
+    if raw.contains(['e', 'E']) {
+        "plain number, no exponent"
+    } else if raw.starts_with('+') {
+        "plain number, no plus"
+    } else if leading_zero(raw) {
+        "plain number, no leading zero"
+    } else {
+        "plain number"
+    }
+}
+
+fn leading_zero(raw: &str) -> bool {
+    let s = raw.strip_prefix('-').unwrap_or(raw);
+    s.len() > 1 && s.starts_with('0') && !s.starts_with("0.")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -486,13 +503,29 @@ mod tests {
         assert_eq!(parse_number("1.10").unwrap().to_string(), "1.10");
         assert_eq!(parse_number("-0.5").unwrap().to_string(), "-0.5");
         for raw in ["01", "+1", "1.", ".5", "1e3"] {
+            let err = parse_number(raw).unwrap_err();
             assert!(
                 matches!(
-                    parse_number(raw).unwrap_err(),
+                    err,
                     Error::Fail(Fail::InvalidNumber(ref s)) if s == raw
                 ),
                 "{raw}"
             );
+            let msg = err.to_string();
+            assert!(msg.contains("plain number"), "{raw}: {msg}");
         }
+        assert!(
+            parse_number("1e3")
+                .unwrap_err()
+                .to_string()
+                .contains("exponent")
+        );
+        assert!(parse_number("+1").unwrap_err().to_string().contains("plus"));
+        assert!(
+            parse_number("01")
+                .unwrap_err()
+                .to_string()
+                .contains("leading zero")
+        );
     }
 }

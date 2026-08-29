@@ -1,6 +1,8 @@
 use std::fmt;
 
-use crate::spec::{EntryId, EntryRef, EnumValue, FieldName, Identifier, LinkName, SchemaName};
+use crate::spec::{
+    EntryId, EntryRef, EnumValue, FieldName, Identifier, LinkName, SchemaName, number_reject_rule,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -165,7 +167,9 @@ fn fail_message(err: &Fail) -> String {
         Fail::EmptyEnumValue => "empty enum value".into(),
         Fail::DuplicateEnumValue(value) => format!("duplicate enum value after fold: {value}"),
         Fail::DuplicateSpecField(name) => format!("duplicate field: {name}"),
-        Fail::InvalidNumber(raw) => format!("invalid number: {raw}"),
+        Fail::InvalidNumber(raw) => {
+            format!("invalid number: {raw} ({})", number_reject_rule(raw))
+        }
         Fail::NumberOverflow => "number overflow".into(),
         Fail::ValuesOnlyForEnum(name) => format!("values only apply to enum, not {name}"),
         Fail::EnumNeedsValues(name) => format!("enum {name} needs values"),
