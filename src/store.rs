@@ -438,6 +438,8 @@ fn attach_links(conn: &impl Connection, q: &Find<'_>, entries: &mut [Entry]) -> 
     if entries.is_empty() {
         return Ok(());
     }
+    // Re-apply the same filter as a CTE. Binding matched ids as
+    // `from_id IN (?,?,…)` dies at SQLITE_MAX_VARIABLE_NUMBER (32766).
     let table = quote_ident(&table_name(q.schema));
     let mut matched = format!("SELECT id FROM {table} WHERE 1=1");
     let mut bind = Vec::new();
