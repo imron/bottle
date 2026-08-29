@@ -109,4 +109,14 @@ async fn ignore_hides_from_ls() {
     .await;
     assert!(shown.contains("eggs"), "{shown}");
     assert!(shown.contains("true"), "{shown}");
+    let restored = ok(
+        &client,
+        "unignore",
+        rmcp::object!({ "schema": "nutrition.meal", "id": 1 }),
+    )
+    .await;
+    assert!(restored.starts_with("id\tat\n"), "{restored}");
+    let visible = ok(&client, "ls", rmcp::object!({ "schema": "nutrition.meal" })).await;
+    assert!(visible.contains("eggs"), "{visible}");
+    assert!(!visible.contains("true"), "{visible}");
 }

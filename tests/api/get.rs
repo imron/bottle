@@ -149,3 +149,69 @@ fn ignore_missing() {
         .unwrap_err();
     assert_fail(err, "not found");
 }
+
+#[test]
+fn unignore_shows_in_ls_and_sum() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    h.run_ok(Cmd::Ignore(cmd::Ignore {
+        schema: "nutrition.meal".into(),
+        id: 1,
+    }));
+    h.run_ok(Cmd::Unignore(cmd::Unignore {
+        schema: "nutrition.meal".into(),
+        id: 1,
+    }));
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    assert_eq!(tsv_lines(&ls).len(), 3);
+    let total = h.run_ok(Cmd::Sum(cmd::Sum {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        field: "protein".into(),
+        from: None,
+        to: None,
+        group: None,
+    }));
+    assert_eq!(
+        tsv_lines(&total),
+        vec![vec!["field", "value"], vec!["protein", "59"]]
+    );
+}
+
+#[test]
+fn unignore_is_idempotent() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let out = h.run_ok(Cmd::Unignore(cmd::Unignore {
+        schema: "nutrition.meal".into(),
+        id: 1,
+    }));
+    assert!(out.starts_with("id\tat\n"), "{out}");
+}
+
+#[test]
+fn unignore_missing() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Unignore(cmd::Unignore {
+            schema: "nutrition.meal".into(),
+            id: 99,
+        }))
+        .unwrap_err();
+    assert_fail(err, "not found");
+}

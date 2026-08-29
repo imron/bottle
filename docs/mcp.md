@@ -10,12 +10,12 @@ stdio. The same binary can serve it (`bottle mcp`). Tools:
 `help`, `schema_list`, `schema_show`, `schema_add`,
 `schema_add_field`, `schema_add_value`, `schema_retire`,
 `schema_drop`, `log`, `ls`, `get`, `sum`, `last`,
-`today`, `amend`, `ignore`, `restore`
+`today`, `amend`, `ignore`, `unignore`
 
 Arguments match the CLI except `schema_add`, which takes
 the YAML as `spec` rather than a file path. `help` takes
 an optional `command` (`log`, `schema add`). `get`, `amend`,
-`ignore`, and `restore` take `schema` and `id`. On `log` / `amend`,
+`ignore`, and `unignore` take `schema` and `id`. On `log` / `amend`,
 `agent` is who wrote the entry. On `ls` / `sum` / `last` /
 `today`, `agent` filters that column. A link target is
 the string `schema/id`. `links` is an object of name to

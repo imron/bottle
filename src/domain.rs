@@ -6,10 +6,10 @@ use crate::ledger::{
     Agent, Amend, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink, GroupedTime,
     Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome, Posted, SchemaAdd,
     SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas, Scope, Stamp,
-    Sum, Summed, Today, Total,
+    Sum, Summed, Today, Total, Unignore,
 };
 use crate::mutable_store;
-use crate::spec::{Field, FieldKind, FieldName, Group, Link, LinkName, Spec};
+use crate::spec::{EntryId, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
 use crate::store;
 use crate::time::{Instant, Range};
 use jiff::tz::TimeZone;
@@ -48,6 +48,7 @@ pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outc
         Op::Today(op) => today(db, op, tz),
         Op::Amend(op) => amend(db, op),
         Op::Ignore(op) => ignore(db, op),
+        Op::Unignore(op) => unignore(db, op),
     }
 }
 
@@ -192,15 +193,28 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
 }
 
 fn ignore(db: &mut Db, op: Ignore) -> Result<Outcome, Error> {
+    set_ignored(db, op.schema, op.id, true)
+}
+
+fn unignore(db: &mut Db, op: Unignore) -> Result<Outcome, Error> {
+    set_ignored(db, op.schema, op.id, false)
+}
+
+fn set_ignored(
+    db: &mut Db,
+    schema: SchemaName,
+    id: EntryId,
+    ignored: bool,
+) -> Result<Outcome, Error> {
     db.transaction(|tx| {
-        let Some(at) = store::entry_at(tx, &op.schema, op.id)? else {
+        let Some(at) = store::entry_at(tx, &schema, id)? else {
             return Err(Error::Fail(Fail::EntryNotFound {
-                schema: op.schema.clone(),
-                id: op.id,
+                schema: schema.clone(),
+                id,
             }));
         };
-        mutable_store::set_ignored(tx, &op.schema, op.id)?;
-        Ok(Outcome::Stamp(Stamp { id: op.id, at }))
+        mutable_store::set_ignored(tx, &schema, id, ignored)?;
+        Ok(Outcome::Stamp(Stamp { id, at }))
     })
 }
 

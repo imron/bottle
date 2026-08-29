@@ -29,7 +29,7 @@ not a TSV body.
 `help`, `schema_list`, `schema_show`, `schema_add`,
 `schema_add_field`, `schema_add_value`, `schema_retire`,
 `schema_drop`, `log`, `ls`, `get`, `sum`, `last`,
-`today`, `amend`, `ignore`.
+`today`, `amend`, `ignore`, `unignore`.
 
 `help` takes an optional `command` (`log`, `schema add`).
 

@@ -97,4 +97,4 @@ id	at	links
 
 ## See also
 
-ls, amend, ignore, mcp, schema add
+ls, amend, ignore, unignore, mcp, schema add

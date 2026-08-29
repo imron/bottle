@@ -33,4 +33,4 @@ bottle schema drop fitness.session
 
 ## See also
 
-schema retire, amend, ignore
+schema retire, amend, ignore, unignore

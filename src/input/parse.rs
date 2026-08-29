@@ -6,6 +6,7 @@ use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, FieldInput, Get, Ignore, Last, List, Log, NonEmptyFieldValue, Op, SchemaAdd,
     SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Scope, Sum, Today,
+    Unignore,
 };
 use crate::spec::{
     EntryId, EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier,
@@ -66,6 +67,7 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
             tz,
         )?),
         Cmd::Ignore(cmd) => Op::Ignore(ignore(cmd.schema, cmd.id)?),
+        Cmd::Unignore(cmd) => Op::Unignore(unignore(cmd.schema, cmd.id)?),
     })
 }
 
@@ -281,6 +283,13 @@ pub fn amend(input: AmendInput, tz: &TimeZone) -> Result<Amend, Error> {
 
 pub fn ignore(schema: String, id: i64) -> Result<Ignore, Error> {
     Ok(Ignore {
+        schema: SchemaName::parse(&schema)?,
+        id: EntryId::parse(id)?,
+    })
+}
+
+pub fn unignore(schema: String, id: i64) -> Result<Unignore, Error> {
+    Ok(Unignore {
         schema: SchemaName::parse(&schema)?,
         id: EntryId::parse(id)?,
     })

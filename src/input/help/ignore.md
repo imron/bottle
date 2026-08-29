@@ -13,8 +13,8 @@ bottle ignore <schema> <id>
 ## Description
 
 Hides an entry from `ls`, `sum`, `last`, and `today`.
-`get` still returns it. There is no un-ignore. If you need
-the fact visible in lists again, log a new entry.
+`get` still returns it. `unignore` clears `ignored` so
+those queries see the entry again.
 
 Ignore does not clear links. Other entries that point here
 still do, and those links still block `schema drop`.
@@ -31,4 +31,4 @@ TSV of `id` and `at`.
 
 ## See also
 
-get, ls, schema drop, amend
+get, ls, unignore, schema drop, amend

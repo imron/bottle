@@ -73,4 +73,5 @@ bottle help schema add
 Topics: `help`, `schema`, `schema list`, `schema show`,
 `schema add`, `schema add-field`, `schema add-value`,
 `schema retire`, `schema drop`, `log`, `ls`, `get`,
-`sum`, `last`, `today`, `amend`, `ignore`, `mcp`.
+`sum`, `last`, `today`, `amend`, `ignore`, `unignore`,
+`mcp`.

@@ -208,13 +208,18 @@ pub fn upsert_link(
     Ok(())
 }
 
-pub fn set_ignored(tx: &mut Tx<'_>, schema: &SchemaName, id: EntryId) -> Result<(), Error> {
+pub fn set_ignored(
+    tx: &mut Tx<'_>,
+    schema: &SchemaName,
+    id: EntryId,
+    ignored: bool,
+) -> Result<(), Error> {
     tx.as_ref().execute(
         &format!(
-            "UPDATE {} SET ignored = 1 WHERE id = ?1",
+            "UPDATE {} SET ignored = ?1 WHERE id = ?2",
             quote_ident(&table_name(schema))
         ),
-        [id.as_i64()],
+        params![ignored as i64, id.as_i64()],
     )?;
     Ok(())
 }

@@ -21,6 +21,7 @@ pub fn page(topic: Option<&str>) -> Result<String, Error> {
         "today" => include_str!("today.md"),
         "amend" => include_str!("amend.md"),
         "ignore" => include_str!("ignore.md"),
+        "unignore" => include_str!("unignore.md"),
         "mcp" => include_str!("mcp.md"),
         _ => return Err(Error::Usage(Usage::UnknownHelpTopic(topic.to_string()))),
     };

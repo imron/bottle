@@ -140,6 +140,7 @@ fn all_topics() {
         "today",
         "amend",
         "ignore",
+        "unignore",
         "mcp",
     ] {
         let out = help(Some(topic)).unwrap_or_else(|e| panic!("{topic}: {e}"));

@@ -391,6 +391,12 @@ impl Server {
         let ignore = parse::ignore(p.schema, p.id);
         Ok(self.run(ignore.map(Op::Ignore)))
     }
+
+    #[tool(description = "Show an ignored entry in lists and totals again")]
+    fn unignore(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
+        let unignore = parse::unignore(p.schema, p.id);
+        Ok(self.run(unignore.map(Op::Unignore)))
+    }
 }
 
 #[tool_handler]

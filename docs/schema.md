@@ -164,15 +164,13 @@ property.
   Link names also may not be `day`, `week`, `month`,
   `year` (`sum --group`).
 
-## ignore and restore
+## ignore and unignore
 
 `ignore` keeps the entry and hides it from `ls`, `sum`,
-`last`, and `today`. `get` still returns it. `restore`
+`last`, and `today`. `get` still returns it. `unignore`
 clears `ignored` so those queries see it again. Both are
 idempotent. Neither clears links. `amend` does not clear
 `ignored`.
-
-TODO: `restore` is specified, not implemented.
 
 ## Changing a schema
 

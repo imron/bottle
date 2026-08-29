@@ -259,6 +259,12 @@ pub struct Ignore {
 }
 
 #[derive(Debug, Clone)]
+pub struct Unignore {
+    pub schema: SchemaName,
+    pub id: EntryId,
+}
+
+#[derive(Debug, Clone)]
 pub enum Op {
     SchemaList,
     SchemaShow(SchemaShow),
@@ -275,6 +281,7 @@ pub enum Op {
     Today(Today),
     Amend(Amend),
     Ignore(Ignore),
+    Unignore(Unignore),
 }
 
 #[derive(Debug, Clone)]

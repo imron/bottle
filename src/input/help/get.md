@@ -31,4 +31,4 @@ declaration order, `agent`, and `ignored` (`true` or
 
 ## See also
 
-ls, amend, ignore
+ls, amend, ignore, unignore

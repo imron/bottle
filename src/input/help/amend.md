@@ -17,8 +17,8 @@ bottle amend <schema> <id> [--at TIME] [--agent NAME] \
 Changes an existing entry: fields, time, agent, and links.
 The id stays.
 
-Amend does not clear `ignored`. Use the `ignore` command
-to hide an entry.
+Amend does not clear `ignored`. Use `ignore` to hide an
+entry and `unignore` to show it again.
 
 At least one of `--at`, `--agent`, `--link`, `--unlink`,
 or a `field=value` is required.
@@ -62,4 +62,4 @@ bottle amend fitness.set 2 --unlink session
 
 ## See also
 
-log, ignore, get
+log, ignore, unignore, get

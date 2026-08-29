@@ -147,6 +147,12 @@ pub struct Ignore {
     pub id: i64,
 }
 
+#[derive(Debug, Clone, Args)]
+pub struct Unignore {
+    pub schema: String,
+    pub id: i64,
+}
+
 #[derive(Debug, Clone, Subcommand)]
 pub enum Cmd {
     #[command(subcommand)]
@@ -159,4 +165,5 @@ pub enum Cmd {
     Today(Filters),
     Amend(Amend),
     Ignore(Ignore),
+    Unignore(Unignore),
 }
