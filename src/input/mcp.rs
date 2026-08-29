@@ -13,6 +13,7 @@ use serde::Deserialize;
 use crate::error::{Error, Fail};
 use crate::help as bottle_help;
 use crate::ledger::Op;
+use crate::spec::EntryId;
 use crate::{Bottle, Style, execute};
 use rmcp::service::ServerInitializeError;
 
@@ -346,7 +347,7 @@ impl Server {
 
     #[tool(description = "Print one entry by schema and id")]
     fn get(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
-        let get = parse::get(p.schema, p.id);
+        let get = EntryId::parse(p.id).and_then(|id| parse::get(p.schema, id));
         Ok(self.run(get.map(Op::Get)))
     }
 
@@ -377,30 +378,32 @@ impl Server {
 
     #[tool(description = "Change an existing entry in place")]
     fn amend(&self, Parameters(p): Parameters<AmendParams>) -> Result<CallToolResult, McpError> {
-        let amend = parse::amend(
-            AmendInput {
-                schema: p.schema,
-                id: p.id,
-                at: p.at,
-                agent: p.agent,
-                links: pairs(p.links),
-                unlinks: p.unlink,
-                fields: cells(p.fields),
-            },
-            &self.tz,
-        );
+        let amend = EntryId::parse(p.id).and_then(|id| {
+            parse::amend(
+                AmendInput {
+                    schema: p.schema,
+                    id,
+                    at: p.at,
+                    agent: p.agent,
+                    links: pairs(p.links),
+                    unlinks: p.unlink,
+                    fields: cells(p.fields),
+                },
+                &self.tz,
+            )
+        });
         Ok(self.run(amend.map(Op::Amend)))
     }
 
     #[tool(description = "Hide an entry from lists and totals")]
     fn ignore(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
-        let ignore = parse::ignore(p.schema, p.id);
+        let ignore = EntryId::parse(p.id).and_then(|id| parse::ignore(p.schema, id));
         Ok(self.run(ignore.map(Op::Ignore)))
     }
 
     #[tool(description = "Show an ignored entry in lists and totals again")]
     fn unignore(&self, Parameters(p): Parameters<IdParams>) -> Result<CallToolResult, McpError> {
-        let unignore = parse::unignore(p.schema, p.id);
+        let unignore = EntryId::parse(p.id).and_then(|id| parse::unignore(p.schema, id));
         Ok(self.run(unignore.map(Op::Unignore)))
     }
 

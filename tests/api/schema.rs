@@ -1,6 +1,6 @@
 use bottle::{Cmd, cmd};
 
-use crate::common::{MEAL, SESSION, SET, assert_fail, harness, tsv_lines};
+use crate::common::{MEAL, SESSION, SET, assert_fail, eid, harness, tsv_lines};
 
 #[test]
 fn list_empty() {
@@ -197,7 +197,7 @@ fn drop_blocked_by_inbound_link() {
     assert_fail(err, "inbound");
     h.run_ok(Cmd::Amend(cmd::Amend {
         schema: "fitness.set".into(),
-        id: 1,
+        id: eid(1),
         at: None,
         agent: None,
         links: vec![],

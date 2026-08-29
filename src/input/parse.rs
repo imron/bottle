@@ -205,10 +205,10 @@ pub fn ls(
     })
 }
 
-pub fn get(schema: String, id: i64) -> Result<Get, Error> {
+pub fn get(schema: String, id: EntryId) -> Result<Get, Error> {
     Ok(Get {
         schema: SchemaName::parse(&schema)?,
-        id: EntryId::parse(id)?,
+        id,
     })
 }
 
@@ -274,7 +274,7 @@ pub fn amend(input: AmendInput, tz: &TimeZone) -> Result<Amend, Error> {
     }
     Ok(Amend {
         schema: SchemaName::parse(&input.schema)?,
-        id: EntryId::parse(input.id)?,
+        id: input.id,
         at,
         agent,
         links,
@@ -283,17 +283,17 @@ pub fn amend(input: AmendInput, tz: &TimeZone) -> Result<Amend, Error> {
     })
 }
 
-pub fn ignore(schema: String, id: i64) -> Result<Ignore, Error> {
+pub fn ignore(schema: String, id: EntryId) -> Result<Ignore, Error> {
     Ok(Ignore {
         schema: SchemaName::parse(&schema)?,
-        id: EntryId::parse(id)?,
+        id,
     })
 }
 
-pub fn unignore(schema: String, id: i64) -> Result<Unignore, Error> {
+pub fn unignore(schema: String, id: EntryId) -> Result<Unignore, Error> {
     Ok(Unignore {
         schema: SchemaName::parse(&schema)?,
-        id: EntryId::parse(id)?,
+        id,
     })
 }
 

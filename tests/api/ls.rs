@@ -1,7 +1,7 @@
 use bottle::{Cmd, cmd};
 
 use crate::common::{
-    MEAL, SESSION, SET, assert_fail, assert_usage, harness, seed_meals, tsv_lines,
+    MEAL, SESSION, SET, assert_fail, assert_usage, eid, harness, seed_meals, tsv_lines,
 };
 
 #[test]
@@ -246,7 +246,7 @@ fn ls_include_ignored() {
     assert_eq!(before_lines[2].last().copied(), Some("false"));
     h.run_ok(Cmd::Ignore(cmd::Ignore {
         schema: "nutrition.meal".into(),
-        id: 1,
+        id: eid(1),
     }));
     let hidden = h.run_ok(Cmd::Ls(cmd::Ls {
         filters: cmd::Filters {

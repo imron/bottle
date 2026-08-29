@@ -466,6 +466,20 @@ mod tests {
     }
 
     #[test]
+    fn entry_id_rejects_zero_and_negative() {
+        for n in [0, -1] {
+            assert!(
+                matches!(
+                    EntryId::parse(n).unwrap_err(),
+                    Error::Usage(Usage::InvalidEntryId(v)) if v == n
+                ),
+                "{n}"
+            );
+        }
+        assert_eq!(EntryId::parse(1).unwrap().as_i64(), 1);
+    }
+
+    #[test]
     fn parse_number_requires_canonical_form() {
         assert_eq!(parse_number("1").unwrap().to_string(), "1");
         assert_eq!(parse_number("1.10").unwrap().to_string(), "1.10");

@@ -5,6 +5,8 @@ pub mod parse;
 
 use std::path::PathBuf;
 
+use crate::spec::EntryId;
+
 pub use cmd::Cmd;
 
 pub enum SpecSource {
@@ -32,7 +34,7 @@ impl From<cmd::Filters> for ScopeInput {
 
 pub struct AmendInput {
     pub schema: String,
-    pub id: i64,
+    pub id: EntryId,
     pub at: Option<String>,
     pub agent: Option<String>,
     pub links: Vec<(String, String)>,

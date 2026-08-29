@@ -1,6 +1,6 @@
 use bottle::{Cmd, cmd};
 
-use crate::common::{SESSION, SET, assert_fail, assert_usage, harness, seed_meals, tsv_lines};
+use crate::common::{SESSION, SET, assert_fail, assert_usage, eid, harness, seed_meals, tsv_lines};
 
 #[test]
 fn amend_and_unlink() {
@@ -21,7 +21,7 @@ fn amend_and_unlink() {
     );
     let out = h.run_ok(Cmd::Amend(cmd::Amend {
         schema: "fitness.set".into(),
-        id: 1,
+        id: eid(1),
         at: None,
         agent: None,
         links: vec![],
@@ -32,7 +32,7 @@ fn amend_and_unlink() {
     assert_eq!(lines[1][2], "");
     h.run_ok(Cmd::Amend(cmd::Amend {
         schema: "fitness.set".into(),
-        id: 1,
+        id: eid(1),
         at: None,
         agent: None,
         links: vec![],
@@ -54,7 +54,7 @@ fn amend_link_unlink_conflict() {
     let err = h
         .run(Cmd::Amend(cmd::Amend {
             schema: "fitness.set".into(),
-            id: 1,
+            id: eid(1),
             at: None,
             agent: None,
             links: vec![("session".into(), "fitness.session/1".into())],
@@ -72,7 +72,7 @@ fn amend_empty_and_missing() {
     let err = h
         .run(Cmd::Amend(cmd::Amend {
             schema: "nutrition.meal".into(),
-            id: 1,
+            id: eid(1),
             at: None,
             agent: None,
             links: vec![],
@@ -84,7 +84,7 @@ fn amend_empty_and_missing() {
     let err = h
         .run(Cmd::Amend(cmd::Amend {
             schema: "nutrition.meal".into(),
-            id: 99,
+            id: eid(99),
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
@@ -108,7 +108,7 @@ fn duplicate_unlink() {
     let err = h
         .run(Cmd::Amend(cmd::Amend {
             schema: "fitness.set".into(),
-            id: 1,
+            id: eid(1),
             at: None,
             agent: None,
             links: vec![],
@@ -144,7 +144,7 @@ fn amend_at_agent_and_link() {
     );
     let out = h.run_ok(Cmd::Amend(cmd::Amend {
         schema: "fitness.set".into(),
-        id: 1,
+        id: eid(1),
         at: Some("2026-08-22T08:05:00Z".into()),
         agent: Some("coach".into()),
         links: vec![("session".into(), "fitness.session/2".into())],

@@ -1,6 +1,10 @@
 use std::path::PathBuf;
 
-use bottle::{Bottle, Cmd, Error, LogInput, cmd};
+use bottle::{Bottle, Cmd, EntryId, Error, LogInput, cmd};
+
+pub fn eid(n: i64) -> EntryId {
+    EntryId::parse(n).unwrap()
+}
 use tempfile::TempDir;
 
 pub const TZ: &str = "Australia/Melbourne";

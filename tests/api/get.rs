@@ -1,6 +1,6 @@
 use bottle::{Cmd, cmd};
 
-use crate::common::{MEAL, assert_fail, assert_usage, harness, seed_meals, tsv_lines};
+use crate::common::{MEAL, assert_fail, eid, harness, seed_meals, tsv_lines};
 
 #[test]
 fn get_includes_ignored() {
@@ -8,7 +8,7 @@ fn get_includes_ignored() {
     seed_meals(&mut h);
     h.run_ok(Cmd::Ignore(cmd::Ignore {
         schema: "nutrition.meal".into(),
-        id: 1,
+        id: eid(1),
     }));
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
         filters: cmd::Filters {
@@ -24,7 +24,7 @@ fn get_includes_ignored() {
     assert_eq!(tsv_lines(&ls).len(), 2);
     let get = h.run_ok(Cmd::Get(cmd::Get {
         schema: "nutrition.meal".into(),
-        id: 1,
+        id: eid(1),
     }));
     let lines = tsv_lines(&get);
     assert_eq!(lines[0].last().copied(), Some("ignored"));
@@ -33,15 +33,11 @@ fn get_includes_ignored() {
 
 #[test]
 fn get_rejects_zero_id() {
-    let mut h = harness();
-    seed_meals(&mut h);
-    let err = h
-        .run(Cmd::Get(cmd::Get {
-            schema: "nutrition.meal".into(),
-            id: 0,
-        }))
-        .unwrap_err();
-    assert_usage(err, "invalid id");
+    use bottle::{EntryId, Error, Usage};
+    assert!(matches!(
+        EntryId::parse(0).unwrap_err(),
+        Error::Usage(Usage::InvalidEntryId(0))
+    ));
 }
 
 #[test]
@@ -51,7 +47,7 @@ fn get_missing() {
     let err = h
         .run(Cmd::Get(cmd::Get {
             schema: "nutrition.meal".into(),
-            id: 99,
+            id: eid(99),
         }))
         .unwrap_err();
     assert_fail(err, "not found");
@@ -92,7 +88,7 @@ fn ignore_hides_from_sum() {
     seed_meals(&mut h);
     h.run_ok(Cmd::Ignore(cmd::Ignore {
         schema: "nutrition.meal".into(),
-        id: 1,
+        id: eid(1),
     }));
     let total = h.run_ok(Cmd::Sum(cmd::Sum {
         filters: cmd::Filters {
@@ -144,7 +140,7 @@ fn ignore_missing() {
     let err = h
         .run(Cmd::Ignore(cmd::Ignore {
             schema: "nutrition.meal".into(),
-            id: 99,
+            id: eid(99),
         }))
         .unwrap_err();
     assert_fail(err, "not found");
@@ -156,11 +152,11 @@ fn unignore_shows_in_ls_and_sum() {
     seed_meals(&mut h);
     h.run_ok(Cmd::Ignore(cmd::Ignore {
         schema: "nutrition.meal".into(),
-        id: 1,
+        id: eid(1),
     }));
     h.run_ok(Cmd::Unignore(cmd::Unignore {
         schema: "nutrition.meal".into(),
-        id: 1,
+        id: eid(1),
     }));
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
         filters: cmd::Filters {
@@ -198,7 +194,7 @@ fn unignore_is_idempotent() {
     seed_meals(&mut h);
     let out = h.run_ok(Cmd::Unignore(cmd::Unignore {
         schema: "nutrition.meal".into(),
-        id: 1,
+        id: eid(1),
     }));
     assert!(out.starts_with("id\tat\n"), "{out}");
 }
@@ -210,7 +206,7 @@ fn unignore_missing() {
     let err = h
         .run(Cmd::Unignore(cmd::Unignore {
             schema: "nutrition.meal".into(),
-            id: 99,
+            id: eid(99),
         }))
         .unwrap_err();
     assert_fail(err, "not found");

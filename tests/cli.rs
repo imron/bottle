@@ -196,6 +196,15 @@ fn date_only_at_is_usage_on_stderr() {
 }
 
 #[test]
+fn zero_id_is_usage_on_stderr() {
+    let dir = TempDir::new().unwrap();
+    let (code, stdout, stderr) = run_db(&dir, &["get", "meal", "0"]);
+    assert_eq!(code, 2);
+    assert!(stdout.is_empty(), "{stdout}");
+    assert!(stderr.contains("invalid id"), "{stderr}");
+}
+
+#[test]
 fn unknown_schema_is_fail_on_stderr() {
     let dir = TempDir::new().unwrap();
     let (code, stdout, stderr) = run_db(&dir, &["ls", "no.such"]);

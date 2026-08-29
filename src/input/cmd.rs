@@ -2,13 +2,18 @@ use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 
-use crate::spec::FieldType;
+use crate::spec::{EntryId, FieldType};
 
 fn parse_kv(s: &str) -> Result<(String, String), String> {
     match s.split_once('=') {
         Some((name, value)) if !name.is_empty() => Ok((name.to_string(), value.to_string())),
         _ => Err("expected name=value".into()),
     }
+}
+
+fn parse_entry_id(s: &str) -> Result<EntryId, String> {
+    let n: i64 = s.parse().map_err(|_| format!("invalid id: {s}"))?;
+    EntryId::parse(n).map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Clone, Args)]
@@ -109,7 +114,8 @@ pub struct Ls {
 #[derive(Debug, Clone, Args)]
 pub struct Get {
     pub schema: String,
-    pub id: i64,
+    #[arg(value_parser = parse_entry_id)]
+    pub id: EntryId,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -128,7 +134,8 @@ pub struct Sum {
 #[derive(Debug, Clone, Args)]
 pub struct Amend {
     pub schema: String,
-    pub id: i64,
+    #[arg(value_parser = parse_entry_id)]
+    pub id: EntryId,
     #[arg(long)]
     pub at: Option<String>,
     #[arg(long)]
@@ -144,13 +151,15 @@ pub struct Amend {
 #[derive(Debug, Clone, Args)]
 pub struct Ignore {
     pub schema: String,
-    pub id: i64,
+    #[arg(value_parser = parse_entry_id)]
+    pub id: EntryId,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct Unignore {
     pub schema: String,
-    pub id: i64,
+    #[arg(value_parser = parse_entry_id)]
+    pub id: EntryId,
 }
 
 #[derive(Debug, Clone, Args)]
