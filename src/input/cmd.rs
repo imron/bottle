@@ -11,10 +11,6 @@ fn parse_kv(s: &str) -> Result<(String, String), String> {
     }
 }
 
-fn parse_values(s: &str) -> Result<Vec<String>, std::convert::Infallible> {
-    Ok(s.split(',').map(str::to_string).collect())
-}
-
 #[derive(Debug, Clone, Args)]
 pub struct SchemaShow {
     pub name: String,
@@ -36,7 +32,7 @@ pub struct SchemaAddField {
     pub name: String,
     #[arg(long = "type")]
     pub type_: FieldType,
-    #[arg(long, value_parser = parse_values)]
+    #[arg(long, value_delimiter = ',')]
     pub values: Option<Vec<String>>,
     #[arg(long)]
     pub default: Option<String>,

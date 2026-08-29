@@ -294,7 +294,7 @@ pub struct EnumValue(String);
 
 impl EnumValue {
     pub fn parse(s: &str) -> Result<Self, Error> {
-        let folded = s.to_ascii_lowercase();
+        let folded = s.trim_matches(' ').to_ascii_lowercase();
         if folded.is_empty() {
             return Err(Error::Fail(Fail::EmptyEnumValue));
         }
@@ -449,4 +449,19 @@ pub fn parse_number(raw: &str) -> Result<Decimal, Error> {
         return Err(Error::Fail(Fail::InvalidNumber(raw.to_string())));
     };
     Ok(n)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn enum_value_trims_spaces_then_folds() {
+        assert_eq!(EnumValue::parse(" Lunch ").unwrap().as_str(), "lunch");
+        assert_eq!(EnumValue::parse("BREAKFAST").unwrap().as_str(), "breakfast");
+        assert!(matches!(
+            EnumValue::parse("   ").unwrap_err(),
+            Error::Fail(Fail::EmptyEnumValue)
+        ));
+    }
 }

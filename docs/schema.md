@@ -141,9 +141,10 @@ property.
 - `text` may not contain tab or newline. Compare is
   case-sensitive.
 - `number` is an integer or float. Only these can be summed.
-- `enum` values are stored lowercase. On write and
-  `--where`, `Water` becomes `water` and must match a
-  declared value. Declared values are lowercased on
+- `enum` values are stored lowercase. Leading and trailing
+  spaces are stripped. On write and `--where`, `Water`
+  becomes `water` and must match a declared value.
+  Declared values are trimmed and lowercased on
   `schema add` / `add-field` / `add-value`. Duplicates
   after fold are rejected. Tab, newline, and comma are
   rejected.

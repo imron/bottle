@@ -84,10 +84,11 @@ bottle schema add-field <name> --name <field> \
 
 Adds one field. Optional unless `--default` is set. Then
 the field is required and old entries are backfilled.
-`--values` is required for `enum`. Values are stored
-lowercase. Fails if the field exists, the schema is
-retired, the name is already used as a link on that
-schema, or two values fold to the same lowercase string.
+`--values` is required for `enum`. Leading and trailing
+spaces are stripped. Values are stored lowercase. Fails
+if the field exists, the schema is retired, the name is
+already used as a link on that schema, or two values
+fold to the same lowercase string.
 
 ## schema add-value
 

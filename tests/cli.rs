@@ -129,6 +129,42 @@ fn schema_log_ls_through_argv() {
 }
 
 #[test]
+fn add_field_values_trim_spaces_after_comma() {
+    let dir = TempDir::new().unwrap();
+    let spec = dir.path().join("meal.yaml");
+    std::fs::write(&spec, MEAL).unwrap();
+    run_db(
+        &dir,
+        &[
+            "schema",
+            "add",
+            "nutrition.meal",
+            "--file",
+            spec.to_str().unwrap(),
+        ],
+    );
+    let (code, stdout, stderr) = run_db(
+        &dir,
+        &[
+            "schema",
+            "add-field",
+            "nutrition.meal",
+            "--name",
+            "mood",
+            "--type",
+            "enum",
+            "--values",
+            "happy, sad",
+        ],
+    );
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.is_empty(), "{stdout}");
+    let (code, stdout, stderr) = run_db(&dir, &["schema", "show", "nutrition.meal"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.contains("mood\tenum\tfalse\thappy,sad"), "{stdout}");
+}
+
+#[test]
 fn date_only_at_is_usage_on_stderr() {
     let dir = TempDir::new().unwrap();
     let spec = dir.path().join("meal.yaml");

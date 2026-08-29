@@ -235,6 +235,12 @@ mod tests {
             "corrupt stored enum: Breakfast"
         );
         assert_eq!(
+            EnumValue::try_from(StoredEnum(" lunch".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored enum:  lunch"
+        );
+        assert_eq!(
             Agent::try_from(StoredAgent(" coach ".into()))
                 .unwrap_err()
                 .to_string(),

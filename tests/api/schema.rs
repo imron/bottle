@@ -656,6 +656,37 @@ fn add_field_enum_and_bad_values() {
 }
 
 #[test]
+fn add_field_enum_trims_values() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.run_ok(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
+        schema: "nutrition.meal".into(),
+        name: "mood".into(),
+        type_: FieldType::Enum,
+        values: Some(vec![" happy".into(), "sad ".into()]),
+        default: None,
+    })));
+    let show = h.run_ok(Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow {
+        name: "nutrition.meal".into(),
+        yaml: false,
+    })));
+    assert!(show.contains("mood\tenum\tfalse\thappy,sad"));
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "1"),
+            ("protein", "1"),
+            ("carbs", "0"),
+            ("mood", "happy"),
+        ],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+}
+
+#[test]
 fn add_field_invalid_name() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
