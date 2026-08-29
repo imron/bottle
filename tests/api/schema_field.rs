@@ -444,3 +444,151 @@ fn add_value_rejects_comma() {
         .unwrap_err();
     assert_fail(err, "tab, newline, or comma");
 }
+
+fn rename(schema: &str, from: &str, to: &str) -> Cmd {
+    Cmd::Schema(cmd::SchemaCmd::RenameField(cmd::SchemaRenameField {
+        schema: schema.into(),
+        from: from.into(),
+        to: to.into(),
+    }))
+}
+
+#[test]
+fn rename_field_keeps_values_and_position() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "568"),
+            ("protein", "49"),
+            ("carbs", "5"),
+        ],
+        &[],
+        Some("2026-08-22T08:14:00Z"),
+    );
+    h.run_ok(rename("nutrition.meal", "kcal", "calories"));
+    let show = h.run_ok(Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow {
+        name: "nutrition.meal".into(),
+        yaml: false,
+    })));
+    let lines = tsv_lines(&show);
+    assert_eq!(lines[3], vec!["calories", "number", "true", ""]);
+    assert!(!show.contains("kcal"));
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    let ls_lines = tsv_lines(&ls);
+    assert!(ls_lines[0].contains(&"calories"), "{ls}");
+    assert!(!ls.contains("kcal"));
+    assert_eq!(
+        ls_lines[1][ls_lines[0].iter().position(|c| *c == "calories").unwrap()],
+        "568"
+    );
+    let sum = h.run_ok(Cmd::Sum(cmd::Sum {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        field: "calories".into(),
+        from: None,
+        to: None,
+        group: None,
+    }));
+    assert_eq!(
+        tsv_lines(&sum),
+        vec![vec!["field", "value"], vec!["calories", "568"]]
+    );
+}
+
+#[test]
+fn rename_enum_keeps_values() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.run_ok(rename("nutrition.meal", "when", "slot"));
+    let show = h.run_ok(Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow {
+        name: "nutrition.meal".into(),
+        yaml: false,
+    })));
+    assert!(show.contains("slot\tenum\ttrue\tbreakfast,snack,lunch,dinner,extra"));
+    h.log(
+        "nutrition.meal",
+        &[
+            ("slot", "Lunch"),
+            ("what", "rice"),
+            ("kcal", "200"),
+            ("protein", "10"),
+            ("carbs", "40"),
+        ],
+        &[],
+        Some("2026-08-22T12:00:00Z"),
+    );
+}
+
+#[test]
+fn rename_same_name_is_usage() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h.run(rename("nutrition.meal", "kcal", "kcal")).unwrap_err();
+    assert_usage(err, "same field");
+}
+
+#[test]
+fn rename_unknown_and_exists() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(rename("nutrition.meal", "nope", "calories"))
+        .unwrap_err();
+    assert_fail(err, "unknown field");
+    let err = h.run(rename("nutrition.meal", "kcal", "what")).unwrap_err();
+    assert_fail(err, "field exists");
+}
+
+#[test]
+fn rename_retired() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.run_ok(Cmd::Schema(cmd::SchemaCmd::Retire(cmd::SchemaRetire {
+        name: "nutrition.meal".into(),
+    })));
+    let err = h
+        .run(rename("nutrition.meal", "kcal", "calories"))
+        .unwrap_err();
+    assert_fail(err, "retired");
+}
+
+#[test]
+fn rename_collides_with_link() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.session",
+        &[("title", "upper")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.log(
+        "fitness.set",
+        &[("movement", "squat"), ("reps", "8")],
+        &[("session", "fitness.session/1")],
+        Some("2026-08-22T08:01:00Z"),
+    );
+    let err = h
+        .run(rename("fitness.set", "movement", "session"))
+        .unwrap_err();
+    assert_fail(err, "collides with field");
+}

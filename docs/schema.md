@@ -38,8 +38,9 @@ CREATE TABLE schema_enum_values (
 );
 ```
 
-`kind` is `text`, `number`, or `enum`. `schema add-field`
-and `schema add-value` insert catalog rows. `retired`
+`kind` is `text`, `number`, or `enum`. `schema add-field`,
+`schema add-value`, and `schema rename-field` change
+catalog rows. `retired`
 blocks new `log`s. Existing entries stay readable. sqlite
 stores `retired` and `ignored` as `0`/`1`. TSV prints
 `true`/`false`.
@@ -203,9 +204,13 @@ link on that schema already uses the new field name.
 `schema add-value` appends one enum value. You may not
 remove one.
 
-To rename a field, drop a field, or change a type: add a new
-schema, copy the entries you want, `schema retire` the old
-name.
+`schema rename-field` renames one field (`ALTER TABLE
+RENAME COLUMN`) and updates the catalog. Values stay.
+It fails if the new name exists, the schema is retired,
+or a link on that schema already uses the new name.
+
+To drop a field or change a type: add a new schema, copy
+the entries you want, `schema retire` the old name.
 
 ## retire and drop
 

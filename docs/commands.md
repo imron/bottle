@@ -102,6 +102,18 @@ the field is not an enum, the folded value already exists,
 or the schema is retired. You may not remove a value. To
 drop one, add a new schema and copy entries.
 
+## schema rename-field
+
+```
+bottle schema rename-field <schema> --from <old> --to <new>
+```
+
+Renames one field. Existing entries keep their values.
+Type, required, enum values, and position stay the same.
+Fails if `--from` is unknown, `--to` already exists, the
+schema is retired, or `--to` is already used as a link on
+that schema. `--from` and `--to` must differ.
+
 ## schema retire
 
 ```

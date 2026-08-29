@@ -27,9 +27,10 @@ not a TSV body.
 ## Tools
 
 `help`, `schema_list`, `schema_show`, `schema_add`,
-`schema_add_field`, `schema_add_value`, `schema_retire`,
-`schema_drop`, `log`, `ls`, `get`, `sum`, `last`,
-`today`, `amend`, `ignore`, `unignore`, `backup`.
+`schema_add_field`, `schema_add_value`,
+`schema_rename_field`, `schema_retire`, `schema_drop`,
+`log`, `ls`, `get`, `sum`, `last`, `today`, `amend`,
+`ignore`, `unignore`, `backup`.
 
 `help` takes an optional `command` (`log`, `schema add`).
 

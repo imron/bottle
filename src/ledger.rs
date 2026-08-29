@@ -185,6 +185,13 @@ pub struct SchemaAddValue {
 }
 
 #[derive(Debug, Clone)]
+pub struct SchemaRenameField {
+    pub schema: SchemaName,
+    pub from: FieldName,
+    pub to: FieldName,
+}
+
+#[derive(Debug, Clone)]
 pub struct SchemaRetire {
     pub name: SchemaName,
 }
@@ -277,6 +284,7 @@ pub enum Op {
     SchemaAdd(SchemaAdd),
     SchemaAddField(SchemaAddField),
     SchemaAddValue(SchemaAddValue),
+    SchemaRenameField(SchemaRenameField),
     SchemaRetire(SchemaRetire),
     SchemaDrop(SchemaDrop),
     Log(Vec<Log>),

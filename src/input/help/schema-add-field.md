@@ -13,10 +13,11 @@ bottle schema add-field <name> --name <field> \
 
 ## Description
 
-Adds one field to an existing schema. You cannot rename a
-field, drop a field, or change its type. For those, add a
-new schema, copy the entries you still want, and
-`schema retire` the old name.
+Adds one field to an existing schema. Use
+`schema rename-field` to rename a field. You cannot drop
+a field or change its type. For those, add a new schema,
+copy the entries you still want, and `schema retire` the
+old name.
 
 Without `--default` the new field is optional. Existing
 entries have an empty cell there.
@@ -48,4 +49,4 @@ or the name is already used as a link.
 
 ## See also
 
-schema add, schema add-value, schema retire
+schema add, schema add-value, schema rename-field, schema retire

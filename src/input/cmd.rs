@@ -53,6 +53,15 @@ pub struct SchemaAddValue {
 }
 
 #[derive(Debug, Clone, Args)]
+pub struct SchemaRenameField {
+    pub schema: String,
+    #[arg(long = "from")]
+    pub from: String,
+    #[arg(long = "to")]
+    pub to: String,
+}
+
+#[derive(Debug, Clone, Args)]
 pub struct SchemaRetire {
     pub name: String,
 }
@@ -76,6 +85,9 @@ pub enum SchemaCmd {
     /// Append one value to an enum field
     #[command(name = "add-value")]
     AddValue(SchemaAddValue),
+    /// Rename a field on an existing schema
+    #[command(name = "rename-field")]
+    RenameField(SchemaRenameField),
     /// Block new logs on a schema
     Retire(SchemaRetire),
     /// Delete a schema and its entries

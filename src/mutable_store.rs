@@ -89,6 +89,30 @@ pub fn insert_field(
     Ok(())
 }
 
+pub fn rename_field(
+    tx: &mut Tx<'_>,
+    schema: &SchemaName,
+    from: &FieldName,
+    to: &FieldName,
+) -> Result<(), Error> {
+    let table = quote_ident(&table_name(schema));
+    let alter = format!(
+        "ALTER TABLE {table} RENAME COLUMN {} TO {}",
+        quote_ident(from.as_str()),
+        quote_ident(to.as_str())
+    );
+    tx.sqlite().execute_batch(&alter)?;
+    tx.sqlite().execute(
+        "UPDATE schema_fields SET name = ?1 WHERE schema = ?2 AND name = ?3",
+        params![to.as_str(), schema.as_str(), from.as_str()],
+    )?;
+    tx.sqlite().execute(
+        "UPDATE schema_enum_values SET field = ?1 WHERE schema = ?2 AND field = ?3",
+        params![to.as_str(), schema.as_str(), from.as_str()],
+    )?;
+    Ok(())
+}
+
 pub fn insert_enum_value(
     tx: &mut Tx<'_>,
     schema: &SchemaName,

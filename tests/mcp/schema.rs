@@ -16,6 +16,7 @@ async fn lists_tools_and_empty_schema_list() {
         "schema_add",
         "schema_add_field",
         "schema_add_value",
+        "schema_rename_field",
         "schema_retire",
         "schema_drop",
         "log",
@@ -147,6 +148,27 @@ async fn add_show_list_and_mutate() {
         .await
         .is_empty()
     );
+    assert!(
+        ok(
+            &client,
+            "schema_rename_field",
+            rmcp::object!({
+                "schema": "nutrition.meal",
+                "from": "note",
+                "to": "memo"
+            }),
+        )
+        .await
+        .is_empty()
+    );
+    let show = ok(
+        &client,
+        "schema_show",
+        rmcp::object!({ "name": "nutrition.meal" }),
+    )
+    .await;
+    assert!(show.contains("memo\ttext"), "{show}");
+    assert!(!show.contains("note\ttext"), "{show}");
 }
 
 #[tokio::test]

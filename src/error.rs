@@ -30,6 +30,7 @@ pub enum Usage {
     UnknownHelpTopic(String),
     UnknownType(String),
     EmptyBackupPath,
+    RenameSameField(FieldName),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,6 +122,7 @@ fn usage_message(err: &Usage) -> String {
         Usage::UnknownHelpTopic(topic) => format!("unknown help topic: {topic}"),
         Usage::UnknownType(t) => format!("unknown type: {t}"),
         Usage::EmptyBackupPath => "backup requires a path".into(),
+        Usage::RenameSameField(name) => format!("from and to are the same field: {name}"),
     }
 }
 

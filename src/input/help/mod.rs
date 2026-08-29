@@ -11,6 +11,7 @@ pub fn page(topic: Option<&str>) -> Result<String, Error> {
         "schema add" => include_str!("schema-add.md"),
         "schema add-field" => include_str!("schema-add-field.md"),
         "schema add-value" => include_str!("schema-add-value.md"),
+        "schema rename-field" => include_str!("schema-rename-field.md"),
         "schema retire" => include_str!("schema-retire.md"),
         "schema drop" => include_str!("schema-drop.md"),
         "log" => include_str!("log.md"),

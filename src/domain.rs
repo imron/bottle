@@ -5,8 +5,8 @@ use crate::error::{Error, Fail};
 use crate::ledger::{
     Agent, Amend, Backup, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink,
     GroupedTime, Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome, Posted,
-    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRetire, SchemaShow, Schemas,
-    Scope, Stamp, Sum, Summed, Today, Total, Unignore,
+    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRenameField, SchemaRetire,
+    SchemaShow, Schemas, Scope, Stamp, Sum, Summed, Today, Total, Unignore,
 };
 use crate::mutable_store;
 use crate::spec::{EntryId, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
@@ -32,6 +32,10 @@ pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outc
         }
         Op::SchemaAddValue(op) => {
             add_value(db, op)?;
+            Ok(Outcome::Empty)
+        }
+        Op::SchemaRenameField(op) => {
+            rename_field(db, op)?;
             Ok(Outcome::Empty)
         }
         Op::SchemaRetire(op) => {
@@ -103,6 +107,27 @@ fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
             return Err(Error::Fail(Fail::EnumValueExists(op.value)));
         }
         mutable_store::insert_enum_value(tx, &op.schema, &op.field, &op.value, values.len() as i64)
+    })
+}
+
+fn rename_field(db: &mut Db, op: SchemaRenameField) -> Result<(), Error> {
+    db.transaction(|tx| {
+        let loaded = store::load_schema(tx, &op.schema)?;
+        if loaded.retired {
+            return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
+        }
+        if loaded.spec.field(&op.from).is_none() {
+            return Err(Error::Fail(Fail::UnknownField(op.from.clone())));
+        }
+        if loaded.spec.field(&op.to).is_some() {
+            return Err(Error::Fail(Fail::FieldExists(op.to.clone())));
+        }
+        if let Ok(link_name) = LinkName::parse(op.to.as_str())
+            && store::has_outbound_link_name(tx, &op.schema, &link_name)?
+        {
+            return Err(Error::Fail(Fail::LinkNameCollidesWithField(link_name)));
+        }
+        mutable_store::rename_field(tx, &op.schema, &op.from, &op.to)
     })
 }
 
