@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use jiff::tz::TimeZone;
 
@@ -39,7 +39,7 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
         }
         Cmd::Schema(cmd::SchemaCmd::Retire(cmd)) => Op::SchemaRetire(schema_retire(cmd.name)?),
         Cmd::Schema(cmd::SchemaCmd::Drop(cmd)) => Op::SchemaDrop(schema_drop(cmd.name)?),
-        Cmd::Log(cmd) => logs(vec![cmd.into()], tz)?,
+        Cmd::Log(cmd) => logs(log_cmd(cmd)?, tz)?,
         Cmd::Ls(cmd) => Op::List(ls(
             cmd.filters.into(),
             cmd.from,
@@ -184,6 +184,38 @@ pub fn schema_drop(name: String) -> Result<SchemaDrop, Error> {
     Ok(SchemaDrop {
         name: SchemaName::parse(&name)?,
     })
+}
+
+fn log_cmd(cmd: cmd::Log) -> Result<Vec<LogInput>, Error> {
+    match cmd.file {
+        None => Ok(vec![cmd.into()]),
+        Some(path) => {
+            if cmd.at.is_some()
+                || cmd.agent.is_some()
+                || !cmd.links.is_empty()
+                || !cmd.fields.is_empty()
+            {
+                return Err(Error::Usage(Usage::LogFileMixed));
+            }
+            let raw = read_text(&path)?;
+            super::tsv::log_rows(&cmd.schema, &raw)
+        }
+    }
+}
+
+fn read_text(path: &Path) -> Result<String, Error> {
+    if path.as_os_str() == "-" {
+        let mut raw = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut raw)?;
+        return Ok(raw);
+    }
+    match std::fs::read_to_string(path) {
+        Ok(raw) => Ok(raw),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            Err(Error::Fail(Fail::FileNotFound(path.display().to_string())))
+        }
+        Err(err) => Err(err.into()),
+    }
 }
 
 pub fn logs(entries: Vec<LogInput>, tz: &TimeZone) -> Result<Op, Error> {

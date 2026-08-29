@@ -125,6 +125,9 @@ pub struct Log {
     /// Named pointer to another entry
     #[arg(long = "link", value_name = "name=SCHEMA/ID", value_parser = parse_kv)]
     pub links: Vec<(String, String)>,
+    /// TSV file of entries; - is stdin
+    #[arg(long, value_name = "PATH")]
+    pub file: Option<PathBuf>,
     /// Declared fields as name=value
     #[arg(trailing_var_arg = true, value_name = "name=value", value_parser = parse_kv)]
     pub fields: Vec<(String, String)>,

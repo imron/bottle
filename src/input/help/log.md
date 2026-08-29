@@ -9,6 +9,8 @@ log — write one entry of a registered schema
 ```
 bottle log <schema> [--at TIME] [--agent NAME] \
   [--link name=SCHEMA/ID]... [field=value ...]
+bottle log <schema> --file rows.tsv
+bottle log <schema> --file -
 ```
 
 ## Description
@@ -16,6 +18,16 @@ bottle log <schema> [--at TIME] [--agent NAME] \
 Writes one entry of a registered schema: the fields you
 declared, an optional time, an optional agent, and
 optional named links to other entries.
+
+`--file` logs many entries in one transaction from a TSV
+file. `--file -` reads stdin. The schema is on the
+command. The first row is a header. Columns may be `at`,
+`agent`, `links`, and declared field names. Missing `at`
+is now. Missing `agent` is `BOTTLE_AGENT`. The `links`
+cell is the same space-separated `name=schema/id` form as
+output. `--file` cannot be combined with `--at`,
+`--agent`, `--link`, or `field=value`. Header with no
+data rows is an error.
 
 Use `amend` to correct an entry if needed.
 
@@ -64,6 +76,9 @@ schema, and must not be reserved (`id`, `at`, `agent`,
 
 `field=value` — values for declared fields.
 
+`--file PATH` — TSV of entries. `-` is stdin. Header
+required. All rows succeed or none do.
+
 ## Output
 
 TSV of `id`, `at`, `links`.
@@ -71,8 +86,8 @@ TSV of `id`, `at`, `links`.
 ## Exit status
 
 `0` ok. `1` retired schema, unknown field, missing
-required field, or missing link target. `2` bad time or
-duplicate link name.
+required field, or missing link target. `2` bad time,
+duplicate link name, or a bad `--file`.
 
 ## Examples
 
@@ -93,6 +108,10 @@ bottle log fitness.set --link session=fitness.session/1 \
 ```
 id	at	links
 1	2026-08-22T08:14:00+10:00	session=fitness.session/1
+```
+
+```
+bottle log nutrition.meal --file meals.tsv
 ```
 
 ## See also

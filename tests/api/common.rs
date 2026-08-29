@@ -69,6 +69,7 @@ impl Harness {
                 .iter()
                 .map(|(n, t)| ((*n).to_string(), (*t).to_string()))
                 .collect(),
+            file: None,
             fields: fields
                 .iter()
                 .map(|(n, v)| ((*n).to_string(), (*v).to_string()))

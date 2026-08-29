@@ -2,6 +2,7 @@ pub mod cmd;
 pub mod help;
 pub mod mcp;
 pub mod parse;
+pub mod tsv;
 
 use std::path::PathBuf;
 

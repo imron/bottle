@@ -206,6 +206,52 @@ fn schema_log_ls_through_argv() {
 }
 
 #[test]
+fn log_file_dash_is_stdin() {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let dir = TempDir::new().unwrap();
+    let spec = dir.path().join("meal.yaml");
+    std::fs::write(&spec, MEAL).unwrap();
+    let (code, _, stderr) = run_db(
+        &dir,
+        &[
+            "schema",
+            "add",
+            "nutrition.meal",
+            "--file",
+            spec.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(code, 0, "{stderr}");
+    let db = dir.path().join("bottle.db");
+    let mut child = bottle()
+        .arg("--db")
+        .arg(&db)
+        .args(["log", "nutrition.meal", "--file", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn log --file -");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"when\tkcal\nbreakfast\t1\n")
+        .expect("write tsv");
+    let out = child.wait_with_output().expect("wait");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(stdout.starts_with("id\tat\tlinks\n1\t"), "{stdout}");
+}
+
+#[test]
 fn add_field_values_trim_spaces_after_comma() {
     let dir = TempDir::new().unwrap();
     let spec = dir.path().join("meal.yaml");

@@ -158,8 +158,11 @@ id	at	links
 ```
 
 The offset is the host zone at that instant. For many
-entries in one transaction, use MCP `entries`. See
-[mcp.md](mcp.md).
+entries in one transaction, `bottle log SCHEMA --file
+rows.tsv` (or `--file -` for stdin). TSV only. Header
+required. Schema is on the command. Missing `at` is now.
+Missing `agent` is `BOTTLE_AGENT`. All succeed or none
+do. Same as MCP `log` `entries`. See [mcp.md](mcp.md).
 
 ## ls
 

@@ -84,6 +84,7 @@ fn execute_uses_the_open_timezone() {
                 at: Some("2026-08-22T08:14:00".into()),
                 agent: None,
                 links: vec![],
+                file: None,
                 fields: vec![
                     ("when".into(), "breakfast".into()),
                     ("what".into(), "eggs".into()),

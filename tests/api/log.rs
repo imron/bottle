@@ -67,6 +67,7 @@ fn date_only_at_is_usage() {
             at: Some("2026-08-22".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: vec![
                 ("when".into(), "breakfast".into()),
                 ("what".into(), "eggs".into()),
@@ -89,6 +90,7 @@ fn unknown_field_rejected() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: vec![
                 ("when".into(), "breakfast".into()),
                 ("what".into(), "eggs".into()),
@@ -112,6 +114,7 @@ fn missing_required_rejected() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: vec![("when".into(), "breakfast".into())],
         }))
         .unwrap_err();
@@ -128,6 +131,7 @@ fn tab_in_text_rejected() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: vec![
                 ("when".into(), "breakfast".into()),
                 ("what".into(), "a\tb".into()),
@@ -150,6 +154,7 @@ fn scientific_notation_rejected() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: vec![
                 ("when".into(), "breakfast".into()),
                 ("what".into(), "eggs".into()),
@@ -173,6 +178,7 @@ fn non_canonical_number_rejected() {
                 at: Some("2026-08-22T08:14:00Z".into()),
                 agent: None,
                 links: vec![],
+                file: None,
                 fields: {
                     let mut f = meal_fields();
                     f[2] = ("kcal".into(), raw.into());
@@ -226,6 +232,7 @@ fn agent_rejects_empty() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: Some("   ".into()),
             links: vec![],
+            file: None,
             fields: meal_fields(),
         }))
         .unwrap_err();
@@ -242,6 +249,7 @@ fn agent_rejects_tab() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: Some("a\tb".into()),
             links: vec![],
+            file: None,
             fields: meal_fields(),
         }))
         .unwrap_err();
@@ -276,6 +284,7 @@ fn agent_trims_spaces() {
         at: Some("2026-08-22T08:14:00Z".into()),
         agent: Some("  coach  ".into()),
         links: vec![],
+        file: None,
         fields: meal_fields(),
     }));
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
@@ -306,6 +315,7 @@ fn unset_agent_defaults_to_bottle() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: vec![
                 ("when".into(), "breakfast".into()),
                 ("what".into(), "eggs".into()),
@@ -354,6 +364,7 @@ fn duplicate_field_and_link_name() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: {
                 let mut f = meal_fields();
                 f.push(("when".into(), "lunch".into()));
@@ -383,6 +394,7 @@ fn duplicate_field_and_link_name() {
                 ("ref".into(), "nutrition.meal/1".into()),
                 ("ref".into(), "nutrition.meal/1".into()),
             ],
+            file: None,
             fields: meal_fields(),
         }))
         .unwrap_err();
@@ -411,6 +423,7 @@ fn link_name_collides_with_field() {
             at: Some("2026-08-22T09:00:00Z".into()),
             agent: None,
             links: vec![("what".into(), "nutrition.meal/1".into())],
+            file: None,
             fields: meal_fields(),
         }))
         .unwrap_err();
@@ -442,6 +455,7 @@ fn invalid_link_targets() {
                 at: Some("2026-08-22T08:14:00Z".into()),
                 agent: None,
                 links: vec![("ref".into(), target.into())],
+                file: None,
                 fields: meal_fields(),
             }))
             .unwrap_err();
@@ -459,6 +473,7 @@ fn time_parse_variants() {
             at: Some("2026-08-22 08:14:00".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: meal_fields(),
         }))
         .unwrap_err();
@@ -469,6 +484,7 @@ fn time_parse_variants() {
             at: Some("2026-08-22T08:14:00+1000".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: meal_fields(),
         }))
         .unwrap_err();
@@ -486,6 +502,7 @@ fn time_parse_variants() {
                 at: Some(at.into()),
                 agent: None,
                 links: vec![],
+                file: None,
                 fields: meal_fields(),
             }))
             .unwrap_err();
@@ -515,6 +532,7 @@ fn empty_required_field() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: {
                 let mut f = meal_fields();
                 f[1] = ("what".into(), "".into());
@@ -536,6 +554,7 @@ fn link_target_missing_entry() {
             at: Some("2026-08-22T08:00:00Z".into()),
             agent: None,
             links: vec![("session".into(), "fitness.session/99".into())],
+            file: None,
             fields: vec![
                 ("movement".into(), "squat".into()),
                 ("reps".into(), "8".into()),
@@ -567,6 +586,7 @@ fn bad_link_names() {
             at: Some("2026-08-22T09:00:00Z".into()),
             agent: None,
             links: vec![("Ref".into(), "nutrition.meal/1".into())],
+            file: None,
             fields: meal_fields(),
         }))
         .unwrap_err();
@@ -578,6 +598,7 @@ fn bad_link_names() {
                 at: Some("2026-08-22T09:00:00Z".into()),
                 agent: None,
                 links: vec![(name.into(), "nutrition.meal/1".into())],
+                file: None,
                 fields: meal_fields(),
             }))
             .unwrap_err();
@@ -595,6 +616,7 @@ fn invalid_plain_number() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: {
                 let mut f = meal_fields();
                 f[2] = ("kcal".into(), "nope".into());
@@ -615,6 +637,7 @@ fn newline_and_bad_enum() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: {
                 let mut f = meal_fields();
                 f[1] = ("what".into(), "a\nb".into());
@@ -629,6 +652,7 @@ fn newline_and_bad_enum() {
             at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
             links: vec![],
+            file: None,
             fields: {
                 let mut f = meal_fields();
                 f[0] = ("when".into(), "not-a-meal".into());
@@ -649,6 +673,7 @@ fn link_target_must_exist() {
             at: Some("2026-08-22T08:00:00Z".into()),
             agent: None,
             links: vec![("session".into(), "fitness.session/1".into())],
+            file: None,
             fields: vec![
                 ("movement".into(), "squat".into()),
                 ("reps".into(), "8".into()),
@@ -664,6 +689,7 @@ fn meal_log(when: &str, kcal: &str) -> cmd::Log {
         at: Some("2026-08-22T08:14:00Z".into()),
         agent: None,
         links: vec![],
+        file: None,
         fields: vec![
             ("when".into(), when.into()),
             ("what".into(), "eggs".into()),
@@ -722,4 +748,207 @@ fn log_entries_rolls_back_on_error() {
         include_ignored: false,
     }));
     assert_eq!(tsv_lines(&ls).len(), 1);
+}
+
+#[test]
+fn log_file_writes_all_rows() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let path = h.dir.path().join("meals.tsv");
+    std::fs::write(
+        &path,
+        "at\twhen\twhat\tkcal\tprotein\tcarbs\n\
+         2026-08-22T08:14:00Z\tbreakfast\teggs\t1\t1\t0\n\
+         2026-08-22T12:00:00Z\tlunch\trice\t2\t2\t1\n",
+    )
+    .unwrap();
+    let out = h.run_ok(Cmd::Log(cmd::Log {
+        schema: "nutrition.meal".into(),
+        at: None,
+        agent: None,
+        links: vec![],
+        file: Some(path),
+        fields: vec![],
+    }));
+    let lines = tsv_lines(&out);
+    assert_eq!(lines[0], vec!["id", "at", "links"]);
+    assert_eq!(lines.len(), 3);
+    assert_eq!(lines[1][0], "1");
+    assert_eq!(lines[2][0], "2");
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    assert_eq!(tsv_lines(&ls).len(), 3);
+}
+
+#[test]
+fn log_file_rolls_back_on_error() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let path = h.dir.path().join("meals.tsv");
+    std::fs::write(
+        &path,
+        "when\twhat\tkcal\tprotein\tcarbs\n\
+         breakfast\teggs\t1\t1\t0\n\
+         lunch\trice\t2\t2\t\n",
+    )
+    .unwrap();
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: None,
+            agent: None,
+            links: vec![],
+            file: Some(path),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_fail(err, "missing required");
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    assert_eq!(tsv_lines(&ls).len(), 1);
+}
+
+#[test]
+fn log_file_needs_header_and_rejects_mix() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let empty = h.dir.path().join("empty.tsv");
+    std::fs::write(&empty, "").unwrap();
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: None,
+            agent: None,
+            links: vec![],
+            file: Some(empty),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_usage(err, "header");
+    let header_only = h.dir.path().join("header.tsv");
+    std::fs::write(&header_only, "when\twhat\tkcal\tprotein\tcarbs\n").unwrap();
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: None,
+            agent: None,
+            links: vec![],
+            file: Some(header_only),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_usage(err, "at least one entry");
+    let path = h.dir.path().join("meals.tsv");
+    std::fs::write(
+        &path,
+        "when\twhat\tkcal\tprotein\tcarbs\nbreakfast\teggs\t1\t1\t0\n",
+    )
+    .unwrap();
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: None,
+            links: vec![],
+            file: Some(path),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_usage(err, "--file cannot be used");
+}
+
+#[test]
+fn log_file_links_and_missing_at() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.session",
+        &[("title", "upper")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    let path = h.dir.path().join("sets.tsv");
+    std::fs::write(
+        &path,
+        "links\tmovement\treps\n\
+         session=fitness.session/1\tsquat\t8\n",
+    )
+    .unwrap();
+    let out = h.run_ok(Cmd::Log(cmd::Log {
+        schema: "fitness.set".into(),
+        at: None,
+        agent: None,
+        links: vec![],
+        file: Some(path),
+        fields: vec![],
+    }));
+    assert!(out.contains("session=fitness.session/1"), "{out}");
+}
+
+#[test]
+fn log_file_missing_is_fail() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: None,
+            agent: None,
+            links: vec![],
+            file: Some(h.dir.path().join("nope.tsv")),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_fail(err, "file not found");
+}
+
+#[test]
+fn log_file_wrong_width_and_duplicate_header() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let wide = h.dir.path().join("wide.tsv");
+    std::fs::write(&wide, "when\twhat\nbreakfast\teggs\textra\n").unwrap();
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: None,
+            agent: None,
+            links: vec![],
+            file: Some(wide),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_usage(err, "wrong number of columns");
+    let dup = h.dir.path().join("dup.tsv");
+    std::fs::write(&dup, "when\twhen\nbreakfast\tlunch\n").unwrap();
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: None,
+            agent: None,
+            links: vec![],
+            file: Some(dup),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_usage(err, "duplicate column");
 }
