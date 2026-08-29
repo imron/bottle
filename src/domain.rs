@@ -61,8 +61,8 @@ fn add_schema(db: &mut Db, op: SchemaAdd) -> Result<(), Error> {
 
 fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
     db.transaction(|tx| {
-        let mut kind = store::load_schema(tx, &op.schema)?;
-        if kind.retired {
+        let mut loaded = store::load_schema(tx, &op.schema)?;
+        if loaded.retired {
             return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
         }
         let field = Field {
@@ -70,22 +70,22 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
             kind: op.kind,
             required: op.default.is_some(),
         };
-        if kind.spec.field(&field.name).is_some() {
+        if loaded.spec.field(&field.name).is_some() {
             return Err(Error::Fail(Fail::FieldExists(field.name.clone())));
         }
         mutable_store::add_column(tx, &op.schema, &field, op.default.as_ref())?;
-        kind.spec.fields.push(field);
-        mutable_store::save_spec(tx, &op.schema, &kind.spec)
+        loaded.spec.fields.push(field);
+        mutable_store::save_spec(tx, &op.schema, &loaded.spec)
     })
 }
 
 fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
     db.transaction(|tx| {
-        let mut kind = store::load_schema(tx, &op.schema)?;
-        if kind.retired {
+        let mut loaded = store::load_schema(tx, &op.schema)?;
+        if loaded.retired {
             return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
         }
-        let Some(f) = kind.spec.fields.iter_mut().find(|f| f.name == op.field) else {
+        let Some(f) = loaded.spec.fields.iter_mut().find(|f| f.name == op.field) else {
             return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
         };
         let FieldKind::Enum(values) = &mut f.kind else {
@@ -95,7 +95,7 @@ fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
             return Err(Error::Fail(Fail::EnumValueExists(op.value)));
         }
         values.push(op.value);
-        mutable_store::save_spec(tx, &op.schema, &kind.spec)
+        mutable_store::save_spec(tx, &op.schema, &loaded.spec)
     })
 }
 
@@ -129,18 +129,18 @@ fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Err
         Some(at) => at,
         None => Instant::now()?,
     };
-    let kind = store::load_schema(tx, &op.schema)?;
-    if kind.retired {
+    let loaded = store::load_schema(tx, &op.schema)?;
+    if loaded.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
-    let values = given_fields(&kind.spec, &op.fields)?;
-    ensure_required(&kind.spec, &values)?;
-    ensure_links(tx, &kind.spec, &op.links)?;
+    let values = given_fields(&loaded.spec, &op.fields)?;
+    ensure_required(&loaded.spec, &values)?;
+    ensure_links(tx, &loaded.spec, &op.links)?;
     op.links.sort_by(|a, b| a.name.cmp(&b.name));
     let id = mutable_store::insert_entry(
         tx,
         &op.schema,
-        &kind.spec,
+        &loaded.spec,
         at,
         Some(agent),
         &values,
@@ -155,15 +155,15 @@ fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Err
 
 fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
     db.transaction(|tx| {
-        let kind = store::load_schema(tx, &op.schema)?;
-        if store::get_entry(tx, &op.schema, &kind.spec, op.id)?.is_none() {
+        let loaded = store::load_schema(tx, &op.schema)?;
+        if store::get_entry(tx, &op.schema, &loaded.spec, op.id)?.is_none() {
             return Err(Error::Fail(Fail::EntryNotFound {
                 schema: op.schema.clone(),
                 id: op.id,
             }));
         }
-        let values = given_fields(&kind.spec, &op.fields)?;
-        ensure_links(tx, &kind.spec, &op.links)?;
+        let values = given_fields(&loaded.spec, &op.fields)?;
+        ensure_links(tx, &loaded.spec, &op.links)?;
         mutable_store::update_entry(tx, &op.schema, op.id, op.at, op.agent.as_ref(), &values)?;
         for name in &op.unlinks {
             mutable_store::delete_link(tx, &op.schema, op.id, name)?;
@@ -172,7 +172,7 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
         for link in &op.links {
             mutable_store::upsert_link(tx, &op.schema, op.id, link)?;
         }
-        let entry = store::get_entry(tx, &op.schema, &kind.spec, op.id)?.ok_or_else(|| {
+        let entry = store::get_entry(tx, &op.schema, &loaded.spec, op.id)?.ok_or_else(|| {
             Error::Fail(Fail::EntryNotFound {
                 schema: op.schema.clone(),
                 id: op.id,
