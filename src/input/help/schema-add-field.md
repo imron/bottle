@@ -29,7 +29,7 @@ entry is filled with that value.
 
 `--name <field>` — field name (`^[a-z][a-z0-9_]*$`).
 Cannot be reserved: `id`, `at`, `agent`, `ignored`,
-`links`.
+`links`, `grain`.
 
 `--type text|number|enum` — the field type.
 

@@ -58,26 +58,37 @@ fn enum_folds_on_write() {
 }
 
 #[test]
-fn date_only_at_is_usage() {
+fn date_only_at_is_a_day() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
-    let err = h
-        .run(Cmd::Log(cmd::Log {
+    let out = h.log(
+        "nutrition.meal",
+        &[
+            ("when", "breakfast"),
+            ("what", "eggs"),
+            ("kcal", "1"),
+            ("protein", "1"),
+            ("carbs", "0"),
+        ],
+        &[],
+        Some("2026-08-22"),
+    );
+    let lines = tsv_lines(&out);
+    assert_eq!(lines[0], vec!["id", "at", "links"]);
+    assert_eq!(lines[1][1], "2026-08-22");
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
             schema: "nutrition.meal".into(),
-            at: Some("2026-08-22".into()),
             agent: None,
+            wheres: vec![],
             links: vec![],
-            file: None,
-            fields: vec![
-                ("when".into(), "breakfast".into()),
-                ("what".into(), "eggs".into()),
-                ("kcal".into(), "1".into()),
-                ("protein".into(), "1".into()),
-                ("carbs".into(), "0".into()),
-            ],
-        }))
-        .unwrap_err();
-    assert_usage(err, "date-only");
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    assert!(ls.contains("2026-08-22\t"), "{ls}");
+    assert!(!ls.contains("2026-08-22T"), "{ls}");
 }
 
 #[test]

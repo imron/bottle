@@ -27,8 +27,9 @@ entries are omitted.
 
 `--from DATE|TIME`, `--to DATE|TIME` — bound `at`. A date
 with no time of day is that whole day in this machine's
-timezone, inclusive on both ends. A full timestamp is an
-instant bound.
+timezone, inclusive on both ends. A `YYYY-MM` is that
+month. A full timestamp is an instant bound. Rows match
+on overlap.
 
 `--agent NAME` — only entries written by that agent.
 
@@ -39,10 +40,12 @@ The name must be a declared field.
 Entries that have that named pointer.
 
 `--group day|week|month|year` — bucket by the entry's time
-in the host timezone:
+in the host timezone. An event coarser than the group is
+omitted (`--group day` does not put a month event on one
+day):
 
-- `day` — `YYYY-MM-DD`
-- `week` — ISO `YYYY-Www`
+- `day` — `YYYY-MM-DD` (instant and day events)
+- `week` — ISO `YYYY-Www` (instant and day events)
 - `month` — `YYYY-MM`
 - `year` — `YYYY`
 

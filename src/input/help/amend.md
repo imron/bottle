@@ -7,7 +7,7 @@ amend — change an existing entry in place
 ## Synopsis
 
 ```
-bottle amend <schema> <id> [--at TIME] [--agent NAME] \
+bottle amend <schema> <id> [--at DATE|TIME] [--agent NAME] \
   [--link name=SCHEMA/ID]... [--unlink name]... \
   [field=value ...]
 ```
@@ -25,11 +25,9 @@ or a `field=value` is required.
 
 ## Options
 
-`--at TIME` — time of the event. A date with no time of
-day is not accepted. Seconds are required. Use `T`, not a
-space. An offset must include a colon (`+10:00`). UTC
-(`Z`), an offset (`+10:00`), or local time with no zone
-are accepted.
+`--at DATE|TIME` — when the event happened. Shape chooses
+the grain, same as `log --at`: a time is an instant, a
+date is a day, `YYYY-MM` is a month.
 
 `--agent NAME` — set who wrote the entry.
 

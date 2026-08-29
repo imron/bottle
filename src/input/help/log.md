@@ -7,7 +7,7 @@ log — write one entry of a registered schema
 ## Synopsis
 
 ```
-bottle log <schema> [--at TIME] [--agent NAME] \
+bottle log <schema> [--at DATE|TIME] [--agent NAME] \
   [--link name=SCHEMA/ID]... [field=value ...]
 bottle log <schema> --file rows.tsv
 bottle log <schema> --file -
@@ -50,16 +50,21 @@ Field rules:
 
 ## Options
 
-`--at TIME` — time of the event. Omit it and bottle uses
-now. A date with no time of day is not accepted. Seconds
-are required. Use `T`, not a space. An offset must include
-a colon (`+10:00`). Accepted instants:
+`--at DATE|TIME` — when the event happened. Shape chooses
+the grain. Omit it and bottle uses now (an instant).
+Seconds are required on a time. Use `T`, not a space. An
+offset must include a colon (`+10:00`). Year, ISO week,
+and quarter are not grains.
 
-- `2026-08-21T22:14:00Z` — UTC
-- `2026-08-22T08:14:00+10:00` — with offset
-- `2026-08-22T08:14:00` — local time on this machine
+- `2026-08-21T22:14:00Z` — instant, UTC
+- `2026-08-22T08:14:00+10:00` — instant, with offset
+- `2026-08-22T08:14:00` — instant, local time on this machine
+- `2026-08-22` — a civil day in the host zone
+- `2026-08` — a calendar month in the host zone
 
-Printed times use this machine's timezone, with an offset.
+Printed `at` uses the same shape: a day comes back
+`2026-08-22`, not midnight. Instants print in this
+machine's timezone, with an offset.
 
 `--agent NAME` — who wrote the entry. Defaults to
 `BOTTLE_AGENT`, or `bottle` if that is unset. Leading and
@@ -75,7 +80,8 @@ exist (ignored entries still count). A link name starts
 with a lowercase letter, then letters, digits, or
 underscores. It must not collide with a field on this
 schema, and must not be reserved (`id`, `at`, `agent`,
-`ignored`, `links`, `day`, `week`, `month`, `year`).
+`ignored`, `links`, `grain`, `day`, `week`, `month`,
+`year`).
 
 `field=value` — values for declared fields.
 

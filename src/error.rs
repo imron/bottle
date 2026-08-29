@@ -24,7 +24,6 @@ pub enum Usage {
     DuplicateField(FieldName),
     InvalidLinkTarget(String),
     InvalidEntryId(i64),
-    DateOnlyNotInstant,
     TimeMustUseT,
     InvalidDate(String),
     InvalidTime(String),
@@ -78,6 +77,7 @@ pub enum Fail {
     CorruptLinkName(String),
     CorruptLinkSchema(String),
     CorruptStoredTime(String),
+    CorruptStoredGrain(String),
     CorruptStoredNumber(String),
     CorruptStoredEnum(String),
     CorruptStoredAgent(String),
@@ -86,6 +86,7 @@ pub enum Fail {
     CorruptStoredFieldName(String),
     CorruptStoredFieldKind(String),
     UnsupportedStoreVersion(i32),
+    GrainFieldBlocksMigrate(SchemaName),
     HomeNotSet,
     FileNotFound(String),
     FileExists(String),
@@ -119,7 +120,6 @@ fn usage_message(err: &Usage) -> String {
         Usage::DuplicateField(name) => format!("duplicate field: {name}"),
         Usage::InvalidLinkTarget(s) => format!("invalid link target: {s}"),
         Usage::InvalidEntryId(id) => format!("invalid id: {id}"),
-        Usage::DateOnlyNotInstant => "date-only is a query bound, not an instant".into(),
         Usage::TimeMustUseT => "time must use T, not a space".into(),
         Usage::InvalidDate(input) => format!("invalid date: {input}"),
         Usage::InvalidTime(input) => format!("invalid time: {input}"),
@@ -183,6 +183,7 @@ fn fail_message(err: &Fail) -> String {
         Fail::CorruptLinkName(name) => format!("corrupt link name: {name}"),
         Fail::CorruptLinkSchema(name) => format!("corrupt link schema: {name}"),
         Fail::CorruptStoredTime(raw) => format!("corrupt stored time: {raw}"),
+        Fail::CorruptStoredGrain(raw) => format!("corrupt stored grain: {raw}"),
         Fail::CorruptStoredNumber(raw) => format!("corrupt stored number: {raw}"),
         Fail::CorruptStoredEnum(raw) => format!("corrupt stored enum: {raw}"),
         Fail::CorruptStoredAgent(raw) => format!("corrupt stored agent: {raw}"),
@@ -191,6 +192,9 @@ fn fail_message(err: &Fail) -> String {
         Fail::CorruptStoredFieldName(name) => format!("corrupt stored field name: {name}"),
         Fail::CorruptStoredFieldKind(kind) => format!("corrupt stored field kind: {kind}"),
         Fail::UnsupportedStoreVersion(v) => format!("unsupported store version: {v}"),
+        Fail::GrainFieldBlocksMigrate(name) => {
+            format!("schema {name} has a field named grain; rename it before opening")
+        }
         Fail::HomeNotSet => "HOME is not set".into(),
     }
 }

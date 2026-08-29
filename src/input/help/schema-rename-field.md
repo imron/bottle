@@ -30,7 +30,7 @@ a link name on that schema.
 
 `--to <new>` — the new field name (`^[a-z][a-z0-9_]*$`).
 Cannot be reserved: `id`, `at`, `agent`, `ignored`,
-`links`.
+`links`, `grain`.
 
 ## Exit status
 

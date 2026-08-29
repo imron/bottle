@@ -263,7 +263,7 @@ fn log(entry: LogInput, tz: &TimeZone) -> Result<Log, Error> {
         at: entry
             .at
             .as_deref()
-            .map(|s| time::parse_instant(s, tz))
+            .map(|s| time::parse_at(s, tz))
             .transpose()?,
         agent: parse_agent(entry.agent)?,
         links: parse_links(entry.links)?,
@@ -341,7 +341,7 @@ pub fn amend(input: AmendInput, tz: &TimeZone) -> Result<Amend, Error> {
     let at = input
         .at
         .as_deref()
-        .map(|s| time::parse_instant(s, tz))
+        .map(|s| time::parse_at(s, tz))
         .transpose()?;
     let agent = parse_agent(input.agent)?;
     if at.is_none()

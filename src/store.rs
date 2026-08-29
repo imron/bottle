@@ -13,11 +13,11 @@ use crate::spec::{
     Spec, TimePeriod,
 };
 use crate::sql::{
-    SqlVal, StoredAgent, StoredEntryId, StoredEnum, StoredFieldName, StoredLinkName,
+    SqlVal, StoredAgent, StoredEntryId, StoredEnum, StoredFieldName, StoredGrain, StoredLinkName,
     StoredLinkSchema, StoredNumber, StoredSchemaName, StoredText, StoredTime, instant_to_sql,
     quote_ident, table_name,
 };
-use crate::time::{Instant, Period, ToBound};
+use crate::time::{At, Grain, Instant, Period};
 
 pub fn list_schemas(conn: &impl Conn) -> Result<Vec<SchemaInfo>, Error> {
     let mut stmt = conn
@@ -154,23 +154,22 @@ pub fn entry_exists(conn: &impl Conn, schema: &SchemaName, id: EntryId) -> Resul
     Ok(found.is_some())
 }
 
-pub fn entry_at(
-    conn: &impl Conn,
-    schema: &SchemaName,
-    id: EntryId,
-) -> Result<Option<Instant>, Error> {
+pub fn entry_at(conn: &impl Conn, schema: &SchemaName, id: EntryId) -> Result<Option<At>, Error> {
     require_schema(conn, schema)?;
     let sql = format!(
-        "SELECT at FROM {} WHERE id = ?1",
+        "SELECT at, grain FROM {} WHERE id = ?1",
         quote_ident(&table_name(schema))
     );
-    let raw: Option<String> = conn
+    let raw: Option<(String, String)> = conn
         .sqlite()
-        .query_row(&sql, [id.as_i64()], |row| row.get(0))
+        .query_row(&sql, [id.as_i64()], |row| Ok((row.get(0)?, row.get(1)?)))
         .optional()?;
     match raw {
         None => Ok(None),
-        Some(raw) => Ok(Some(Instant::try_from(StoredTime(raw))?)),
+        Some((at, grain)) => Ok(Some(At {
+            start: Instant::try_from(StoredTime(at))?,
+            grain: Grain::try_from(StoredGrain(grain))?,
+        })),
     }
 }
 
@@ -364,19 +363,26 @@ fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) ->
     }
     if let Some(from) = q.range.from {
         bind.push(SqlVal::Text(instant_to_sql(from)?));
-        sql.push_str(&format!(" AND at >= ?{}", bind.len()));
+        sql.push_str(&format!(
+            " AND bottle_grain_end(at, grain) > ?{}",
+            bind.len()
+        ));
     }
-    if let Some(to) = q.range.to {
-        match to {
-            ToBound::Inclusive(end) => {
-                bind.push(SqlVal::Text(instant_to_sql(end)?));
-                sql.push_str(&format!(" AND at <= ?{}", bind.len()));
+    if let Some(to) = q.range.exclusive_to()? {
+        bind.push(SqlVal::Text(instant_to_sql(to)?));
+        sql.push_str(&format!(" AND at < ?{}", bind.len()));
+    }
+    if let Some(max) = q.max_grain {
+        let allowed: Vec<Grain> = max.at_most().collect();
+        sql.push_str(" AND grain IN (");
+        for (i, grain) in allowed.iter().enumerate() {
+            if i > 0 {
+                sql.push(',');
             }
-            ToBound::Exclusive(end) => {
-                bind.push(SqlVal::Text(instant_to_sql(end)?));
-                sql.push_str(&format!(" AND at < ?{}", bind.len()));
-            }
+            bind.push(SqlVal::Text(grain.as_str().to_string()));
+            sql.push_str(&format!("?{}", bind.len()));
         }
+        sql.push(')');
     }
     if let Some(agent) = q.agent {
         bind.push(SqlVal::Text(agent.to_string()));
@@ -425,6 +431,7 @@ fn entry_columns(spec: &Spec) -> String {
     let mut cols = vec![
         "id".to_string(),
         "at".to_string(),
+        "grain".to_string(),
         "agent".to_string(),
         "ignored".to_string(),
     ];
@@ -437,15 +444,19 @@ fn entry_columns(spec: &Spec) -> String {
 fn read_entry(spec: &Spec, r: &rusqlite::Row<'_>) -> Result<Entry, Error> {
     let id: i64 = r.get(0)?;
     let at_raw: String = r.get(1)?;
-    let agent: Option<String> = r.get(2)?;
-    let ignored: i64 = r.get(3)?;
+    let grain_raw: String = r.get(2)?;
+    let agent: Option<String> = r.get(3)?;
+    let ignored: i64 = r.get(4)?;
     let mut values = HashMap::new();
     for (i, field) in spec.fields.iter().enumerate() {
-        values.insert(field.name.clone(), read_field_value(field, r, 4 + i)?);
+        values.insert(field.name.clone(), read_field_value(field, r, 5 + i)?);
     }
     Ok(Entry {
         id: EntryId::try_from(StoredEntryId(id))?,
-        at: Instant::try_from(StoredTime(at_raw))?,
+        at: At {
+            start: Instant::try_from(StoredTime(at_raw))?,
+            grain: Grain::try_from(StoredGrain(grain_raw))?,
+        },
         agent: agent.map(StoredAgent).map(Agent::try_from).transpose()?,
         ignored: ignored != 0,
         values,

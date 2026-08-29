@@ -2,17 +2,20 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use rusqlite::Connection as Sqlite;
+use rusqlite::OptionalExtension;
 use rusqlite::TransactionBehavior;
 use rusqlite::functions::{Aggregate, FunctionFlags};
 use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
-use crate::spec::TimePeriod;
-use crate::sql::{StoredNumber, StoredTime};
-use crate::time::{self, Instant};
+use crate::spec::{SchemaName, TimePeriod};
+use crate::sql::{
+    StoredNumber, StoredSchemaName, StoredTime, instant_to_sql, quote_ident, table_name,
+};
+use crate::time::{self, At, Grain, Instant};
 use jiff::tz::TimeZone;
 
-pub(crate) const USER_VERSION: i32 = 1;
+pub(crate) const USER_VERSION: i32 = 2;
 
 const CATALOG_SQL: &str = "
 CREATE TABLE IF NOT EXISTS schemas (
@@ -230,6 +233,7 @@ fn register_functions(conn: &Sqlite, tz: TimeZone) -> Result<(), Error> {
         FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
         DecSum,
     )?;
+    let period_tz = tz.clone();
     conn.create_scalar_function(
         "bottle_period",
         2,
@@ -237,7 +241,17 @@ fn register_functions(conn: &Sqlite, tz: TimeZone) -> Result<(), Error> {
         move |ctx| {
             let at: String = ctx.get(0)?;
             let unit: String = ctx.get(1)?;
-            Ok(period_bucket(&at, &unit, &tz)?)
+            Ok(period_bucket(&at, &unit, &period_tz)?)
+        },
+    )?;
+    conn.create_scalar_function(
+        "bottle_grain_end",
+        2,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        move |ctx| {
+            let at: String = ctx.get(0)?;
+            let grain: String = ctx.get(1)?;
+            Ok(grain_end_sql(&at, &grain, &tz)?)
         },
     )?;
     Ok(())
@@ -249,6 +263,12 @@ fn period_bucket(at: &str, unit: &str, tz: &TimeZone) -> Result<String, Error> {
         return Err(Error::Fail(Fail::Store(format!("unknown period: {unit}"))));
     };
     Ok(time::period(unit, at, tz).to_string())
+}
+
+fn grain_end_sql(at: &str, grain: &str, tz: &TimeZone) -> Result<String, Error> {
+    let start = Instant::try_from(StoredTime(at.to_string()))?;
+    let grain = Grain::parse(grain)?;
+    instant_to_sql(time::grain_end(At { start, grain }, tz)?)
 }
 
 struct DecSum;
@@ -302,23 +322,72 @@ fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
 
 fn ensure_user_version(conn: &Sqlite) -> Result<(), Error> {
     let v: i32 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
-    if version_needs_stamp(v, USER_VERSION)? {
+    if v == USER_VERSION {
+        return Ok(());
+    }
+    if v == 0 {
         conn.pragma_update(None, "user_version", USER_VERSION)?;
+        return Ok(());
+    }
+    if v == 1 {
+        migrate_v1_to_v2(conn)?;
+        conn.pragma_update(None, "user_version", USER_VERSION)?;
+        return Ok(());
+    }
+    Err(Error::Fail(Fail::UnsupportedStoreVersion(v)))
+}
+
+fn migrate_v1_to_v2(conn: &Sqlite) -> Result<(), Error> {
+    let names: Vec<String> = {
+        let mut stmt = conn.prepare("SELECT name FROM schemas")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        let mut names = Vec::new();
+        for row in rows {
+            names.push(row?);
+        }
+        names
+    };
+    for name in names {
+        let schema = SchemaName::try_from(StoredSchemaName(name))?;
+        if catalog_has_field(conn, &schema, "grain")? {
+            return Err(Error::Fail(Fail::GrainFieldBlocksMigrate(schema)));
+        }
+        let table = table_name(&schema);
+        if has_column(conn, &table, "grain")? {
+            continue;
+        }
+        conn.execute(
+            &format!(
+                "ALTER TABLE {} ADD COLUMN grain TEXT NOT NULL DEFAULT 'instant'",
+                quote_ident(&table)
+            ),
+            [],
+        )?;
     }
     Ok(())
 }
 
-/// Unversioned files (0) are stamped to `current`. A higher version is
-/// refused. A lower non-zero version is also refused: there is no migrate
-/// yet, and stamping would lie.
-fn version_needs_stamp(file: i32, current: i32) -> Result<bool, Error> {
-    if file == current {
-        return Ok(false);
+fn has_column(conn: &Sqlite, table: &str, column: &str) -> Result<bool, Error> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", quote_ident(table)))?;
+    let mut raw = stmt.query([])?;
+    while let Some(row) = raw.next()? {
+        let name: String = row.get(1)?;
+        if name == column {
+            return Ok(true);
+        }
     }
-    if file == 0 {
-        return Ok(true);
-    }
-    Err(Error::Fail(Fail::UnsupportedStoreVersion(file)))
+    Ok(false)
+}
+
+fn catalog_has_field(conn: &Sqlite, schema: &SchemaName, field: &str) -> Result<bool, Error> {
+    let found: Option<i64> = conn
+        .query_row(
+            "SELECT 1 FROM schema_fields WHERE schema = ?1 AND name = ?2",
+            rusqlite::params![schema.as_str(), field],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(found.is_some())
 }
 
 fn home_dir() -> Result<PathBuf, Error> {
@@ -378,17 +447,84 @@ mod tests {
     }
 
     #[test]
-    fn version_only_stamps_unversioned() {
-        assert!(!version_needs_stamp(1, 1).unwrap());
-        assert!(version_needs_stamp(0, 1).unwrap());
-        assert!(matches!(
-            version_needs_stamp(2, 1).unwrap_err(),
-            Error::Fail(Fail::UnsupportedStoreVersion(2))
-        ));
-        assert!(matches!(
-            version_needs_stamp(1, 2).unwrap_err(),
-            Error::Fail(Fail::UnsupportedStoreVersion(1))
-        ));
+    fn migrates_v1_entry_tables_to_grain() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bottle.db");
+        {
+            let conn = Sqlite::open(&path).unwrap();
+            conn.execute_batch(
+                "
+                CREATE TABLE schemas (name TEXT PRIMARY KEY, retired INTEGER NOT NULL DEFAULT 0);
+                INSERT INTO schemas (name, retired) VALUES ('nutrition.meal', 0);
+                CREATE TABLE entry_nutrition_meal (
+                    id INTEGER PRIMARY KEY,
+                    at TEXT NOT NULL,
+                    agent TEXT,
+                    ignored INTEGER NOT NULL DEFAULT 0
+                );
+                INSERT INTO entry_nutrition_meal (at, ignored)
+                VALUES ('2026-08-22T08:14:00Z', 0);
+                ",
+            )
+            .unwrap();
+            conn.pragma_update(None, "user_version", 1).unwrap();
+        }
+        let _db = Db::open(&path, TimeZone::UTC).unwrap();
+        let conn = Sqlite::open(&path).unwrap();
+        let v: i32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(v, USER_VERSION);
+        let grain: String = conn
+            .query_row(
+                "SELECT grain FROM entry_nutrition_meal WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(grain, "instant");
+    }
+
+    #[test]
+    fn v1_grain_field_blocks_migrate() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bottle.db");
+        {
+            let conn = Sqlite::open(&path).unwrap();
+            conn.execute_batch(
+                "
+                CREATE TABLE schemas (name TEXT PRIMARY KEY, retired INTEGER NOT NULL DEFAULT 0);
+                CREATE TABLE schema_fields (
+                    schema TEXT NOT NULL,
+                    position INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    required INTEGER NOT NULL,
+                    PRIMARY KEY (schema, name)
+                );
+                INSERT INTO schemas (name, retired) VALUES ('nutrition.meal', 0);
+                INSERT INTO schema_fields (schema, position, name, kind, required)
+                VALUES ('nutrition.meal', 0, 'grain', 'text', 1);
+                CREATE TABLE entry_nutrition_meal (
+                    id INTEGER PRIMARY KEY,
+                    at TEXT NOT NULL,
+                    agent TEXT,
+                    ignored INTEGER NOT NULL DEFAULT 0,
+                    grain TEXT
+                );
+                ",
+            )
+            .unwrap();
+            conn.pragma_update(None, "user_version", 1).unwrap();
+        }
+        let err = match Db::open(&path, TimeZone::UTC) {
+            Ok(_) => panic!("expected grain field to block migrate"),
+            Err(err) => err,
+        };
+        assert_eq!(
+            err.to_string(),
+            "schema nutrition.meal has a field named grain; rename it before opening"
+        );
     }
 
     #[test]

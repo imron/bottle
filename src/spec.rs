@@ -435,7 +435,7 @@ pub fn is_schema_name(s: &str) -> bool {
 }
 
 pub fn is_reserved(s: &str) -> bool {
-    matches!(s, "id" | "at" | "agent" | "ignored" | "links")
+    matches!(s, "id" | "at" | "agent" | "ignored" | "links" | "grain")
 }
 
 pub fn is_time_group(s: &str) -> bool {

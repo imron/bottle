@@ -258,16 +258,18 @@ fn add_field_enum_default_folds() {
 fn add_field_reserved_name() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
-    let err = h
-        .run(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
-            schema: "nutrition.meal".into(),
-            name: "id".into(),
-            type_: FieldType::Text,
-            values: None,
-            default: None,
-        })))
-        .unwrap_err();
-    assert_fail(err, "reserved field name");
+    for name in ["id", "at", "agent", "ignored", "links", "grain"] {
+        let err = h
+            .run(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
+                schema: "nutrition.meal".into(),
+                name: name.into(),
+                type_: FieldType::Text,
+                values: None,
+                default: None,
+            })))
+            .unwrap_err();
+        assert_fail(err, "reserved field name");
+    }
 }
 
 #[test]

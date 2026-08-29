@@ -24,6 +24,77 @@ impl Instant {
     pub fn timestamp(self) -> Timestamp {
         self.0
     }
+
+    fn next_second(self) -> Result<Self, Error> {
+        Ok(Self::from_timestamp(
+            self.0.checked_add(jiff::Span::new().seconds(1))?,
+        ))
+    }
+}
+
+/// How coarse an `at` value is. Inferred from the input shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Grain {
+    Instant,
+    Day,
+    Month,
+}
+
+impl Grain {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Instant => "instant",
+            Self::Day => "day",
+            Self::Month => "month",
+        }
+    }
+
+    pub fn parse(s: &str) -> Result<Self, Error> {
+        match s {
+            "instant" => Ok(Self::Instant),
+            "day" => Ok(Self::Day),
+            "month" => Ok(Self::Month),
+            _ => Err(Error::Fail(Fail::CorruptStoredGrain(s.to_string()))),
+        }
+    }
+
+    fn rank(self) -> u8 {
+        match self {
+            Self::Instant => 0,
+            Self::Day => 1,
+            Self::Month => 2,
+        }
+    }
+
+    pub fn at_most(self) -> impl Iterator<Item = Self> {
+        [Self::Instant, Self::Day, Self::Month]
+            .into_iter()
+            .filter(move |g| g.rank() <= self.rank())
+    }
+
+    /// Coarsest event grain that can sit in this sum group.
+    pub fn for_group(unit: TimePeriod) -> Self {
+        match unit {
+            TimePeriod::Day | TimePeriod::Week => Self::Day,
+            TimePeriod::Month | TimePeriod::Year => Self::Month,
+        }
+    }
+}
+
+/// UTC start plus grain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct At {
+    pub start: Instant,
+    pub grain: Grain,
+}
+
+impl At {
+    pub fn now() -> Self {
+        Self {
+            start: Instant::now(),
+            grain: Grain::Instant,
+        }
+    }
 }
 
 fn seconds_only(ts: Timestamp) -> Timestamp {
@@ -39,10 +110,20 @@ pub fn zone(name: Option<&str>) -> Result<TimeZone, Error> {
     }
 }
 
-pub fn parse_instant(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
+pub fn parse_at(input: &str, tz: &TimeZone) -> Result<At, Error> {
     match parse(input, tz)? {
-        Parsed::Instant(ts) => Ok(Instant::from_timestamp(ts)),
-        Parsed::Date(_) => Err(Error::Usage(Usage::DateOnlyNotInstant)),
+        Parsed::Instant(ts) => Ok(At {
+            start: Instant::from_timestamp(ts),
+            grain: Grain::Instant,
+        }),
+        Parsed::Date(date) => Ok(At {
+            start: Instant::from_timestamp(date_midnight(date, tz)?),
+            grain: Grain::Day,
+        }),
+        Parsed::Month { year, month } => Ok(At {
+            start: month_start(year, month, tz)?,
+            grain: Grain::Month,
+        }),
     }
 }
 
@@ -51,10 +132,40 @@ pub fn display_local(at: Instant, tz: &TimeZone) -> Result<String, Error> {
     Ok(strtime::format("%Y-%m-%dT%H:%M:%S%:z", &zoned)?)
 }
 
+pub fn display_at(at: At, tz: &TimeZone) -> Result<String, Error> {
+    match at.grain {
+        Grain::Instant => display_local(at.start, tz),
+        Grain::Day => Ok(local_civil(at.start, tz).to_string()),
+        Grain::Month => {
+            let date = local_civil(at.start, tz);
+            Ok(format!("{:04}-{:02}", date.year(), date.month()))
+        }
+    }
+}
+
+/// Exclusive UTC end of this `at` value in `tz`. An instant occupies one
+/// second so range overlap can use the same half-open test as day/month.
+pub fn grain_end(at: At, tz: &TimeZone) -> Result<Instant, Error> {
+    match at.grain {
+        Grain::Instant => at.start.next_second(),
+        Grain::Day => {
+            let next = local_civil(at.start, tz).checked_add(jiff::Span::new().days(1))?;
+            Ok(Instant::from_timestamp(date_midnight(next, tz)?))
+        }
+        Grain::Month => {
+            let date = local_civil(at.start, tz);
+            let first = Date::new(date.year(), date.month(), 1)?;
+            let next = first.checked_add(jiff::Span::new().months(1))?;
+            Ok(Instant::from_timestamp(date_midnight(next, tz)?))
+        }
+    }
+}
+
 fn from_bound(input: &str, tz: &TimeZone) -> Result<Instant, Error> {
     match parse(input, tz)? {
         Parsed::Instant(ts) => Ok(Instant::from_timestamp(ts)),
         Parsed::Date(date) => Ok(Instant::from_timestamp(date_midnight(date, tz)?)),
+        Parsed::Month { year, month } => month_start(year, month, tz),
     }
 }
 
@@ -88,6 +199,14 @@ impl Range {
             to: Some(ToBound::Exclusive(end)),
         })
     }
+
+    pub fn exclusive_to(self) -> Result<Option<Instant>, Error> {
+        match self.to {
+            None => Ok(None),
+            Some(ToBound::Exclusive(end)) => Ok(Some(end)),
+            Some(ToBound::Inclusive(end)) => Ok(Some(end.next_second()?)),
+        }
+    }
 }
 
 fn to_bound(input: &str, tz: &TimeZone) -> Result<ToBound, Error> {
@@ -99,6 +218,7 @@ fn to_bound(input: &str, tz: &TimeZone) -> Result<ToBound, Error> {
                 next, tz,
             )?)))
         }
+        Parsed::Month { year, month } => Ok(ToBound::Exclusive(month_end(year, month, tz)?)),
     }
 }
 
@@ -174,6 +294,7 @@ pub fn period(unit: TimePeriod, at: Instant, tz: &TimeZone) -> Period {
 enum Parsed {
     Instant(Timestamp),
     Date(Date),
+    Month { year: i16, month: i8 },
 }
 
 fn parse(input: &str, tz: &TimeZone) -> Result<Parsed, Error> {
@@ -185,6 +306,17 @@ fn parse(input: &str, tz: &TimeZone) -> Result<Parsed, Error> {
             .parse()
             .map_err(|_| Error::Usage(Usage::InvalidDate(input.to_string())))?;
         return Ok(Parsed::Date(date));
+    }
+    if looks_like_month(input) {
+        let year: i16 = input[..4]
+            .parse()
+            .map_err(|_| Error::Usage(Usage::InvalidDate(input.to_string())))?;
+        let month: i8 = input[5..]
+            .parse()
+            .map_err(|_| Error::Usage(Usage::InvalidDate(input.to_string())))?;
+        Date::new(year, month, 1)
+            .map_err(|_| Error::Usage(Usage::InvalidDate(input.to_string())))?;
+        return Ok(Parsed::Month { year, month });
     }
     let Some((date, rest)) = input.split_once('T') else {
         return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
@@ -233,6 +365,21 @@ fn looks_like_date(s: &str) -> bool {
         && s.bytes().all(|b| b == b'-' || b.is_ascii_digit())
 }
 
+fn looks_like_month(s: &str) -> bool {
+    s.len() == 7 && s.as_bytes()[4] == b'-' && s.bytes().all(|b| b == b'-' || b.is_ascii_digit())
+}
+
+fn month_start(year: i16, month: i8, tz: &TimeZone) -> Result<Instant, Error> {
+    let date = Date::new(year, month, 1)?;
+    Ok(Instant::from_timestamp(date_midnight(date, tz)?))
+}
+
+fn month_end(year: i16, month: i8, tz: &TimeZone) -> Result<Instant, Error> {
+    let date = Date::new(year, month, 1)?;
+    let next = date.checked_add(jiff::Span::new().months(1))?;
+    Ok(Instant::from_timestamp(date_midnight(next, tz)?))
+}
+
 fn looks_like_hms(s: &str) -> bool {
     s.len() == 8
         && s.as_bytes()[2] == b':'
@@ -256,7 +403,7 @@ mod tests {
     fn non_ascii_time_tail_is_invalid_not_panic() {
         let tz = TimeZone::UTC;
         for input in ["2026-08-22T08:14:0µ", "2026-08-22T08:14:🎉"] {
-            let err = parse_instant(input, &tz).unwrap_err();
+            let err = parse_at(input, &tz).unwrap_err();
             assert!(
                 matches!(err, Error::Usage(Usage::InvalidTime(ref s)) if s == input),
                 "{input}: {err}"
@@ -272,7 +419,7 @@ mod tests {
     #[test]
     fn period_display_round_trips() {
         let tz = melbourne();
-        let at = parse_instant("2026-08-22T08:14:00+10:00", &tz).unwrap();
+        let at = parse_at("2026-08-22T08:14:00+10:00", &tz).unwrap().start;
         for unit in [
             TimePeriod::Day,
             TimePeriod::Week,
@@ -317,29 +464,39 @@ mod tests {
     #[test]
     fn z_offset_and_naive_local_are_one_instant() {
         let tz = melbourne();
-        let z = parse_instant("2026-08-21T22:14:00Z", &tz).unwrap();
-        let offset = parse_instant("2026-08-22T08:14:00+10:00", &tz).unwrap();
-        let naive = parse_instant("2026-08-22T08:14:00", &tz).unwrap();
+        let z = parse_at("2026-08-21T22:14:00Z", &tz).unwrap();
+        let offset = parse_at("2026-08-22T08:14:00+10:00", &tz).unwrap();
+        let naive = parse_at("2026-08-22T08:14:00", &tz).unwrap();
         assert_eq!(z, offset);
         assert_eq!(z, naive);
-        assert_eq!(display_local(z, &tz).unwrap(), "2026-08-22T08:14:00+10:00");
+        assert_eq!(display_at(z, &tz).unwrap(), "2026-08-22T08:14:00+10:00");
     }
 
     #[test]
     fn negative_offset_is_an_instant() {
         let tz = melbourne();
-        let at = parse_instant("2026-08-22T08:14:00-05:00", &tz).unwrap();
-        let utc = parse_instant("2026-08-22T13:14:00Z", &tz).unwrap();
+        let at = parse_at("2026-08-22T08:14:00-05:00", &tz).unwrap();
+        let utc = parse_at("2026-08-22T13:14:00Z", &tz).unwrap();
         assert_eq!(at, utc);
     }
 
     #[test]
-    fn date_only_is_a_query_bound() {
+    fn date_and_month_are_grains() {
         let tz = melbourne();
-        assert!(matches!(
-            parse_instant("2026-08-22", &tz).unwrap_err(),
-            Error::Usage(Usage::DateOnlyNotInstant)
-        ));
+        let day = parse_at("2026-08-22", &tz).unwrap();
+        assert_eq!(day.grain, Grain::Day);
+        assert_eq!(display_at(day, &tz).unwrap(), "2026-08-22");
+        assert_eq!(
+            display_local(day.start, &tz).unwrap(),
+            "2026-08-22T00:00:00+10:00"
+        );
+        let month = parse_at("2026-08", &tz).unwrap();
+        assert_eq!(month.grain, Grain::Month);
+        assert_eq!(display_at(month, &tz).unwrap(), "2026-08");
+        assert_eq!(
+            display_local(month.start, &tz).unwrap(),
+            "2026-08-01T00:00:00+10:00"
+        );
         let range = Range::parse(Some("2026-08-22"), Some("2026-08-22"), &tz).unwrap();
         let from = range.from.unwrap();
         let Some(ToBound::Exclusive(to)) = range.to else {
@@ -350,6 +507,43 @@ mod tests {
             "2026-08-22T00:00:00+10:00"
         );
         assert_eq!(display_local(to, &tz).unwrap(), "2026-08-23T00:00:00+10:00");
+        let month_range = Range::parse(Some("2026-08"), Some("2026-08"), &tz).unwrap();
+        assert_eq!(
+            display_local(month_range.from.unwrap(), &tz).unwrap(),
+            "2026-08-01T00:00:00+10:00"
+        );
+        let Some(ToBound::Exclusive(month_to)) = month_range.to else {
+            panic!("{:?}", month_range.to);
+        };
+        assert_eq!(
+            display_local(month_to, &tz).unwrap(),
+            "2026-09-01T00:00:00+10:00"
+        );
+    }
+
+    #[test]
+    fn grain_end_is_exclusive() {
+        let tz = melbourne();
+        let instant = parse_at("2026-08-22T08:14:00+10:00", &tz).unwrap();
+        assert_eq!(
+            display_local(grain_end(instant, &tz).unwrap(), &tz).unwrap(),
+            "2026-08-22T08:14:01+10:00"
+        );
+        let day = parse_at("2026-08-22", &tz).unwrap();
+        assert_eq!(
+            display_local(grain_end(day, &tz).unwrap(), &tz).unwrap(),
+            "2026-08-23T00:00:00+10:00"
+        );
+        let month = parse_at("2026-08", &tz).unwrap();
+        assert_eq!(
+            display_local(grain_end(month, &tz).unwrap(), &tz).unwrap(),
+            "2026-09-01T00:00:00+10:00"
+        );
+        let dst = parse_at("2026-10-04", &tz).unwrap();
+        let hours = (grain_end(dst, &tz).unwrap().timestamp().as_second()
+            - dst.start.timestamp().as_second())
+            / 3600;
+        assert_eq!(hours, 23);
     }
 
     #[test]
@@ -371,13 +565,10 @@ mod tests {
     #[test]
     fn dst_gap_naive_time_is_the_later_instant() {
         let tz = melbourne();
-        let gap = parse_instant("2026-10-04T02:30:00", &tz).unwrap();
-        let later = parse_instant("2026-10-04T03:30:00", &tz).unwrap();
+        let gap = parse_at("2026-10-04T02:30:00", &tz).unwrap();
+        let later = parse_at("2026-10-04T03:30:00", &tz).unwrap();
         assert_eq!(gap, later);
-        assert_eq!(
-            display_local(gap, &tz).unwrap(),
-            "2026-10-04T03:30:00+11:00"
-        );
+        assert_eq!(display_at(gap, &tz).unwrap(), "2026-10-04T03:30:00+11:00");
     }
 
     #[test]
@@ -390,16 +581,23 @@ mod tests {
             "2026-08-22T25:00:00",
             "2026-08-22T08:61:00",
         ] {
-            let err = parse_instant(input, &tz).unwrap_err();
+            let err = parse_at(input, &tz).unwrap_err();
             assert!(
                 matches!(err, Error::Usage(Usage::InvalidTime(ref s)) if s == input),
                 "{input}: {err}"
             );
         }
-        for input in ["2026-02-30", "2025-02-29"] {
-            let err = parse_instant(input, &tz).unwrap_err();
+        for input in ["2026-02-30", "2025-02-29", "2026-13"] {
+            let err = parse_at(input, &tz).unwrap_err();
             assert!(
                 matches!(err, Error::Usage(Usage::InvalidDate(ref s)) if s == input),
+                "{input}: {err}"
+            );
+        }
+        for input in ["2026", "2026-W34", "2026-Q3"] {
+            let err = parse_at(input, &tz).unwrap_err();
+            assert!(
+                matches!(err, Error::Usage(Usage::InvalidTime(ref s)) if s == input),
                 "{input}: {err}"
             );
         }

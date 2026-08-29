@@ -2,6 +2,7 @@ mod amend;
 mod backup;
 mod common;
 mod get;
+mod grain;
 mod help;
 mod log;
 mod ls;

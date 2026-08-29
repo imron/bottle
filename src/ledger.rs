@@ -8,7 +8,7 @@ use crate::spec::{
     self, EntryId, EntryRef, EnumValue, Field, FieldKind, FieldName, Group, Link, LinkName,
     SchemaName, Spec, TimePeriod, parse_number,
 };
-use crate::time::{Instant, Period, Range};
+use crate::time::{At, Grain, Period, Range};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldValue {
@@ -74,7 +74,7 @@ spec::string_newtype!(Agent);
 #[derive(Debug, Clone)]
 pub struct Entry {
     pub id: EntryId,
-    pub at: Instant,
+    pub at: At,
     pub agent: Option<Agent>,
     pub ignored: bool,
     pub values: HashMap<FieldName, FieldValue>,
@@ -144,6 +144,8 @@ pub struct Find<'a> {
     pub filters: &'a [Filter],
     pub order: Order,
     pub limit: Option<usize>,
+    /// None means every grain. `Some(g)` keeps instants through `g`.
+    pub max_grain: Option<Grain>,
 }
 
 pub enum Summed {
@@ -204,7 +206,7 @@ pub struct SchemaDrop {
 #[derive(Debug, Clone)]
 pub struct Log {
     pub schema: SchemaName,
-    pub at: Option<Instant>,
+    pub at: Option<At>,
     pub agent: Option<Agent>,
     pub links: Vec<Link>,
     pub fields: Vec<FieldInput>,
@@ -253,7 +255,7 @@ pub struct Today {
 pub struct Amend {
     pub schema: SchemaName,
     pub id: EntryId,
-    pub at: Option<Instant>,
+    pub at: Option<At>,
     pub agent: Option<Agent>,
     pub links: Vec<Link>,
     pub unlinks: Vec<LinkName>,
@@ -314,14 +316,14 @@ pub struct Entries {
 #[derive(Debug, Clone)]
 pub struct Posted {
     pub id: EntryId,
-    pub at: Instant,
+    pub at: At,
     pub links: Vec<Link>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Stamp {
     pub id: EntryId,
-    pub at: Instant,
+    pub at: At,
 }
 
 #[derive(Debug, Clone)]

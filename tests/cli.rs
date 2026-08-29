@@ -288,7 +288,7 @@ fn add_field_values_trim_spaces_after_comma() {
 }
 
 #[test]
-fn date_only_at_is_usage_on_stderr() {
+fn date_only_at_prints_the_day() {
     let dir = TempDir::new().unwrap();
     let spec = dir.path().join("meal.yaml");
     std::fs::write(&spec, MEAL).unwrap();
@@ -313,9 +313,9 @@ fn date_only_at_is_usage_on_stderr() {
             "kcal=1",
         ],
     );
-    assert_eq!(code, 2);
-    assert!(stdout.is_empty(), "{stdout}");
-    assert!(stderr.contains("date-only"), "{stderr}");
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.contains("2026-08-22\t"), "{stdout}");
+    assert!(!stdout.contains("2026-08-22T"), "{stdout}");
 }
 
 #[test]
@@ -343,11 +343,11 @@ fn usage_does_not_create_db() {
     let out = bottle()
         .arg("--db")
         .arg(&db)
-        .args(["log", "meal", "--at", "2026-08-22", "kcal=1"])
+        .args(["log", "meal", "--at", "2026-08-22T08:14", "kcal=1"])
         .output()
         .expect("run bottle");
     assert_eq!(out.status.code().expect("status code"), 2);
     let stderr = String::from_utf8(out.stderr).expect("stderr utf8");
-    assert!(stderr.contains("date-only"), "{stderr}");
+    assert!(stderr.contains("invalid time"), "{stderr}");
     assert!(!db.exists(), "usage must not create {}", db.display());
 }

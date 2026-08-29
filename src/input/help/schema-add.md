@@ -52,7 +52,7 @@ Types:
 
 Field names: `^[a-z][a-z0-9_]*$`. Reserved (you may not
 use them as fields): `id`, `at`, `agent`, `ignored`,
-`links`. There is no date field type; the time of the
+`links`, `grain`. There is no date field type; the time of the
 event is `at` on every entry. Keys other than `name`,
 `type`, `required`, and `values` are rejected. `default`
 is `schema add-field --default`, not a YAML key.

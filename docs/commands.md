@@ -137,12 +137,13 @@ ids, ignored or not. `amend --unlink` those links first.
 ## log
 
 ```
-bottle log <schema> [--at TIME] [--agent NAME] \
+bottle log <schema> [--at DATE|TIME] [--agent NAME] \
   [--link name=SCHEMA/ID]... [field=value ...]
 ```
 
-`--at` defaults to now. A date-only `--at` is an error.
-See [time.md](time.md). `--agent` defaults to
+`--at` defaults to now. Shape chooses the grain: a time
+is an instant, `YYYY-MM-DD` is a day, `YYYY-MM` is a
+month. See [time.md](time.md). `--agent` defaults to
 `BOTTLE_AGENT`, or `bottle` if that is unset. Fails if
 the schema is retired. `--link`
 may repeat with different names. A name once per command.
@@ -182,7 +183,7 @@ order, `agent`. `ignored` only with `--include-ignored`.
 repeat (AND) and must name a declared field (`enum`
 values folded lowercase; `text` exact). `--link` filters
 by a named pointer; the value is `schema/id`. `--where`
-on reserved names (`id`, `at`, `agent`, `ignored`,
+on reserved names (`id`, `at`, `agent`, `ignored`, `grain`,
 `links`) is an error; use `--agent`, `get`, or
 `--from` / `--to`. Order: oldest `at`, then `id`.
 
@@ -207,7 +208,9 @@ bottle sum <schema> <field> [--from DATE|TIME] \
 ```
 
 `<field>` must be a declared number. With no `--group`:
-`field`, `value`. Time groups use the host zone:
+`field`, `value`. Time groups use the host zone. An event coarser than the
+group is omitted (`--group day` does not put a month
+event on one day):
 
 - `day` -- `YYYY-MM-DD`
 - `week` -- ISO `YYYY-Www`
@@ -238,12 +241,14 @@ bottle today <schema> [--agent NAME] \
   [--where field=value]... [--link name=SCHEMA/ID]...
 ```
 
-`ls` for the current host civil day. No totals. Run `sum`.
+`ls` for the current host civil day: instants and day
+events only. A month event does not appear. No totals.
+Run `sum`.
 
 ## amend
 
 ```
-bottle amend <schema> <id> [--at TIME] [--agent NAME] \
+bottle amend <schema> <id> [--at DATE|TIME] [--agent NAME] \
   [--link name=SCHEMA/ID]... [--unlink name]... \
   [field=value ...]
 ```

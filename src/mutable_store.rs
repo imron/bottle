@@ -9,7 +9,7 @@ use crate::spec::{
     EntryId, EnumValue, Field, FieldKind, FieldName, Link, LinkName, SchemaName, Spec,
 };
 use crate::sql::{SqlVal, StoredEntryId, instant_to_sql, quote_ident, sql_default, table_name};
-use crate::time::Instant;
+use crate::time::At;
 
 pub fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
     let cols = create_columns(spec);
@@ -167,15 +167,16 @@ pub fn insert_entry(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
     spec: &Spec,
-    at: Instant,
+    at: At,
     agent: Option<&Agent>,
     values: &HashMap<FieldName, FieldValue>,
     links: &[Link],
 ) -> Result<EntryId, Error> {
-    let mut col_names = vec!["at".to_string(), "agent".to_string()];
-    let mut placeholders = vec!["?1".to_string(), "?2".to_string()];
+    let mut col_names = vec!["at".to_string(), "grain".to_string(), "agent".to_string()];
+    let mut placeholders = vec!["?1".to_string(), "?2".to_string(), "?3".to_string()];
     let mut bind: Vec<SqlVal> = vec![
-        SqlVal::Text(instant_to_sql(at)?),
+        SqlVal::Text(instant_to_sql(at.start)?),
+        SqlVal::Text(at.grain.as_str().to_string()),
         match agent {
             Some(a) => SqlVal::Text(a.to_string()),
             None => SqlVal::Null,
@@ -216,7 +217,7 @@ pub fn update_entry(
     tx: &mut Tx<'_>,
     schema: &SchemaName,
     id: EntryId,
-    at: Option<Instant>,
+    at: Option<At>,
     agent: Option<&Agent>,
     values: &HashMap<FieldName, FieldValue>,
 ) -> Result<(), Error> {
@@ -224,7 +225,9 @@ pub fn update_entry(
     let mut bind: Vec<SqlVal> = Vec::new();
     if let Some(at) = at {
         sets.push(format!("at = ?{}", bind.len() + 1));
-        bind.push(SqlVal::Text(instant_to_sql(at)?));
+        bind.push(SqlVal::Text(instant_to_sql(at.start)?));
+        sets.push(format!("grain = ?{}", bind.len() + 1));
+        bind.push(SqlVal::Text(at.grain.as_str().to_string()));
     }
     if let Some(agent) = agent {
         sets.push(format!("agent = ?{}", bind.len() + 1));
@@ -333,6 +336,7 @@ fn create_columns(spec: &Spec) -> String {
     let mut cols = vec![
         "id INTEGER PRIMARY KEY".to_string(),
         "at TEXT NOT NULL".to_string(),
+        "grain TEXT NOT NULL".to_string(),
         "agent TEXT".to_string(),
         "ignored INTEGER NOT NULL DEFAULT 0".to_string(),
     ];

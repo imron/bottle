@@ -13,9 +13,11 @@ bottle today <schema> [--agent NAME] \
 
 ## Description
 
-Lists entries of a schema whose `at` falls on the current
-day in the timezone of this machine. It does not print a
-total; run `sum` for that.
+Lists entries of a schema whose `at` is an instant or a
+civil day on the current day in the timezone of this
+machine. Month events are omitted even if the month
+contains today. It does not print a total; run `sum` for
+that.
 
 The window is local midnight through the next local
 midnight. Days that change daylight saving time are 23 or

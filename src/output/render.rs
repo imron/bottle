@@ -35,14 +35,14 @@ pub fn render(outcome: &Outcome, tz: &TimeZone, style: Style) -> Result<String, 
             for Posted { id, at, links } in rows {
                 out.push(vec![
                     id.to_string(),
-                    time::display_local(*at, tz)?,
+                    time::display_at(*at, tz)?,
                     render_links(links),
                 ]);
             }
             Ok(tsv::table(&["id", "at", "links"], &out))
         }
         Outcome::Stamp(Stamp { id, at }) => {
-            let at = time::display_local(*at, tz)?;
+            let at = time::display_at(*at, tz)?;
             Ok(tsv::table(&["id", "at"], &[vec![id.to_string(), at]]))
         }
         Outcome::Total(Total { field, value }) => Ok(tsv::table(
@@ -111,7 +111,7 @@ fn render_entries(
     for entry in entries {
         let mut cells = vec![
             entry.id.to_string(),
-            time::display_local(entry.at, tz)?,
+            time::display_at(entry.at, tz)?,
             render_links(&entry.links),
         ];
         for field in &spec.fields {

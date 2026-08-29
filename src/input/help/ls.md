@@ -27,9 +27,11 @@ not repeated on each line.
 ## Options
 
 `--from DATE|TIME` — lower bound on `at`. A date with no
-time of day is that civil day in the host timezone,
-inclusive. A full timestamp is an instant bound. `--from`
-alone has no end.
+time of day is that civil day in the host timezone. A
+`YYYY-MM` is that calendar month. A full timestamp is an
+instant bound. `--from` alone has no end. A row matches
+if its `at` interval overlaps the window (a month event
+in August matches `--from 2026-08-21 --to 2026-08-21`).
 
 `--to DATE|TIME` — upper bound on `at`. A date is that
 civil day, inclusive. `--from 2026-08-16 --to 2026-08-22`
@@ -43,8 +45,8 @@ change daylight saving time are 23 or 25 hours long.
 The name must be a declared field (`enum` values folded
 lowercase, `text` exact and case-sensitive). The value
 may not be empty. `--where` on `id`, `at`, `agent`,
-`ignored`, or `links` is an error; use `--agent`, `get`,
-or `--from` / `--to`.
+`ignored`, `links`, or `grain` is an error; use `--agent`,
+`get`, or `--from` / `--to`.
 
 `--link name=SCHEMA/ID` — may repeat; all clauses are AND.
 Entries that have that named pointer. Same spelling as

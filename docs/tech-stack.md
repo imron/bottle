@@ -52,13 +52,15 @@ On open:
 ```
 PRAGMA journal_mode=WAL;
 PRAGMA busy_timeout=5000;
-PRAGMA user_version=1;
+PRAGMA user_version=2;
 ```
 
-`user_version` is 1: field catalog as rows. A file with a
-higher version is refused. Unversioned files (0) are stamped
-1. A lower non-zero version is refused until a migrate
-exists. Never stamp an old version current without migrating.
+`user_version` is 2: field catalog as rows, `grain` on
+each entry table. A file with a higher version is refused.
+Unversioned files (0) are stamped 2. Version 1 is migrated
+(add `grain` default `instant`). Any other lower non-zero
+version is refused. Never stamp an old version current
+without migrating.
 
 WAL so readers do not block a writer. `busy_timeout` is
 5000 milliseconds: a second writer waits up to that long
@@ -73,8 +75,9 @@ flag, each documented failure (usage, unknown schema, bad
 field, not found, retired, link target missing, reserved
 `--where`, `--link`/`--unlink` conflict), TSV headers and
 cells (`true`/`false`, numbers as logged,
-`links` sort), and time bounds including date-only vs
-instant. MCP `log` `entries` is one transaction: all
+`links` sort), and time bounds including overlap of day
+and month grains vs instant. MCP `log` `entries` is one
+transaction: all
 succeed or none do.
 
 The binary gets a thin smoke: clap maps flags into the
@@ -86,8 +89,9 @@ db path.
 
 ## Time
 
-jiff reads the host timezone. Storage is UTC `Z`. Output is
-offset-local. See [time.md](time.md).
+jiff reads the host timezone. Storage is UTC start plus
+grain (`instant`, `day`, `month`). Output uses that shape.
+See [time.md](time.md).
 
 ## MCP
 

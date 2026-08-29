@@ -62,6 +62,7 @@ They live in a side table.
 CREATE TABLE entry_fitness_set (
   id       INTEGER PRIMARY KEY,
   at       TEXT NOT NULL,
+  grain    TEXT NOT NULL,
   agent    TEXT,
   ignored  INTEGER NOT NULL DEFAULT 0,
   movement TEXT NOT NULL,
@@ -72,7 +73,8 @@ CREATE TABLE entry_fitness_set (
 );
 ```
 
-`at` is the event instant in UTC. See [time.md](time.md).
+`at` is the UTC start of the event. `grain` is `instant`,
+`day`, or `month`. See [time.md](time.md).
 Numbers are `TEXT` decimals. Enums are `TEXT` checked on
 write.
 
@@ -182,7 +184,7 @@ property.
   `foo__bar`). Dots are a namespace convention only.
 - Link names use the field-name regex. A link name may not
   be a field on that schema, and may not be reserved.
-- Reserved: `id`, `at`, `agent`, `ignored`, `links`.
+- Reserved: `id`, `at`, `agent`, `ignored`, `links`, `grain`.
   Link names also may not be `day`, `week`, `month`,
   `year` (`sum --group`).
 

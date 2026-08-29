@@ -1,7 +1,7 @@
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, FieldValue, NonEmptyFieldValue};
 use crate::spec::{EntryId, EnumValue, FieldName, LinkName, SchemaName, parse_number};
-use crate::time::Instant;
+use crate::time::{Grain, Instant};
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
@@ -55,6 +55,7 @@ pub fn instant_to_sql(at: Instant) -> Result<String, Error> {
 }
 
 pub struct StoredTime(pub String);
+pub struct StoredGrain(pub String);
 pub struct StoredSchemaName(pub String);
 pub struct StoredLinkName(pub String);
 pub struct StoredLinkSchema(pub String);
@@ -92,6 +93,14 @@ impl TryFrom<StoredTime> for Instant {
             Ok(canonical) if canonical == raw => Ok(at),
             _ => Err(Error::Fail(Fail::CorruptStoredTime(raw))),
         }
+    }
+}
+
+impl TryFrom<StoredGrain> for Grain {
+    type Error = Error;
+
+    fn try_from(StoredGrain(raw): StoredGrain) -> Result<Self, Error> {
+        Grain::parse(&raw)
     }
 }
 
@@ -156,6 +165,12 @@ mod tests {
                 .unwrap_err()
                 .to_string(),
             "corrupt stored time: nope"
+        );
+        assert_eq!(
+            Grain::try_from(StoredGrain("week".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored grain: week"
         );
         assert_eq!(
             SchemaName::try_from(StoredSchemaName("Nope".into()))
@@ -313,5 +328,9 @@ mod tests {
         );
         let at = Instant::try_from(StoredTime("2026-08-22T08:14:00Z".into())).unwrap();
         assert_eq!(instant_to_sql(at).unwrap(), "2026-08-22T08:14:00Z");
+        assert_eq!(
+            Grain::try_from(StoredGrain("day".into())).unwrap(),
+            Grain::Day
+        );
     }
 }

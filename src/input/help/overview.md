@@ -28,8 +28,9 @@ entries, and the fields you declared. A link
 `session` is entry 1 of `fitness.session`.
 
 Times print in the timezone of the machine running bottle.
-A date with no time of day is that whole day, not a
-timestamp you can log.
+`--at` shape is the grain: a time is an instant, a date is
+a day, `YYYY-MM` is a month. Printed `at` uses the same
+shape.
 
 ## Files
 

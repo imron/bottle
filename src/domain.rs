@@ -11,7 +11,7 @@ use crate::ledger::{
 use crate::mutable_store;
 use crate::spec::{EntryId, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
 use crate::store;
-use crate::time::{Instant, Range};
+use crate::time::{At, Grain, Range};
 use jiff::tz::TimeZone;
 
 pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outcome, Error> {
@@ -159,7 +159,7 @@ fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Err
     let agent = op.agent.as_ref().unwrap_or(agent);
     let at = match op.at {
         Some(at) => at,
-        None => Instant::now(),
+        None => At::now(),
     };
     let loaded = store::load_schema(tx, &op.schema)?;
     if loaded.retired {
@@ -276,6 +276,7 @@ fn last(db: &mut Db, op: Last) -> Result<Outcome, Error> {
             include_ignored: false,
             order: Order::Newest,
             limit: Some(1),
+            max_grain: None,
         },
     )?;
     match &outcome {
@@ -295,6 +296,7 @@ fn today(db: &mut Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
             include_ignored: false,
             order: Order::Oldest,
             limit: None,
+            max_grain: Some(Grain::Day),
         },
     )
 }
@@ -308,6 +310,7 @@ fn list(db: &mut Db, op: List) -> Result<Outcome, Error> {
             include_ignored: op.include_ignored,
             order: Order::Oldest,
             limit: None,
+            max_grain: None,
         },
     )
 }
@@ -318,6 +321,7 @@ struct Query<'a> {
     include_ignored: bool,
     order: Order,
     limit: Option<usize>,
+    max_grain: Option<Grain>,
 }
 
 fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
@@ -335,6 +339,7 @@ fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
                 filters: &resolved,
                 order: q.order,
                 limit: q.limit,
+                max_grain: q.max_grain,
             },
         )?;
         Ok(Outcome::Entries(Entries {
@@ -364,6 +369,10 @@ fn sum(db: &mut Db, op: Sum) -> Result<Outcome, Error> {
             filters: &resolved,
             order: Order::Oldest,
             limit: None,
+            max_grain: match op.group {
+                Some(Group::Time(unit)) => Some(Grain::for_group(unit)),
+                _ => None,
+            },
         };
         if let Some(Group::Link(name)) = &op.group {
             spec.ensure_link_name(name)?;

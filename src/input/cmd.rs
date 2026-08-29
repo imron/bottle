@@ -116,8 +116,8 @@ pub enum SchemaCmd {
 pub struct Log {
     /// Schema name
     pub schema: String,
-    /// Time of the event; omit to use now
-    #[arg(long, value_name = "TIME")]
+    /// Time of the event; omit to use now. A date is a day, YYYY-MM is a month
+    #[arg(long, value_name = "DATE|TIME")]
     pub at: Option<String>,
     /// Who wrote the entry
     #[arg(long, value_name = "NAME")]
@@ -196,8 +196,8 @@ pub struct Amend {
     /// Entry id
     #[arg(value_parser = parse_entry_id)]
     pub id: EntryId,
-    /// Time of the event
-    #[arg(long, value_name = "TIME")]
+    /// Time of the event. A date is a day, YYYY-MM is a month
+    #[arg(long, value_name = "DATE|TIME")]
     pub at: Option<String>,
     /// Set who wrote the entry
     #[arg(long, value_name = "NAME")]
