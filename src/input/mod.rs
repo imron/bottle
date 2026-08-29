@@ -1,5 +1,4 @@
 pub mod cmd;
-mod error;
 pub mod help;
 pub mod mcp;
 pub mod parse;

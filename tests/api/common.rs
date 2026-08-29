@@ -155,17 +155,15 @@ pub fn tsv_lines(s: &str) -> Vec<Vec<&str>> {
 pub fn assert_fail(err: Error, needle: &str) {
     assert_eq!(err.exit_code(), 1, "{err}");
     assert!(
-        err.message().contains(needle),
-        "expected {needle:?} in {}",
-        err.message()
+        err.to_string().contains(needle),
+        "expected {needle:?} in {err}"
     );
 }
 
 pub fn assert_usage(err: Error, needle: &str) {
     assert_eq!(err.exit_code(), 2, "{err}");
     assert!(
-        err.message().contains(needle),
-        "expected {needle:?} in {}",
-        err.message()
+        err.to_string().contains(needle),
+        "expected {needle:?} in {err}"
     );
 }
