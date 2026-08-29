@@ -49,7 +49,6 @@ impl Bottle {
 
 fn resolve_agent(explicit: Option<&str>, env: Option<&str>) -> Result<Agent, Error> {
     match explicit.or(env) {
-        Some(s) if s.trim_matches(' ').is_empty() => Ok(Agent::bottle()),
         Some(s) => Agent::parse(s),
         None => Ok(Agent::bottle()),
     }
@@ -91,11 +90,17 @@ mod tests {
             resolve_agent(None, Some("  bot  ")).unwrap().as_str(),
             "bot"
         );
-        assert_eq!(resolve_agent(None, Some("")).unwrap().as_str(), "bottle");
-        assert_eq!(resolve_agent(None, Some("   ")).unwrap().as_str(), "bottle");
-        assert_eq!(
-            resolve_agent(Some(""), Some("env")).unwrap().as_str(),
-            "bottle"
-        );
+        assert!(matches!(
+            resolve_agent(None, Some("")).unwrap_err(),
+            Error::Fail(Fail::EmptyAgent)
+        ));
+        assert!(matches!(
+            resolve_agent(None, Some("   ")).unwrap_err(),
+            Error::Fail(Fail::EmptyAgent)
+        ));
+        assert!(matches!(
+            resolve_agent(Some(""), Some("env")).unwrap_err(),
+            Error::Fail(Fail::EmptyAgent)
+        ));
     }
 }

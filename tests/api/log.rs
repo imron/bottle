@@ -255,6 +255,19 @@ fn agent_rejects_tab() {
 }
 
 #[test]
+fn empty_open_agent_is_rejected() {
+    let h = harness();
+    let db = h.dir.path().join("other.db");
+    for agent in ["", "   "] {
+        let err = match Bottle::open(&db, Some(agent.into()), Some(common::TZ)) {
+            Ok(_) => panic!("expected fail for {agent:?}"),
+            Err(e) => e,
+        };
+        assert_fail(err, "empty agent");
+    }
+}
+
+#[test]
 fn agent_trims_spaces() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
