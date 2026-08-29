@@ -302,13 +302,23 @@ fn dec_eq(left: Option<&str>, right: Option<&str>) -> Result<bool, Error> {
 
 fn ensure_user_version(conn: &Sqlite) -> Result<(), Error> {
     let v: i32 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
-    if v > USER_VERSION {
-        return Err(Error::Fail(Fail::UnsupportedStoreVersion(v)));
-    }
-    if v < USER_VERSION {
+    if version_needs_stamp(v, USER_VERSION)? {
         conn.pragma_update(None, "user_version", USER_VERSION)?;
     }
     Ok(())
+}
+
+/// Unversioned files (0) are stamped to `current`. A higher version is
+/// refused. A lower non-zero version is also refused: there is no migrate
+/// yet, and stamping would lie.
+fn version_needs_stamp(file: i32, current: i32) -> Result<bool, Error> {
+    if file == current {
+        return Ok(false);
+    }
+    if file == 0 {
+        return Ok(true);
+    }
+    Err(Error::Fail(Fail::UnsupportedStoreVersion(file)))
 }
 
 fn home_dir() -> Result<PathBuf, Error> {
@@ -365,6 +375,20 @@ mod tests {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
         assert_eq!(v, USER_VERSION);
+    }
+
+    #[test]
+    fn version_only_stamps_unversioned() {
+        assert!(!version_needs_stamp(1, 1).unwrap());
+        assert!(version_needs_stamp(0, 1).unwrap());
+        assert!(matches!(
+            version_needs_stamp(2, 1).unwrap_err(),
+            Error::Fail(Fail::UnsupportedStoreVersion(2))
+        ));
+        assert!(matches!(
+            version_needs_stamp(1, 2).unwrap_err(),
+            Error::Fail(Fail::UnsupportedStoreVersion(1))
+        ));
     }
 
     #[test]

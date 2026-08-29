@@ -56,7 +56,9 @@ PRAGMA user_version=1;
 ```
 
 `user_version` is 1: field catalog as rows. A file with a
-higher version is refused. Unversioned files are stamped 1.
+higher version is refused. Unversioned files (0) are stamped
+1. A lower non-zero version is refused until a migrate
+exists. Never stamp an old version current without migrating.
 
 WAL so readers do not block a writer. `busy_timeout` is
 5000 milliseconds: a second writer waits up to that long
