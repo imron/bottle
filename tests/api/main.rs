@@ -5,4 +5,6 @@ mod help;
 mod log;
 mod ls;
 mod schema;
+mod schema_field;
+mod schema_yaml;
 mod sum;
