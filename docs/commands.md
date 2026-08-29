@@ -160,9 +160,11 @@ id	at	links
 The offset is the host zone at that instant. For many
 entries in one transaction, `bottle log SCHEMA --file
 rows.tsv` (or `--file -` for stdin). TSV only. Header
-required. Schema is on the command. Missing `at` is now.
-Missing `agent` is `BOTTLE_AGENT`. All succeed or none
-do. Same as MCP `log` `entries`. See [mcp.md](mcp.md).
+required. Schema is on the command. `--at`, `--agent`,
+`--link`, and `field=value` default every row; a TSV cell
+wins. Missing `at` is now. Missing `agent` is
+`BOTTLE_AGENT`. All succeed or none do. Same as MCP `log`
+`entries`. See [mcp.md](mcp.md).
 
 ## ls
 

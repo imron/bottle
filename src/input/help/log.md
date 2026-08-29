@@ -22,12 +22,15 @@ optional named links to other entries.
 `--file` logs many entries in one transaction from a TSV
 file. `--file -` reads stdin. The schema is on the
 command. The first row is a header. Columns may be `at`,
-`agent`, `links`, and declared field names. Missing `at`
-is now. Missing `agent` is `BOTTLE_AGENT`. The `links`
+`agent`, `links`, and declared field names. The `links`
 cell is the same space-separated `name=schema/id` form as
-output. `--file` cannot be combined with `--at`,
-`--agent`, `--link`, or `field=value`. Header with no
-data rows is an error.
+output.
+
+`--at`, `--agent`, `--link`, and `field=value` on the
+command are defaults for every row. A non-empty TSV cell
+wins. Missing `at` (no cell and no `--at`) is now.
+Missing `agent` is `BOTTLE_AGENT`. Header with no data
+rows is an error.
 
 Use `amend` to correct an entry if needed.
 
@@ -77,7 +80,8 @@ schema, and must not be reserved (`id`, `at`, `agent`,
 `field=value` — values for declared fields.
 
 `--file PATH` — TSV of entries. `-` is stdin. Header
-required. All rows succeed or none do.
+required. All rows succeed or none do. Other log flags
+are defaults for blank cells.
 
 ## Output
 

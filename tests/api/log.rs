@@ -827,7 +827,7 @@ fn log_file_rolls_back_on_error() {
 }
 
 #[test]
-fn log_file_needs_header_and_rejects_mix() {
+fn log_file_needs_header() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
     let empty = h.dir.path().join("empty.tsv");
@@ -856,23 +856,45 @@ fn log_file_needs_header_and_rejects_mix() {
         }))
         .unwrap_err();
     assert_usage(err, "at least one entry");
-    let path = h.dir.path().join("meals.tsv");
-    std::fs::write(
-        &path,
-        "when\twhat\tkcal\tprotein\tcarbs\nbreakfast\teggs\t1\t1\t0\n",
-    )
-    .unwrap();
-    let err = h
-        .run(Cmd::Log(cmd::Log {
-            schema: "nutrition.meal".into(),
-            at: Some("2026-08-22T08:14:00Z".into()),
-            agent: None,
+}
+
+#[test]
+fn log_file_uses_command_defaults() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.session",
+        &[("title", "upper")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    let path = h.dir.path().join("sets.tsv");
+    std::fs::write(&path, "movement\treps\nsquat\t8\nbench\t5\n").unwrap();
+    let out = h.run_ok(Cmd::Log(cmd::Log {
+        schema: "fitness.set".into(),
+        at: Some("2026-08-22T08:01:00Z".into()),
+        agent: Some("coach".into()),
+        links: vec![("session".into(), "fitness.session/1".into())],
+        file: Some(path),
+        fields: vec![],
+    }));
+    let lines = tsv_lines(&out);
+    assert_eq!(lines.len(), 3);
+    assert!(lines[1][2].contains("session=fitness.session/1"), "{out}");
+    assert!(lines[2][2].contains("session=fitness.session/1"), "{out}");
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "fitness.set".into(),
+            agent: Some("coach".into()),
+            wheres: vec![],
             links: vec![],
-            file: Some(path),
-            fields: vec![],
-        }))
-        .unwrap_err();
-    assert_usage(err, "--file cannot be used");
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    assert_eq!(tsv_lines(&ls).len(), 3);
 }
 
 #[test]

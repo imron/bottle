@@ -189,18 +189,46 @@ pub fn schema_drop(name: String) -> Result<SchemaDrop, Error> {
 fn log_cmd(cmd: cmd::Log) -> Result<Vec<LogInput>, Error> {
     match cmd.file {
         None => Ok(vec![cmd.into()]),
-        Some(path) => {
-            if cmd.at.is_some()
-                || cmd.agent.is_some()
-                || !cmd.links.is_empty()
-                || !cmd.fields.is_empty()
-            {
-                return Err(Error::Usage(Usage::LogFileMixed));
+        Some(ref path) => {
+            let raw = read_text(path)?;
+            let mut rows = super::tsv::log_rows(&cmd.schema, &raw)?;
+            for row in &mut rows {
+                apply_log_defaults(row, &cmd);
             }
-            let raw = read_text(&path)?;
-            super::tsv::log_rows(&cmd.schema, &raw)
+            Ok(rows)
         }
     }
+}
+
+fn apply_log_defaults(row: &mut LogInput, cmd: &cmd::Log) {
+    if row.at.is_none() {
+        row.at.clone_from(&cmd.at);
+    }
+    if row.agent.is_none() {
+        row.agent.clone_from(&cmd.agent);
+    }
+    row.links = overlay_pairs(&cmd.links, &row.links);
+    let present: HashSet<String> = row.fields.iter().map(|(n, _)| n.clone()).collect();
+    for (name, value) in &cmd.fields {
+        if !present.contains(name) {
+            row.fields.push((name.clone(), value.clone()));
+        }
+    }
+}
+
+fn overlay_pairs(
+    defaults: &[(String, String)],
+    overlay: &[(String, String)],
+) -> Vec<(String, String)> {
+    let mut out = defaults.to_vec();
+    for (name, value) in overlay {
+        if let Some((_, existing)) = out.iter_mut().find(|(n, _)| n == name) {
+            *existing = value.clone();
+        } else {
+            out.push((name.clone(), value.clone()));
+        }
+    }
+    out
 }
 
 fn read_text(path: &Path) -> Result<String, Error> {

@@ -33,7 +33,6 @@ pub enum Usage {
     UnknownType(String),
     EmptyBackupPath,
     RenameSameField(FieldName),
-    LogFileMixed,
     LogFileNeedsHeader,
     TsvRowWidth,
     DuplicateHeader(String),
@@ -129,9 +128,6 @@ fn usage_message(err: &Usage) -> String {
         Usage::UnknownType(t) => format!("unknown type: {t}"),
         Usage::EmptyBackupPath => "backup requires a path".into(),
         Usage::RenameSameField(name) => format!("from and to are the same field: {name}"),
-        Usage::LogFileMixed => {
-            "log --file cannot be used with --at, --agent, --link, or fields".into()
-        }
         Usage::LogFileNeedsHeader => "log --file requires a header row".into(),
         Usage::TsvRowWidth => "log --file row has the wrong number of columns".into(),
         Usage::DuplicateHeader(name) => format!("duplicate column: {name}"),
