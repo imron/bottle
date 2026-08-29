@@ -1,6 +1,6 @@
 use bottle::{Cmd, cmd};
 
-use crate::common::{MEAL, SESSION, SET, assert_fail, eid, harness, tsv_lines};
+use crate::common::{MEAL, SESSION, SET, assert_fail, assert_usage, eid, harness, tsv_lines};
 
 #[test]
 fn list_empty() {
@@ -244,4 +244,152 @@ fn retire_unknown() {
         })))
         .unwrap_err();
     assert_fail(err, "unknown schema");
+}
+
+fn rename(from: &str, to: &str) -> Cmd {
+    Cmd::Schema(cmd::SchemaCmd::Rename(cmd::SchemaRename {
+        from: from.into(),
+        to: to.into(),
+    }))
+}
+
+#[test]
+fn rename_moves_entries_and_links() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.session",
+        &[("title", "a")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.log(
+        "fitness.set",
+        &[("movement", "squat"), ("reps", "8")],
+        &[("session", "fitness.session/1")],
+        Some("2026-08-22T08:01:00Z"),
+    );
+    assert!(
+        h.run_ok(rename("fitness.session", "fitness.workout"))
+            .is_empty()
+    );
+    let list = h.run_ok(Cmd::Schema(cmd::SchemaCmd::List));
+    assert!(list.contains("fitness.workout\tfalse"), "{list}");
+    assert!(!list.contains("fitness.session"), "{list}");
+    let session = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "fitness.workout".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    assert!(session.contains("a"), "{session}");
+    let set = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "fitness.set".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    assert!(set.contains("session=fitness.workout/1"), "{set}");
+    let err = h
+        .run(Cmd::Ls(cmd::Ls {
+            filters: cmd::Filters {
+                schema: "fitness.session".into(),
+                agent: None,
+                wheres: vec![],
+                links: vec![],
+            },
+            from: None,
+            to: None,
+            include_ignored: false,
+        }))
+        .unwrap_err();
+    assert_fail(err, "unknown schema");
+}
+
+#[test]
+fn rename_outbound_links() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.session",
+        &[("title", "a")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.log(
+        "fitness.set",
+        &[("movement", "squat"), ("reps", "8")],
+        &[("session", "fitness.session/1")],
+        Some("2026-08-22T08:01:00Z"),
+    );
+    h.run_ok(rename("fitness.set", "fitness.lift"));
+    let lift = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: "fitness.lift".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    assert!(lift.contains("session=fitness.session/1"), "{lift}");
+}
+
+#[test]
+fn rename_retired_follows() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.run_ok(Cmd::Schema(cmd::SchemaCmd::Retire(cmd::SchemaRetire {
+        name: "nutrition.meal".into(),
+    })));
+    h.run_ok(rename("nutrition.meal", "nutrition.food"));
+    let list = h.run_ok(Cmd::Schema(cmd::SchemaCmd::List));
+    assert!(list.contains("nutrition.food\ttrue"), "{list}");
+    assert!(!list.contains("nutrition.meal"), "{list}");
+}
+
+#[test]
+fn rename_exists_and_missing() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    h.add_schema("nutrition.food", MEAL);
+    let err = h
+        .run(rename("nutrition.meal", "nutrition.food"))
+        .unwrap_err();
+    assert_fail(err, "exists");
+    let err = h.run(rename("no.such", "nutrition.snack")).unwrap_err();
+    assert_fail(err, "unknown schema");
+}
+
+#[test]
+fn rename_same_is_usage() {
+    let mut h = harness();
+    let err = h
+        .run(rename("nutrition.meal", "nutrition.meal"))
+        .unwrap_err();
+    assert_usage(err, "same schema");
+    let err = h.run(rename("foo.bar", "foo_bar")).unwrap_err();
+    assert_usage(err, "same schema");
+}
+
+#[test]
+fn rename_illegal() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let err = h.run(rename("nutrition.meal", "Meal")).unwrap_err();
+    assert_fail(err, "invalid schema name");
 }

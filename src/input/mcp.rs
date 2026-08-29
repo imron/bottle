@@ -153,6 +153,13 @@ struct SchemaAddValueParams {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+struct SchemaRenameParams {
+    from: String,
+    to: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SchemaRenameFieldParams {
     schema: String,
     from: String,
@@ -302,6 +309,15 @@ impl Server {
     ) -> Result<CallToolResult, McpError> {
         let value = parse::schema_add_value(p.schema, p.field, p.value);
         Ok(self.run(value.map(Op::SchemaAddValue)))
+    }
+
+    #[tool(description = "Rename a schema")]
+    fn schema_rename(
+        &self,
+        Parameters(p): Parameters<SchemaRenameParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let schema = parse::schema_rename(p.from, p.to);
+        Ok(self.run(schema.map(Op::SchemaRename)))
     }
 
     #[tool(description = "Rename a field on an existing schema")]

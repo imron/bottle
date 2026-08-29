@@ -143,6 +143,7 @@ fn every_help_page_describes_args() {
         "add",
         "add-field",
         "add-value",
+        "rename",
         "rename-field",
         "retire",
         "drop",

@@ -6,8 +6,8 @@ use jiff::tz::TimeZone;
 use crate::error::{Error, Fail, Usage};
 use crate::ledger::{
     Agent, Amend, Backup, FieldInput, Get, Ignore, Last, List, Log, NonEmptyFieldValue, Op,
-    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRenameField, SchemaRetire,
-    SchemaShow, Scope, Sum, Today, Unignore,
+    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRename, SchemaRenameField,
+    SchemaRetire, SchemaShow, Scope, Sum, Today, Unignore,
 };
 use crate::spec::{
     EntryId, EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier,
@@ -33,6 +33,9 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
         )?),
         Cmd::Schema(cmd::SchemaCmd::AddValue(cmd)) => {
             Op::SchemaAddValue(schema_add_value(cmd.schema, cmd.field, cmd.value)?)
+        }
+        Cmd::Schema(cmd::SchemaCmd::Rename(cmd)) => {
+            Op::SchemaRename(schema_rename(cmd.from, cmd.to)?)
         }
         Cmd::Schema(cmd::SchemaCmd::RenameField(cmd)) => {
             Op::SchemaRenameField(schema_rename_field(cmd.schema, cmd.from, cmd.to)?)
@@ -155,6 +158,15 @@ pub fn schema_add_value(
         field: FieldName::parse(&field)?,
         value: EnumValue::parse(&value)?,
     })
+}
+
+pub fn schema_rename(from: String, to: String) -> Result<SchemaRename, Error> {
+    let from = SchemaName::parse(&from)?;
+    let to = SchemaName::parse(&to)?;
+    if from == to {
+        return Err(Error::Usage(Usage::RenameSameSchema(from)));
+    }
+    Ok(SchemaRename { from, to })
 }
 
 pub fn schema_rename_field(

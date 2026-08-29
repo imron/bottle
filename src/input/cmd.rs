@@ -65,6 +65,14 @@ pub struct SchemaAddValue {
 }
 
 #[derive(Debug, Clone, Args)]
+pub struct SchemaRename {
+    /// Current schema name
+    pub from: String,
+    /// New schema name
+    pub to: String,
+}
+
+#[derive(Debug, Clone, Args)]
 pub struct SchemaRenameField {
     /// Schema name
     pub schema: String,
@@ -103,6 +111,8 @@ pub enum SchemaCmd {
     /// Append one value to an enum field
     #[command(name = "add-value")]
     AddValue(SchemaAddValue),
+    /// Rename a schema
+    Rename(SchemaRename),
     /// Rename a field on an existing schema
     #[command(name = "rename-field")]
     RenameField(SchemaRenameField),

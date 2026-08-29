@@ -5,8 +5,8 @@ use crate::error::{Error, Fail};
 use crate::ledger::{
     Agent, Amend, Backup, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink,
     GroupedTime, Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome, Posted,
-    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRenameField, SchemaRetire,
-    SchemaShow, Schemas, Scope, Stamp, Sum, Summed, Today, Total, Unignore,
+    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRename, SchemaRenameField,
+    SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed, Today, Total, Unignore,
 };
 use crate::mutable_store;
 use crate::spec::{EntryId, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
@@ -32,6 +32,10 @@ pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outc
         }
         Op::SchemaAddValue(op) => {
             add_value(db, op)?;
+            Ok(Outcome::Empty)
+        }
+        Op::SchemaRename(op) => {
+            rename_schema(db, op)?;
             Ok(Outcome::Empty)
         }
         Op::SchemaRenameField(op) => {
@@ -108,6 +112,10 @@ fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
         }
         mutable_store::insert_enum_value(tx, &op.schema, &op.field, &op.value, values.len() as i64)
     })
+}
+
+fn rename_schema(db: &mut Db, op: SchemaRename) -> Result<(), Error> {
+    db.transaction(|tx| mutable_store::rename_schema(tx, &op.from, &op.to))
 }
 
 fn rename_field(db: &mut Db, op: SchemaRenameField) -> Result<(), Error> {

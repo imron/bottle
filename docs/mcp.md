@@ -8,7 +8,7 @@ not get a shell.
 stdio. The same binary can serve it (`bottle mcp`). Tools:
 
 `help`, `schema_list`, `schema_show`, `schema_add`,
-`schema_add_field`, `schema_add_value`,
+`schema_add_field`, `schema_add_value`, `schema_rename`,
 `schema_rename_field`, `schema_retire`, `schema_drop`,
 `log`, `ls`, `get`, `sum`, `last`, `today`, `amend`,
 `ignore`, `unignore`, `backup`

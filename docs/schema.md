@@ -39,7 +39,8 @@ CREATE TABLE schema_enum_values (
 ```
 
 `kind` is `text`, `number`, or `enum`. `schema add-field`,
-`schema add-value`, and `schema rename-field` change
+`schema add-value`, `schema rename`, and
+`schema rename-field` change
 catalog rows. `retired`
 blocks new `log`s. Existing entries stay readable. sqlite
 stores `retired` and `ignored` as `0`/`1`. TSV prints
@@ -206,6 +207,11 @@ link on that schema already uses the new field name.
 
 `schema add-value` appends one enum value. You may not
 remove one.
+
+`schema rename` renames a schema (`ALTER TABLE RENAME`)
+and rewrites catalog rows and `old/id` links. The retired
+flag follows. It fails if the new name exists or is
+illegal, or the old name is missing.
 
 `schema rename-field` renames one field (`ALTER TABLE
 RENAME COLUMN`) and updates the catalog. Values stay.

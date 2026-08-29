@@ -89,6 +89,42 @@ pub fn insert_field(
     Ok(())
 }
 
+pub fn rename_schema(tx: &mut Tx<'_>, from: &SchemaName, to: &SchemaName) -> Result<(), Error> {
+    let n = tx
+        .sqlite()
+        .execute(
+            "UPDATE schemas SET name = ?1 WHERE name = ?2",
+            params![to.as_str(), from.as_str()],
+        )
+        .unique(Fail::SchemaExists(to.clone()))?;
+    if n == 0 {
+        return Err(Error::Fail(Fail::UnknownSchema(from.clone())));
+    }
+    tx.sqlite().execute(
+        "UPDATE schema_fields SET schema = ?1 WHERE schema = ?2",
+        params![to.as_str(), from.as_str()],
+    )?;
+    tx.sqlite().execute(
+        "UPDATE schema_enum_values SET schema = ?1 WHERE schema = ?2",
+        params![to.as_str(), from.as_str()],
+    )?;
+    tx.sqlite().execute(
+        "UPDATE links SET from_schema = ?1 WHERE from_schema = ?2",
+        params![to.as_str(), from.as_str()],
+    )?;
+    tx.sqlite().execute(
+        "UPDATE links SET to_schema = ?1 WHERE to_schema = ?2",
+        params![to.as_str(), from.as_str()],
+    )?;
+    let alter = format!(
+        "ALTER TABLE {} RENAME TO {}",
+        quote_ident(&table_name(from)),
+        quote_ident(&table_name(to))
+    );
+    tx.sqlite().execute_batch(&alter)?;
+    Ok(())
+}
+
 pub fn rename_field(
     tx: &mut Tx<'_>,
     schema: &SchemaName,

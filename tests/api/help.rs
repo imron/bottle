@@ -131,6 +131,7 @@ fn all_topics() {
         "schema add",
         "schema add-field",
         "schema add-value",
+        "schema rename",
         "schema rename-field",
         "schema retire",
         "schema drop",
