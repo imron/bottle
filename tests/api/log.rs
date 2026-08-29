@@ -478,34 +478,33 @@ fn invalid_link_targets() {
 fn time_parse_variants() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
-    let err = h
-        .run(Cmd::Log(cmd::Log {
-            schema: "nutrition.meal".into(),
-            at: Some("2026-08-22 08:14:00".into()),
-            agent: None,
-            links: vec![],
-            file: None,
-            fields: meal_fields(),
-        }))
-        .unwrap_err();
-    assert_usage(err, "time must use T");
-    let err = h
-        .run(Cmd::Log(cmd::Log {
-            schema: "nutrition.meal".into(),
-            at: Some("2026-08-22T08:14:00+1000".into()),
-            agent: None,
-            links: vec![],
-            file: None,
-            fields: meal_fields(),
-        }))
-        .unwrap_err();
-    assert_usage(err, "colon");
+    for at in [
+        "2026-08-22 08:14:00",
+        "2026-08-22T08:14",
+        "2026-08-22T08:14:00+1000",
+        "2026-08-22T08:14+10",
+    ] {
+        let out = h.log(
+            "nutrition.meal",
+            &[
+                ("when", "breakfast"),
+                ("what", at),
+                ("kcal", "1"),
+                ("protein", "1"),
+                ("carbs", "0"),
+            ],
+            &[],
+            Some(at),
+        );
+        assert!(out.contains("2026-08-22T08:14:00+10:00"), "{at}: {out}");
+    }
     for at in [
         "nope",
         "2026-08-22Tnotime1",
         "2026-08-22T08:14:00.5Z",
         "2026-08-22T08:14:00x",
         "2026-08-22T08:14:00.0+10:00",
+        "2026-08-22T08:14:00z",
     ] {
         let err = h
             .run(Cmd::Log(cmd::Log {
@@ -519,18 +518,6 @@ fn time_parse_variants() {
             .unwrap_err();
         assert_usage(err, "invalid time");
     }
-    h.log(
-        "nutrition.meal",
-        &[
-            ("when", "breakfast"),
-            ("what", "local"),
-            ("kcal", "1"),
-            ("protein", "1"),
-            ("carbs", "0"),
-        ],
-        &[],
-        Some("2026-08-22T08:14:00"),
-    );
 }
 
 #[test]

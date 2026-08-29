@@ -1,9 +1,9 @@
 use std::fmt;
 
 use jiff::Timestamp;
-use jiff::civil::{Date, DateTime};
+use jiff::civil::{Date, Time};
 use jiff::fmt::strtime;
-use jiff::tz::TimeZone;
+use jiff::tz::{Offset, TimeZone};
 
 use crate::error::{Error, Fail, Usage};
 use crate::spec::TimePeriod;
@@ -298,64 +298,103 @@ enum Parsed {
 }
 
 fn parse(input: &str, tz: &TimeZone) -> Result<Parsed, Error> {
-    if input.contains(' ') {
-        return Err(Error::Usage(Usage::TimeMustUseT));
-    }
+    let invalid_time = || Error::Usage(Usage::InvalidTime(input.to_string()));
+    let invalid_date = || Error::Usage(Usage::InvalidDate(input.to_string()));
     if looks_like_date(input) {
-        let date: Date = input
-            .parse()
-            .map_err(|_| Error::Usage(Usage::InvalidDate(input.to_string())))?;
+        let date: Date = input.parse().map_err(|_| invalid_date())?;
         return Ok(Parsed::Date(date));
     }
     if looks_like_month(input) {
-        let year: i16 = input[..4]
-            .parse()
-            .map_err(|_| Error::Usage(Usage::InvalidDate(input.to_string())))?;
-        let month: i8 = input[5..]
-            .parse()
-            .map_err(|_| Error::Usage(Usage::InvalidDate(input.to_string())))?;
-        Date::new(year, month, 1)
-            .map_err(|_| Error::Usage(Usage::InvalidDate(input.to_string())))?;
+        let year: i16 = input[..4].parse().map_err(|_| invalid_date())?;
+        let month: i8 = input[5..].parse().map_err(|_| invalid_date())?;
+        Date::new(year, month, 1).map_err(|_| invalid_date())?;
         return Ok(Parsed::Month { year, month });
     }
-    let Some((date, rest)) = input.split_once('T') else {
-        return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
+    let Some((date, rest)) = split_date_time(input) else {
+        return Err(invalid_time());
     };
-    if !looks_like_date(date) || !looks_like_hms(rest.get(..8).unwrap_or("")) {
-        return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
+    if !looks_like_date(date) {
+        return Err(invalid_time());
     }
-    if rest.len() == 8 {
-        let dt: DateTime = strtime::parse("%Y-%m-%dT%H:%M:%S", input)
-            .and_then(|p| p.to_datetime())
-            .map_err(|_| Error::Usage(Usage::InvalidTime(input.to_string())))?;
-        let zoned = dt
-            .to_zoned(tz.clone())
-            .map_err(|e| Error::Usage(Usage::InvalidTime(e.to_string())))?;
-        return Ok(Parsed::Instant(zoned.timestamp()));
-    }
-    if rest.ends_with('Z') {
-        if rest.len() != 9 {
-            return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
+    let Some((hms, offset)) = split_time_offset(rest) else {
+        return Err(invalid_time());
+    };
+    let Some((hour, minute, second)) = parse_hms(hms) else {
+        return Err(invalid_time());
+    };
+    let date: Date = date.parse().map_err(|_| invalid_time())?;
+    let time = Time::new(hour, minute, second, 0).map_err(|_| invalid_time())?;
+    let dt = date.to_datetime(time);
+    let zone = match offset {
+        None => tz.clone(),
+        Some("Z") => TimeZone::UTC,
+        Some(raw) => {
+            let seconds = parse_offset_seconds(raw).ok_or_else(invalid_time)?;
+            TimeZone::fixed(Offset::from_seconds(seconds).map_err(|_| invalid_time())?)
         }
-        let ts: Timestamp = input
-            .parse()
-            .map_err(|_| Error::Usage(Usage::InvalidTime(input.to_string())))?;
-        return Ok(Parsed::Instant(ts));
-    }
-    let Some(sign_at) = rest.rfind(['+', '-']) else {
-        return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
     };
-    if sign_at != 8 {
-        return Err(Error::Usage(Usage::InvalidTime(input.to_string())));
-    }
-    let offset = &rest[sign_at..];
-    if offset.len() != 6 || offset.as_bytes().get(3) != Some(&b':') {
-        return Err(Error::Usage(Usage::OffsetNeedsColon));
-    }
-    let zoned = strtime::parse("%Y-%m-%dT%H:%M:%S%:z", input)
-        .and_then(|p| p.to_zoned())
-        .map_err(|_| Error::Usage(Usage::InvalidTime(input.to_string())))?;
+    let zoned = dt.to_zoned(zone).map_err(|_| invalid_time())?;
     Ok(Parsed::Instant(zoned.timestamp()))
+}
+
+fn split_date_time(input: &str) -> Option<(&str, &str)> {
+    input.split_once('T').or_else(|| input.split_once(' '))
+}
+
+fn split_time_offset(rest: &str) -> Option<(&str, Option<&str>)> {
+    if rest.ends_with('Z') {
+        return Some((rest.strip_suffix('Z')?, Some("Z")));
+    }
+    match rest.rfind(['+', '-']) {
+        None => Some((rest, None)),
+        Some(0) => None,
+        Some(i) => Some((&rest[..i], Some(&rest[i..]))),
+    }
+}
+
+fn parse_hms(s: &str) -> Option<(i8, i8, i8)> {
+    if s.len() == 5 && s.as_bytes()[2] == b':' && s.bytes().all(|b| b == b':' || b.is_ascii_digit())
+    {
+        let hour = s[..2].parse().ok()?;
+        let minute = s[3..].parse().ok()?;
+        return Some((hour, minute, 0));
+    }
+    if looks_like_hms(s) {
+        let hour = s[..2].parse().ok()?;
+        let minute = s[3..5].parse().ok()?;
+        let second = s[6..].parse().ok()?;
+        return Some((hour, minute, second));
+    }
+    None
+}
+
+fn parse_offset_seconds(s: &str) -> Option<i32> {
+    let sign: i32 = match s.as_bytes().first()? {
+        b'+' => 1,
+        b'-' => -1,
+        _ => return None,
+    };
+    let rest = &s[1..];
+    let (hour, minute): (i32, i32) = if rest.len() == 2 && rest.bytes().all(|b| b.is_ascii_digit())
+    {
+        (rest.parse().ok()?, 0)
+    } else if rest.len() == 4 && rest.bytes().all(|b| b.is_ascii_digit()) {
+        (rest[..2].parse().ok()?, rest[2..].parse().ok()?)
+    } else if rest.len() == 5
+        && rest.as_bytes()[2] == b':'
+        && rest.bytes().all(|b| b == b':' || b.is_ascii_digit())
+    {
+        (rest[..2].parse().ok()?, rest[3..].parse().ok()?)
+    } else {
+        return None;
+    };
+    if !(0..=59).contains(&minute) {
+        return None;
+    }
+    sign.checked_mul(
+        hour.checked_mul(3600)?
+            .checked_add(minute.checked_mul(60)?)?,
+    )
 }
 
 fn looks_like_date(s: &str) -> bool {
@@ -470,14 +509,39 @@ mod tests {
         assert_eq!(z, offset);
         assert_eq!(z, naive);
         assert_eq!(display_at(z, &tz).unwrap(), "2026-08-22T08:14:00+10:00");
+        for input in [
+            "2026-08-22T08:14:00+10:00",
+            "2026-08-22T08:14:00+1000",
+            "2026-08-22T08:14:00+10",
+            "2026-08-22T08:14+10:00",
+            "2026-08-22T08:14+1000",
+            "2026-08-22T08:14+10",
+            "2026-08-22 08:14:00+10:00",
+            "2026-08-22 08:14+10",
+            "2026-08-21T22:14:00Z",
+            "2026-08-21T22:14Z",
+            "2026-08-21 22:14:00Z",
+            "2026-08-22T08:14:00",
+            "2026-08-22T08:14",
+            "2026-08-22 08:14:00",
+            "2026-08-22 08:14",
+        ] {
+            assert_eq!(parse_at(input, &tz).unwrap(), z, "{input}");
+        }
     }
 
     #[test]
     fn negative_offset_is_an_instant() {
         let tz = melbourne();
-        let at = parse_at("2026-08-22T08:14:00-05:00", &tz).unwrap();
         let utc = parse_at("2026-08-22T13:14:00Z", &tz).unwrap();
-        assert_eq!(at, utc);
+        for input in [
+            "2026-08-22T08:14:00-05:00",
+            "2026-08-22T08:14:00-0500",
+            "2026-08-22T08:14:00-05",
+            "2026-08-22T08:14-05",
+        ] {
+            assert_eq!(parse_at(input, &tz).unwrap(), utc, "{input}");
+        }
     }
 
     #[test]
@@ -575,11 +639,15 @@ mod tests {
     fn rejects_bad_time_and_date_shapes() {
         let tz = melbourne();
         for input in [
-            "2026-08-22T08:14",
             "2026-08-22t08:14:00",
             "2026-08-22T08:14:00z",
             "2026-08-22T25:00:00",
             "2026-08-22T08:61:00",
+            "2026-08-22T08:14:00.5Z",
+            "2026-08-22T08",
+            "2026-08-22T08:14:00+10:0",
+            "2026-08-22T08:14:00+1",
+            "2026-08-22T08:14:00 +10:00",
         ] {
             let err = parse_at(input, &tz).unwrap_err();
             assert!(

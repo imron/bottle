@@ -38,15 +38,21 @@ the caller did not send `Z`.
 | Input | Meaning |
 |---|---|
 | omitted on `log` | now, an instant |
-| `2026-08-21T22:14:00Z` | instant, stored as-is |
-| `2026-08-22T08:14:00+10:00` | instant, converted to Z |
+| `2026-08-21T22:14:00Z` | instant, UTC |
+| `2026-08-22T08:14Z` | instant, UTC, seconds default to 00 |
+| `2026-08-22T08:14:00+10:00` | instant, offset |
+| `2026-08-22T08:14:00+1000` | instant, same offset |
+| `2026-08-22T08:14+10` | instant, same offset, seconds 00 |
+| `2026-08-22 08:14:00` | instant, space instead of `T` (quote on the CLI) |
 | `2026-08-22T08:14:00` | naive, host zone, then Z |
 | `2026-08-22` | a civil day in the host zone |
 | `2026-08` | a calendar month in the host zone |
 
-Anything else is rejected: missing seconds, a space instead
-of `T`, an offset without a colon, a year, an ISO week, or
-a quarter.
+`Z` is UTC. No offset is the host zone. Printed instants
+always have seconds and a colon offset.
+
+Anything else is rejected: a year, an ISO week, a quarter,
+fractional seconds, or a lowercase `t` / `z`.
 
 ## Ranges
 

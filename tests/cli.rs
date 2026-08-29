@@ -343,7 +343,7 @@ fn usage_does_not_create_db() {
     let out = bottle()
         .arg("--db")
         .arg(&db)
-        .args(["log", "meal", "--at", "2026-08-22T08:14", "kcal=1"])
+        .args(["log", "meal", "--at", "2026-08-22T08:14:00z", "kcal=1"])
         .output()
         .expect("run bottle");
     assert_eq!(out.status.code().expect("status code"), 2);

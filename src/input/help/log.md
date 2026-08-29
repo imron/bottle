@@ -51,13 +51,17 @@ Field rules:
 ## Options
 
 `--at DATE|TIME` — when the event happened. Shape chooses
-the grain. Omit it and bottle uses now (an instant).
-Seconds are required on a time. Use `T`, not a space. An
-offset must include a colon (`+10:00`). Year, ISO week,
-and quarter are not grains.
+the grain. Omit it and bottle uses now (an instant). Date
+and time may be split by `T` or a space (quote the value
+on the CLI). Seconds are optional (missing seconds are
+`:00`). Offset is `Z` (UTC), `+10:00`, `+1000`, or `+10`.
+No offset is the host zone. Year, ISO week, and quarter
+are not grains.
 
 - `2026-08-21T22:14:00Z` — instant, UTC
 - `2026-08-22T08:14:00+10:00` — instant, with offset
+- `2026-08-22T08:14` — instant, seconds default to 00
+- `2026-08-22 08:14:00` — instant, space instead of `T`
 - `2026-08-22T08:14:00` — instant, local time on this machine
 - `2026-08-22` — a civil day in the host zone
 - `2026-08` — a calendar month in the host zone
