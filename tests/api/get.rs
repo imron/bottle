@@ -16,6 +16,7 @@ fn get_includes_ignored() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -62,9 +63,25 @@ fn last_newest() {
         agent: None,
         wheres: vec![],
         links: vec![],
+        excludes: vec![],
     }));
     let lines = tsv_lines(&out);
     assert_eq!(lines[1][4], "rice");
+}
+
+#[test]
+fn last_exclude_skips_matching_newest() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let out = h.run_ok(Cmd::Last(cmd::Filters {
+        schema: "nutrition.meal".into(),
+        agent: None,
+        wheres: vec![],
+        links: vec![],
+        excludes: vec![("when".into(), "lunch".into())],
+    }));
+    let lines = tsv_lines(&out);
+    assert_eq!(lines[1][4], "eggs");
 }
 
 #[test]
@@ -77,6 +94,7 @@ fn last_empty() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         }))
         .unwrap_err();
     assert_fail(err, "not found");
@@ -96,6 +114,7 @@ fn ignore_hides_from_sum() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "protein".into(),
         from: None,
@@ -129,6 +148,7 @@ fn today_is_civil_day() {
         agent: None,
         wheres: vec![],
         links: vec![],
+        excludes: vec![],
     }));
     assert!(out.contains("now"));
 }
@@ -164,6 +184,7 @@ fn unignore_shows_in_ls_and_sum() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -176,6 +197,7 @@ fn unignore_shows_in_ls_and_sum() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "protein".into(),
         from: None,

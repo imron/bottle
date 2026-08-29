@@ -10,6 +10,7 @@ sum — total a number field
 bottle sum <schema> <field> [--from DATE|TIME] \
   [--to DATE|TIME] [--agent NAME] \
   [--where field=value]... \
+  [--exclude field=value]... \
   [--link name=SCHEMA/ID]... \
   [--group day|week|month|year|<link>]
 ```
@@ -35,6 +36,9 @@ on overlap.
 
 `--where field=value` — may repeat; all clauses are AND.
 The name must be a declared field.
+
+`--exclude field=value` — may repeat; a row drops if it
+matches any exclude. Same field rules as `--where`.
 
 `--link name=SCHEMA/ID` — may repeat; all clauses are AND.
 Entries that have that named pointer.

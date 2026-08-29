@@ -19,6 +19,7 @@ pub struct ScopeInput {
     pub schema: String,
     pub agent: Option<String>,
     pub wheres: Vec<(String, String)>,
+    pub excludes: Vec<(String, String)>,
     pub links: Vec<(String, String)>,
 }
 
@@ -28,6 +29,7 @@ impl From<cmd::Filters> for ScopeInput {
             schema: filters.schema,
             agent: filters.agent,
             wheres: filters.wheres,
+            excludes: filters.excludes,
             links: filters.links,
         }
     }

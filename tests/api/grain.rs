@@ -24,6 +24,7 @@ fn ls_whats(h: &mut crate::common::Harness, from: Option<&str>, to: Option<&str>
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: from.map(str::to_string),
         to: to.map(str::to_string),
@@ -101,6 +102,7 @@ fn today_is_civil_day_not_month() {
         agent: None,
         wheres: vec![],
         links: vec![],
+        excludes: vec![],
     }));
     assert!(out.contains("now"), "{out}");
     assert!(out.contains("day"), "{out}");
@@ -120,6 +122,7 @@ fn sum_group_day_skips_month() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "kcal".into(),
         from: None,
@@ -136,6 +139,7 @@ fn sum_group_day_skips_month() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "kcal".into(),
         from: None,
@@ -152,6 +156,7 @@ fn sum_group_day_skips_month() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "kcal".into(),
         from: Some("2026-08-22".into()),

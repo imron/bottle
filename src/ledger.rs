@@ -142,6 +142,7 @@ pub struct Find<'a> {
     pub agent: Option<&'a Agent>,
     pub include_ignored: bool,
     pub filters: &'a [Filter],
+    pub excludes: &'a [Filter],
     pub order: Order,
     pub limit: Option<usize>,
     /// None means every grain. `Some(g)` keeps instants through `g`.
@@ -223,6 +224,7 @@ pub struct Scope {
     pub schema: SchemaName,
     pub agent: Option<Agent>,
     pub fields: Vec<FieldInput>,
+    pub excludes: Vec<FieldInput>,
     pub links: Vec<Link>,
 }
 

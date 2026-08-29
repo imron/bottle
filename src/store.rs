@@ -391,23 +391,8 @@ fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) ->
     for filter in q.filters {
         match filter {
             Filter::Field { name, value } => {
-                bind.push(SqlVal::from_filter(value));
-                match value {
-                    NonEmptyFieldValue::Number(_) => {
-                        sql.push_str(&format!(
-                            " AND bottle_dec_eq({}, ?{})",
-                            quote_ident(name.as_str()),
-                            bind.len()
-                        ));
-                    }
-                    NonEmptyFieldValue::Text(_) | NonEmptyFieldValue::Enum(_) => {
-                        sql.push_str(&format!(
-                            " AND {} = ?{}",
-                            quote_ident(name.as_str()),
-                            bind.len()
-                        ));
-                    }
-                }
+                sql.push_str(" AND ");
+                push_field_eq(sql, bind, name, value);
             }
             Filter::Link { name, to } => {
                 bind.push(SqlVal::Text(q.schema.to_string()));
@@ -424,7 +409,54 @@ fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) ->
             }
         }
     }
+    if !q.excludes.is_empty() {
+        sql.push_str(" AND NOT (");
+        for (i, filter) in q.excludes.iter().enumerate() {
+            if i > 0 {
+                sql.push_str(" OR ");
+            }
+            match filter {
+                Filter::Field { name, value } => {
+                    sql.push('(');
+                    push_field_eq(sql, bind, name, value);
+                    // NULL = x is UNKNOWN; NOT UNKNOWN would drop empty
+                    // optional text/enum. Force those to false so they stay.
+                    if !matches!(value, NonEmptyFieldValue::Number(_)) {
+                        sql.push_str(&format!(" AND {} IS NOT NULL", quote_ident(name.as_str())));
+                    }
+                    sql.push(')');
+                }
+                Filter::Link { .. } => {
+                    return Err(Error::Fail(Fail::Store(
+                        "exclude is a field equality".into(),
+                    )));
+                }
+            }
+        }
+        sql.push(')');
+    }
     Ok(())
+}
+
+fn push_field_eq(
+    sql: &mut String,
+    bind: &mut Vec<SqlVal>,
+    name: &FieldName,
+    value: &NonEmptyFieldValue,
+) {
+    bind.push(SqlVal::from_filter(value));
+    match value {
+        NonEmptyFieldValue::Number(_) => {
+            sql.push_str(&format!(
+                "bottle_dec_eq({}, ?{})",
+                quote_ident(name.as_str()),
+                bind.len()
+            ));
+        }
+        NonEmptyFieldValue::Text(_) | NonEmptyFieldValue::Enum(_) => {
+            sql.push_str(&format!("{} = ?{}", quote_ident(name.as_str()), bind.len()));
+        }
+    }
 }
 
 fn entry_columns(spec: &Spec) -> String {

@@ -337,6 +337,7 @@ fn scope(input: ScopeInput) -> Result<Scope, Error> {
         schema: SchemaName::parse(&input.schema)?,
         agent: parse_agent(input.agent)?,
         fields: parse_wheres(input.wheres)?,
+        excludes: parse_excludes(input.excludes)?,
         links: parse_links(input.links)?,
     })
 }
@@ -427,16 +428,21 @@ fn parse_unlinks(names: Vec<String>) -> Result<Vec<LinkName>, Error> {
 }
 
 fn parse_fields(fields: Vec<(String, String)>) -> Result<Vec<FieldInput>, Error> {
-    named_fields(fields, false)
+    named_fields(fields, false, true)
 }
 
 fn parse_wheres(wheres: Vec<(String, String)>) -> Result<Vec<FieldInput>, Error> {
-    named_fields(wheres, true)
+    named_fields(wheres, true, true)
+}
+
+fn parse_excludes(excludes: Vec<(String, String)>) -> Result<Vec<FieldInput>, Error> {
+    named_fields(excludes, true, false)
 }
 
 fn named_fields(
     pairs: Vec<(String, String)>,
     reject_reserved: bool,
+    unique: bool,
 ) -> Result<Vec<FieldInput>, Error> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
@@ -447,7 +453,7 @@ fn named_fields(
             )?)));
         }
         let name = FieldName::parse(&name)?;
-        if !seen.insert(name.clone()) {
+        if unique && !seen.insert(name.clone()) {
             return Err(Error::Usage(Usage::DuplicateField(name)));
         }
         out.push(FieldInput { name, value });

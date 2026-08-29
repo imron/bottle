@@ -8,7 +8,8 @@ last — print the most recent entry of a schema
 
 ```
 bottle last <schema> [--agent NAME] \
-  [--where field=value]... [--link name=SCHEMA/ID]...
+  [--where field=value]... [--exclude field=value]... \
+  [--link name=SCHEMA/ID]...
 ```
 
 ## Description
@@ -25,6 +26,9 @@ the highest `id` wins. Ignored entries are omitted.
 
 `--where field=value` — may repeat; all clauses are AND.
 The name must be a declared field.
+
+`--exclude field=value` — may repeat; a row drops if it
+matches any exclude. Same field rules as `--where`.
 
 `--link name=SCHEMA/ID` — may repeat; all clauses are AND.
 Entries that have that named pointer.

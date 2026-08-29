@@ -34,6 +34,9 @@ not a TSV body.
 
 `help` takes an optional `command` (`log`, `schema add`).
 
+On `ls` / `sum` / `last` / `today`, `exclude` is a list of
+`{field, value}`. A row drops if it matches any.
+
 `log` takes `entries`, a list of objects. One entry is a
 one-element list. All entries share one schema and run in
 one transaction: all succeed or none do. Put `at`,

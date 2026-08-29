@@ -183,6 +183,7 @@ wins. Missing `at` is now. Missing `agent` is
 ```
 bottle ls <schema> [--from DATE|TIME] [--to DATE|TIME] \
   [--agent NAME] [--where field=value]... \
+  [--exclude field=value]... \
   [--link name=SCHEMA/ID]... [--include-ignored]
 ```
 
@@ -196,7 +197,10 @@ values folded lowercase; `text` exact). `--link` filters
 by a named pointer; the value is `schema/id`. `--where`
 on reserved names (`id`, `at`, `agent`, `ignored`, `grain`,
 `links`) is an error; use `--agent`, `get`, or
-`--from` / `--to`. Order: oldest `at`, then `id`.
+`--from` / `--to`. `--exclude field=value` may repeat; a
+row drops if it matches any exclude. Same field rules as
+`--where`. Still must match every `--where`. No `!=` in
+`--where`. Order: oldest `at`, then `id`.
 
 ## get
 
@@ -214,6 +218,7 @@ because ids are per table.
 bottle sum <schema> <field> [--from DATE|TIME] \
   [--to DATE|TIME] [--agent NAME] \
   [--where field=value]... \
+  [--exclude field=value]... \
   [--link name=SCHEMA/ID]... \
   [--group day|week|month|year|<link>]
 ```
@@ -239,7 +244,8 @@ lines).
 
 ```
 bottle last <schema> [--agent NAME] \
-  [--where field=value]... [--link name=SCHEMA/ID]...
+  [--where field=value]... [--exclude field=value]... \
+  [--link name=SCHEMA/ID]...
 ```
 
 Newest `at`, then highest `id`. Same columns as `ls`.
@@ -249,7 +255,8 @@ Exit 1 if none.
 
 ```
 bottle today <schema> [--agent NAME] \
-  [--where field=value]... [--link name=SCHEMA/ID]...
+  [--where field=value]... [--exclude field=value]... \
+  [--link name=SCHEMA/ID]...
 ```
 
 `ls` for the current host civil day: instants and day

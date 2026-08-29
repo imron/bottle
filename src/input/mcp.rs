@@ -46,17 +46,16 @@ impl<'de> Deserialize<'de> for FieldCell {
     }
 }
 
+fn cell_text(v: FieldCell) -> String {
+    match v {
+        FieldCell::String(s) => s,
+        FieldCell::Number(n) => n.to_string(),
+        FieldCell::Null => String::new(),
+    }
+}
+
 fn cells(map: HashMap<String, FieldCell>) -> Vec<(String, String)> {
-    map.into_iter()
-        .map(|(k, v)| {
-            let value = match v {
-                FieldCell::String(s) => s,
-                FieldCell::Number(n) => n.to_string(),
-                FieldCell::Null => String::new(),
-            };
-            (k, value)
-        })
-        .collect()
+    map.into_iter().map(|(k, v)| (k, cell_text(v))).collect()
 }
 
 #[derive(Clone)]
@@ -198,7 +197,16 @@ struct ScopeParams {
     #[serde(rename = "where", default)]
     wheres: HashMap<String, FieldCell>,
     #[serde(default)]
+    exclude: Vec<ExcludeParam>,
+    #[serde(default)]
     links: HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ExcludeParam {
+    field: String,
+    value: FieldCell,
 }
 
 impl ScopeParams {
@@ -207,6 +215,11 @@ impl ScopeParams {
             schema: self.schema,
             agent: self.agent,
             wheres: cells(self.wheres),
+            excludes: self
+                .exclude
+                .into_iter()
+                .map(|e| (e.field, cell_text(e.value)))
+                .collect(),
             links: pairs(self.links),
         }
     }

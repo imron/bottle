@@ -12,6 +12,7 @@ fn sum_and_group_day() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "protein".into(),
         from: None,
@@ -28,6 +29,7 @@ fn sum_and_group_day() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "protein".into(),
         from: Some("2020-01-01".into()),
@@ -44,6 +46,7 @@ fn sum_and_group_day() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "protein".into(),
         from: None,
@@ -63,6 +66,7 @@ fn sum_skips_empty_number() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "fat".into(),
         from: None,
@@ -79,6 +83,7 @@ fn sum_skips_empty_number() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "fat".into(),
         from: None,
@@ -120,6 +125,7 @@ fn sum_group_link_skips_empty_number() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "load".into(),
         from: None,
@@ -143,6 +149,7 @@ fn sum_rejects_text_field() {
                 agent: None,
                 wheres: vec![],
                 links: vec![],
+                excludes: vec![],
             },
             field: "what".into(),
             from: None,
@@ -164,6 +171,7 @@ fn sum_group_week_month_year() {
                 agent: None,
                 wheres: vec![],
                 links: vec![],
+                excludes: vec![],
             },
             field: "protein".into(),
             from: None,
@@ -186,6 +194,7 @@ fn sum_unknown_field() {
                 agent: None,
                 wheres: vec![],
                 links: vec![],
+                excludes: vec![],
             },
             field: "fiber".into(),
             from: None,
@@ -207,6 +216,7 @@ fn sum_group_collides_with_field() {
                 agent: None,
                 wheres: vec![],
                 links: vec![],
+                excludes: vec![],
             },
             field: "protein".into(),
             from: None,
@@ -215,4 +225,27 @@ fn sum_group_collides_with_field() {
         }))
         .unwrap_err();
     assert_fail(err, "collides with field");
+}
+
+#[test]
+fn sum_exclude_drops_matching_rows() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let total = h.run_ok(Cmd::Sum(cmd::Sum {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+            excludes: vec![("when".into(), "lunch".into())],
+        },
+        field: "protein".into(),
+        from: None,
+        to: None,
+        group: None,
+    }));
+    assert_eq!(
+        tsv_lines(&total),
+        vec![vec!["field", "value"], vec!["protein", "49"]]
+    );
 }

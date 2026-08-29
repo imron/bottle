@@ -9,6 +9,7 @@ ls — list entries of a schema
 ```
 bottle ls <schema> [--from DATE|TIME] [--to DATE|TIME] \
   [--agent NAME] [--where field=value]... \
+  [--exclude field=value]... \
   [--link name=SCHEMA/ID]... [--include-ignored]
 ```
 
@@ -46,7 +47,12 @@ The name must be a declared field (`enum` values folded
 lowercase, `text` exact and case-sensitive). The value
 may not be empty. `--where` on `id`, `at`, `agent`,
 `ignored`, `links`, or `grain` is an error; use `--agent`,
-`get`, or `--from` / `--to`.
+`get`, or `--from` / `--to`. There is no `!=`; use
+`--exclude`.
+
+`--exclude field=value` — may repeat; a row drops if it
+matches any exclude. Same field rules as `--where`. Still
+must match every `--where`.
 
 `--link name=SCHEMA/ID` — may repeat; all clauses are AND.
 Entries that have that named pointer. Same spelling as

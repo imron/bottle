@@ -153,6 +153,9 @@ pub struct Filters {
     /// Filter a declared field; repeat, all AND
     #[arg(long = "where", value_name = "field=value", value_parser = parse_kv)]
     pub wheres: Vec<(String, String)>,
+    /// Drop a row matching this field equality; repeat, any match drops
+    #[arg(long = "exclude", value_name = "field=value", value_parser = parse_kv)]
+    pub excludes: Vec<(String, String)>,
     /// Filter a named pointer; repeat, all AND
     #[arg(long = "link", value_name = "name=SCHEMA/ID", value_parser = parse_kv)]
     pub links: Vec<(String, String)>,

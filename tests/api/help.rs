@@ -107,6 +107,7 @@ fn execute_uses_the_open_timezone() {
                     agent: None,
                     wheres: vec![],
                     links: vec![],
+                    excludes: vec![],
                 },
                 from: None,
                 to: None,

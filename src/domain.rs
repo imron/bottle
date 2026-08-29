@@ -336,6 +336,7 @@ fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
     db.read(|conn| {
         let spec = store::load_schema(conn, &q.scope.schema)?.spec;
         let resolved = resolve_filters(&spec, &q.scope.fields, &q.scope.links)?;
+        let excludes = resolve_filters(&spec, &q.scope.excludes, &[])?;
         let entries = store::find(
             conn,
             Find {
@@ -345,6 +346,7 @@ fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
                 agent: q.scope.agent.as_ref(),
                 include_ignored: q.include_ignored,
                 filters: &resolved,
+                excludes: &excludes,
                 order: q.order,
                 limit: q.limit,
                 max_grain: q.max_grain,
@@ -368,6 +370,7 @@ fn sum(db: &mut Db, op: Sum) -> Result<Outcome, Error> {
             return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
         }
         let resolved = resolve_filters(&spec, &op.scope.fields, &op.scope.links)?;
+        let excludes = resolve_filters(&spec, &op.scope.excludes, &[])?;
         let q = Find {
             schema: &op.scope.schema,
             spec: &spec,
@@ -375,6 +378,7 @@ fn sum(db: &mut Db, op: Sum) -> Result<Outcome, Error> {
             agent: op.scope.agent.as_ref(),
             include_ignored: false,
             filters: &resolved,
+            excludes: &excludes,
             order: Order::Oldest,
             limit: None,
             max_grain: match op.group {

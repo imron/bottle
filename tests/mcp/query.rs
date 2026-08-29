@@ -124,6 +124,17 @@ async fn ls_filters() {
     .await;
     assert!(by_kcal.contains("eggs"), "{by_kcal}");
     assert!(!by_kcal.contains("rice"), "{by_kcal}");
+    let excluded = ok(
+        &client,
+        "ls",
+        rmcp::object!({
+            "schema": "nutrition.meal",
+            "exclude": [{ "field": "when", "value": "lunch" }]
+        }),
+    )
+    .await;
+    assert!(excluded.contains("eggs"), "{excluded}");
+    assert!(!excluded.contains("rice"), "{excluded}");
     let linked = ok(
         &client,
         "ls",

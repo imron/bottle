@@ -14,6 +14,7 @@ fn ls_columns_and_number_format() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -55,6 +56,7 @@ fn ls_keeps_logged_number_scale() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -68,6 +70,7 @@ fn ls_keeps_logged_number_scale() {
             agent: None,
             wheres: vec![("fat".into(), "39.6".into())],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -86,6 +89,7 @@ fn ls_from_instant() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: Some("2026-08-23T12:00:00Z".into()),
         to: None,
@@ -106,6 +110,7 @@ fn ls_instant_to_is_inclusive() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: Some("2026-08-22T08:14:00Z".into()),
@@ -126,6 +131,7 @@ fn ls_from_to_dates() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: Some("2026-08-22".into()),
         to: Some("2026-08-22".into()),
@@ -146,6 +152,7 @@ fn ls_where_enum_folds() {
             agent: None,
             wheres: vec![("when".into(), "LUNCH".into())],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -166,6 +173,7 @@ fn ls_where_text_is_exact() {
             agent: None,
             wheres: vec![("what".into(), "Eggs".into())],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -185,6 +193,7 @@ fn ls_where_agent_reserved() {
                 agent: None,
                 wheres: vec![("agent".into(), "test".into())],
                 links: vec![],
+                excludes: vec![],
             },
             from: None,
             to: None,
@@ -204,6 +213,7 @@ fn ls_filter_agent_flag() {
             agent: Some("other".into()),
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -216,6 +226,7 @@ fn ls_filter_agent_flag() {
             agent: Some("test".into()),
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -234,6 +245,7 @@ fn ls_include_ignored() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -254,6 +266,7 @@ fn ls_include_ignored() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -267,6 +280,7 @@ fn ls_include_ignored() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -310,6 +324,7 @@ fn links_where_and_group() {
             agent: None,
             wheres: vec![],
             links: vec![("session".into(), "fitness.session/1".into())],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -324,6 +339,7 @@ fn links_where_and_group() {
             agent: None,
             wheres: vec![],
             links: vec![],
+            excludes: vec![],
         },
         field: "reps".into(),
         from: None,
@@ -343,6 +359,7 @@ fn ls_where_number_skips_null() {
             agent: None,
             wheres: vec![("fat".into(), "39.6".into())],
             links: vec![],
+            excludes: vec![],
         },
         from: None,
         to: None,
@@ -364,6 +381,7 @@ fn invalid_date_bound() {
                 agent: None,
                 wheres: vec![],
                 links: vec![],
+                excludes: vec![],
             },
             from: Some("2026-13-01".into()),
             to: None,
@@ -384,6 +402,7 @@ fn where_invalid_ident() {
                 agent: None,
                 wheres: vec![("When".into(), "breakfast".into())],
                 links: vec![],
+                excludes: vec![],
             },
             from: None,
             to: None,
@@ -405,6 +424,7 @@ fn where_empty_value_is_usage() {
                     agent: None,
                     wheres: vec![(field.into(), String::new())],
                     links: vec![],
+                    excludes: vec![],
                 },
                 from: None,
                 to: None,
@@ -426,6 +446,7 @@ fn where_unknown_field() {
                 agent: None,
                 wheres: vec![("nope".into(), "x".into())],
                 links: vec![],
+                excludes: vec![],
             },
             from: None,
             to: None,
@@ -433,4 +454,117 @@ fn where_unknown_field() {
         }))
         .unwrap_err();
     assert_fail(err, "unknown field");
+}
+
+fn ls_filters(schema: &str, wheres: Vec<(String, String)>, excludes: Vec<(String, String)>) -> Cmd {
+    Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
+            schema: schema.into(),
+            agent: None,
+            wheres,
+            links: vec![],
+            excludes,
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    })
+}
+
+#[test]
+fn exclude_drops_matching_rows() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let out = h.run_ok(ls_filters(
+        "nutrition.meal",
+        vec![],
+        vec![("when".into(), "lunch".into())],
+    ));
+    let lines = tsv_lines(&out);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[1][4], "eggs");
+    let folded = h.run_ok(ls_filters(
+        "nutrition.meal",
+        vec![],
+        vec![("when".into(), "LUNCH".into())],
+    ));
+    assert_eq!(tsv_lines(&folded)[1][4], "eggs");
+}
+
+#[test]
+fn exclude_any_match_drops_the_row() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let out = h.run_ok(ls_filters(
+        "nutrition.meal",
+        vec![],
+        vec![
+            ("when".into(), "breakfast".into()),
+            ("when".into(), "lunch".into()),
+        ],
+    ));
+    assert_eq!(tsv_lines(&out).len(), 1);
+}
+
+#[test]
+fn exclude_still_requires_where() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let out = h.run_ok(ls_filters(
+        "nutrition.meal",
+        vec![("when".into(), "breakfast".into())],
+        vec![("what".into(), "eggs".into())],
+    ));
+    assert_eq!(tsv_lines(&out).len(), 1);
+}
+
+#[test]
+fn exclude_keeps_empty_optional_text() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.log(
+        "fitness.session",
+        &[("title", "upper")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.log("fitness.session", &[], &[], Some("2026-08-22T09:00:00Z"));
+    let out = h.run_ok(ls_filters(
+        "fitness.session",
+        vec![],
+        vec![("title".into(), "upper".into())],
+    ));
+    let lines = tsv_lines(&out);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[1][3], "");
+}
+
+#[test]
+fn exclude_same_rules_as_where() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(ls_filters(
+            "nutrition.meal",
+            vec![],
+            vec![("when".into(), String::new())],
+        ))
+        .unwrap_err();
+    assert_usage(err, "empty when");
+    let err = h
+        .run(ls_filters(
+            "nutrition.meal",
+            vec![],
+            vec![("nope".into(), "x".into())],
+        ))
+        .unwrap_err();
+    assert_fail(err, "unknown field");
+    let err = h
+        .run(ls_filters(
+            "nutrition.meal",
+            vec![],
+            vec![("agent".into(), "test".into())],
+        ))
+        .unwrap_err();
+    assert_usage(err, "reserved");
 }

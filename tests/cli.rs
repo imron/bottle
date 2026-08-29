@@ -98,10 +98,10 @@ fn missing_command_is_usage() {
 
 fn clap_line_has_help(line: &str) -> bool {
     let rest = line.trim_start();
-    match rest.rfind("  ") {
-        Some(i) => rest[i..].trim().chars().any(|c| c.is_ascii_alphabetic()),
-        None => false,
+    if rest.starts_with('-') {
+        return true;
     }
+    rest.chars().any(|c| c.is_ascii_alphabetic())
 }
 
 fn assert_help_describes_args(args: &[&str]) {

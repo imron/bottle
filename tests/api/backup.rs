@@ -22,6 +22,7 @@ fn backup_copies_entries() {
                 agent: None,
                 wheres: vec![],
                 links: vec![],
+                excludes: vec![],
             },
             from: None,
             to: None,

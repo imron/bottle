@@ -21,7 +21,9 @@ takes `path` on the machine running bottle. On `log` / `amend`,
 `agent` is who wrote the entry. On `ls` / `sum` / `last` /
 `today`, `agent` filters that column. A link target is
 the string `schema/id`. `links` is an object of name to
-target. `unlink` is a list of names.
+target. `unlink` is a list of names. `exclude` on `ls` /
+`sum` / `last` / `today` is a list of `{field, value}`; a
+row drops if it matches any.
 
 ## One entry or many
 
