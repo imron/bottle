@@ -77,15 +77,15 @@ impl From<Error> for rusqlite::Error {
     }
 }
 
-/// Read-only sqlite session. Borrowed from [`Db`] or [`Tx`].
-pub struct Conn<'a> {
-    inner: &'a Sqlite,
+/// Read capability. Implemented by [`Read`] and [`Tx`] so a write
+/// transaction can be passed to store reads. Writes still take [`Tx`].
+pub(crate) trait Conn {
+    fn sqlite(&self) -> &Sqlite;
 }
 
-impl Conn<'_> {
-    pub(crate) fn sqlite(&self) -> &Sqlite {
-        self.inner
-    }
+/// Deferred read transaction.
+pub struct Read<'a> {
+    inner: rusqlite::Transaction<'a>,
 }
 
 pub struct Db {
@@ -112,8 +112,15 @@ impl Db {
         Ok(Self { conn })
     }
 
-    pub fn conn(&self) -> Conn<'_> {
-        Conn { inner: &self.conn }
+    pub fn read<T>(&mut self, f: impl FnOnce(&Read<'_>) -> Result<T, Error>) -> Result<T, Error> {
+        let tx = Read::begin(&mut self.conn)?;
+        match f(&tx) {
+            Ok(value) => {
+                tx.commit()?;
+                Ok(value)
+            }
+            Err(err) => Err(err),
+        }
     }
 
     pub fn transaction<T>(
@@ -150,6 +157,25 @@ impl Db {
     }
 }
 
+impl<'a> Read<'a> {
+    fn begin(conn: &'a mut Sqlite) -> Result<Self, Error> {
+        Ok(Self {
+            inner: conn.transaction_with_behavior(TransactionBehavior::Deferred)?,
+        })
+    }
+
+    fn commit(self) -> Result<(), Error> {
+        self.inner.commit()?;
+        Ok(())
+    }
+}
+
+impl Conn for Read<'_> {
+    fn sqlite(&self) -> &Sqlite {
+        &self.inner
+    }
+}
+
 impl<'a> Tx<'a> {
     fn begin(conn: &'a mut Sqlite) -> Result<Self, Error> {
         Ok(Self {
@@ -157,17 +183,15 @@ impl<'a> Tx<'a> {
         })
     }
 
-    pub fn conn(&self) -> Conn<'_> {
-        Conn { inner: &self.inner }
-    }
-
-    pub(crate) fn sqlite(&self) -> &Sqlite {
-        &self.inner
-    }
-
     fn commit(self) -> Result<(), Error> {
         self.inner.commit()?;
         Ok(())
+    }
+}
+
+impl Conn for Tx<'_> {
+    fn sqlite(&self) -> &Sqlite {
+        &self.inner
     }
 }
 

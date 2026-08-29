@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use rusqlite::params;
 
-use crate::db::{Tx, UniqueConstraint};
+use crate::db::{Conn, Tx, UniqueConstraint};
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, FieldValue, NonEmptyFieldValue};
 use crate::spec::{

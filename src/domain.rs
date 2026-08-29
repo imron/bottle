@@ -16,9 +16,11 @@ use jiff::tz::TimeZone;
 
 pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outcome, Error> {
     match op {
-        Op::SchemaList => Ok(Outcome::Schemas(Schemas {
-            schemas: store::list_schemas(&db.conn())?,
-        })),
+        Op::SchemaList => db.read(|conn| {
+            Ok(Outcome::Schemas(Schemas {
+                schemas: store::list_schemas(conn)?,
+            }))
+        }),
         Op::SchemaShow(op) => show_schema(db, op),
         Op::SchemaAdd(op) => {
             add_schema(db, op)?;
@@ -53,10 +55,8 @@ pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outc
     }
 }
 
-fn show_schema(db: &Db, op: SchemaShow) -> Result<Outcome, Error> {
-    Ok(Outcome::Spec(
-        store::load_schema(&db.conn(), &op.name)?.spec,
-    ))
+fn show_schema(db: &mut Db, op: SchemaShow) -> Result<Outcome, Error> {
+    db.read(|conn| Ok(Outcome::Spec(store::load_schema(conn, &op.name)?.spec)))
 }
 
 fn add_schema(db: &mut Db, op: SchemaAdd) -> Result<(), Error> {
@@ -65,7 +65,7 @@ fn add_schema(db: &mut Db, op: SchemaAdd) -> Result<(), Error> {
 
 fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
     db.transaction(|tx| {
-        let loaded = store::load_schema(&tx.conn(), &op.schema)?;
+        let loaded = store::load_schema(tx, &op.schema)?;
         if loaded.retired {
             return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
         }
@@ -78,7 +78,7 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
             return Err(Error::Fail(Fail::FieldExists(field.name.clone())));
         }
         if let Ok(link_name) = LinkName::parse(field.name.as_str())
-            && store::has_outbound_link_name(&tx.conn(), &op.schema, &link_name)?
+            && store::has_outbound_link_name(tx, &op.schema, &link_name)?
         {
             return Err(Error::Fail(Fail::LinkNameCollidesWithField(link_name)));
         }
@@ -89,7 +89,7 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
 
 fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
     db.transaction(|tx| {
-        let loaded = store::load_schema(&tx.conn(), &op.schema)?;
+        let loaded = store::load_schema(tx, &op.schema)?;
         if loaded.retired {
             return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
         }
@@ -112,7 +112,7 @@ fn retire(db: &mut Db, op: SchemaRetire) -> Result<(), Error> {
 
 fn drop_schema(db: &mut Db, op: SchemaDrop) -> Result<(), Error> {
     db.transaction(|tx| {
-        if store::inbound_link_count(&tx.conn(), &op.name)? > 0 {
+        if store::inbound_link_count(tx, &op.name)? > 0 {
             return Err(Error::Fail(Fail::SchemaHasInboundLinks(op.name.clone())));
         }
         mutable_store::drop_schema(tx, &op.name)
@@ -136,13 +136,13 @@ fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Err
         Some(at) => at,
         None => Instant::now(),
     };
-    let loaded = store::load_schema(&tx.conn(), &op.schema)?;
+    let loaded = store::load_schema(tx, &op.schema)?;
     if loaded.retired {
         return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
     }
     let values = given_fields(&loaded.spec, &op.fields)?;
     ensure_required(&loaded.spec, &values)?;
-    ensure_links(&tx.conn(), &loaded.spec, &op.links)?;
+    ensure_links(tx, &loaded.spec, &op.links)?;
     op.links.sort_by(|a, b| a.name.cmp(&b.name));
     let id = mutable_store::insert_entry(
         tx,
@@ -162,15 +162,15 @@ fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Err
 
 fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
     db.transaction(|tx| {
-        let loaded = store::load_schema(&tx.conn(), &op.schema)?;
-        if store::get_entry(&tx.conn(), &op.schema, &loaded.spec, op.id)?.is_none() {
+        let loaded = store::load_schema(tx, &op.schema)?;
+        if store::get_entry(tx, &op.schema, &loaded.spec, op.id)?.is_none() {
             return Err(Error::Fail(Fail::EntryNotFound {
                 schema: op.schema.clone(),
                 id: op.id,
             }));
         }
         let values = given_fields(&loaded.spec, &op.fields)?;
-        ensure_links(&tx.conn(), &loaded.spec, &op.links)?;
+        ensure_links(tx, &loaded.spec, &op.links)?;
         mutable_store::update_entry(tx, &op.schema, op.id, op.at, op.agent.as_ref(), &values)?;
         for name in &op.unlinks {
             mutable_store::delete_link(tx, &op.schema, op.id, name)?;
@@ -179,13 +179,12 @@ fn amend(db: &mut Db, mut op: Amend) -> Result<Outcome, Error> {
         for link in &op.links {
             mutable_store::upsert_link(tx, &op.schema, op.id, link)?;
         }
-        let entry =
-            store::get_entry(&tx.conn(), &op.schema, &loaded.spec, op.id)?.ok_or_else(|| {
-                Error::Fail(Fail::EntryNotFound {
-                    schema: op.schema.clone(),
-                    id: op.id,
-                })
-            })?;
+        let entry = store::get_entry(tx, &op.schema, &loaded.spec, op.id)?.ok_or_else(|| {
+            Error::Fail(Fail::EntryNotFound {
+                schema: op.schema.clone(),
+                id: op.id,
+            })
+        })?;
         Ok(Outcome::Posted(vec![Posted {
             id: op.id,
             at: entry.at,
@@ -215,7 +214,7 @@ fn set_ignored(
     ignored: bool,
 ) -> Result<Outcome, Error> {
     db.transaction(|tx| {
-        let Some(at) = store::entry_at(&tx.conn(), &schema, id)? else {
+        let Some(at) = store::entry_at(tx, &schema, id)? else {
             return Err(Error::Fail(Fail::EntryNotFound {
                 schema: schema.clone(),
                 id,
@@ -226,23 +225,24 @@ fn set_ignored(
     })
 }
 
-fn get(db: &Db, op: Get) -> Result<Outcome, Error> {
-    let conn = db.conn();
-    let spec = store::load_schema(&conn, &op.schema)?.spec;
-    let Some(entry) = store::get_entry(&conn, &op.schema, &spec, op.id)? else {
-        return Err(Error::Fail(Fail::EntryNotFound {
-            schema: op.schema.clone(),
-            id: op.id,
-        }));
-    };
-    Ok(Outcome::Entries(Entries {
-        spec,
-        entries: vec![entry],
-        include_ignored: true,
-    }))
+fn get(db: &mut Db, op: Get) -> Result<Outcome, Error> {
+    db.read(|conn| {
+        let spec = store::load_schema(conn, &op.schema)?.spec;
+        let Some(entry) = store::get_entry(conn, &op.schema, &spec, op.id)? else {
+            return Err(Error::Fail(Fail::EntryNotFound {
+                schema: op.schema.clone(),
+                id: op.id,
+            }));
+        };
+        Ok(Outcome::Entries(Entries {
+            spec,
+            entries: vec![entry],
+            include_ignored: true,
+        }))
+    })
 }
 
-fn last(db: &Db, op: Last) -> Result<Outcome, Error> {
+fn last(db: &mut Db, op: Last) -> Result<Outcome, Error> {
     let outcome = find_entries(
         db,
         Query {
@@ -261,7 +261,7 @@ fn last(db: &Db, op: Last) -> Result<Outcome, Error> {
     }
 }
 
-fn today(db: &Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
+fn today(db: &mut Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
     find_entries(
         db,
         Query {
@@ -274,7 +274,7 @@ fn today(db: &Db, op: Today, tz: &TimeZone) -> Result<Outcome, Error> {
     )
 }
 
-fn list(db: &Db, op: List) -> Result<Outcome, Error> {
+fn list(db: &mut Db, op: List) -> Result<Outcome, Error> {
     find_entries(
         db,
         Query {
@@ -295,60 +295,62 @@ struct Query<'a> {
     limit: Option<usize>,
 }
 
-fn find_entries(db: &Db, q: Query<'_>) -> Result<Outcome, Error> {
-    let conn = db.conn();
-    let spec = store::load_schema(&conn, &q.scope.schema)?.spec;
-    let resolved = resolve_filters(&spec, &q.scope.fields, &q.scope.links)?;
-    let entries = store::find(
-        &conn,
-        Find {
-            schema: &q.scope.schema,
-            spec: &spec,
-            range: q.range,
-            agent: q.scope.agent.as_ref(),
+fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
+    db.read(|conn| {
+        let spec = store::load_schema(conn, &q.scope.schema)?.spec;
+        let resolved = resolve_filters(&spec, &q.scope.fields, &q.scope.links)?;
+        let entries = store::find(
+            conn,
+            Find {
+                schema: &q.scope.schema,
+                spec: &spec,
+                range: q.range,
+                agent: q.scope.agent.as_ref(),
+                include_ignored: q.include_ignored,
+                filters: &resolved,
+                order: q.order,
+                limit: q.limit,
+            },
+        )?;
+        Ok(Outcome::Entries(Entries {
+            spec,
+            entries,
             include_ignored: q.include_ignored,
-            filters: &resolved,
-            order: q.order,
-            limit: q.limit,
-        },
-    )?;
-    Ok(Outcome::Entries(Entries {
-        spec,
-        entries,
-        include_ignored: q.include_ignored,
-    }))
+        }))
+    })
 }
 
-fn sum(db: &Db, op: Sum) -> Result<Outcome, Error> {
-    let conn = db.conn();
-    let spec = store::load_schema(&conn, &op.scope.schema)?.spec;
-    let Some(f) = spec.field(&op.field) else {
-        return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
-    };
-    if !matches!(f.kind, FieldKind::Number) {
-        return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
-    }
-    let resolved = resolve_filters(&spec, &op.scope.fields, &op.scope.links)?;
-    let q = Find {
-        schema: &op.scope.schema,
-        spec: &spec,
-        range: op.range,
-        agent: op.scope.agent.as_ref(),
-        include_ignored: false,
-        filters: &resolved,
-        order: Order::Oldest,
-        limit: None,
-    };
-    if let Some(Group::Link(name)) = &op.group {
-        spec.ensure_link_name(name)?;
-    }
-    Ok(match store::sum(&conn, q, &op.field, op.group)? {
-        Summed::Total(value) => Outcome::Total(Total {
-            field: op.field,
-            value,
-        }),
-        Summed::Time { unit, buckets } => Outcome::GroupedTime(GroupedTime { unit, buckets }),
-        Summed::Link { name, buckets } => Outcome::GroupedLink(GroupedLink { name, buckets }),
+fn sum(db: &mut Db, op: Sum) -> Result<Outcome, Error> {
+    db.read(|conn| {
+        let spec = store::load_schema(conn, &op.scope.schema)?.spec;
+        let Some(f) = spec.field(&op.field) else {
+            return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
+        };
+        if !matches!(f.kind, FieldKind::Number) {
+            return Err(Error::Fail(Fail::FieldNotNumber(op.field.clone())));
+        }
+        let resolved = resolve_filters(&spec, &op.scope.fields, &op.scope.links)?;
+        let q = Find {
+            schema: &op.scope.schema,
+            spec: &spec,
+            range: op.range,
+            agent: op.scope.agent.as_ref(),
+            include_ignored: false,
+            filters: &resolved,
+            order: Order::Oldest,
+            limit: None,
+        };
+        if let Some(Group::Link(name)) = &op.group {
+            spec.ensure_link_name(name)?;
+        }
+        Ok(match store::sum(conn, q, &op.field, op.group)? {
+            Summed::Total(value) => Outcome::Total(Total {
+                field: op.field,
+                value,
+            }),
+            Summed::Time { unit, buckets } => Outcome::GroupedTime(GroupedTime { unit, buckets }),
+            Summed::Link { name, buckets } => Outcome::GroupedLink(GroupedLink { name, buckets }),
+        })
     })
 }
 
@@ -377,7 +379,7 @@ fn resolve_filters(
     Ok(out)
 }
 
-fn ensure_links(conn: &Conn<'_>, spec: &Spec, links: &[Link]) -> Result<(), Error> {
+fn ensure_links(conn: &impl Conn, spec: &Spec, links: &[Link]) -> Result<(), Error> {
     for link in links {
         spec.ensure_link_name(&link.name)?;
         if !store::entry_exists(conn, &link.to.schema, link.to.id)? {

@@ -28,18 +28,20 @@ input → domain → store
   Cmd, or TSV. It does not return rendered output. Domain owns
   transaction boundaries via `db.transaction(...)`. If a write's
   decision depends on a read, that read runs in the same Immediate
-  transaction as the write.
+  transaction as the write. Standalone reads run in `db.read(...)`,
+  a deferred snapshot.
 - **store** is sqlite. It takes domain objects and returns domain
   objects. sqlite TEXT/INTEGER stay inside store; convert to
   Instant, SchemaName, Link, and so on before returning. Store
   types never leak into domain. Input types never leak into domain.
-- **Db**, **Tx**, and **Conn** are bottle session types, not rusqlite.
-  **Conn** is a read-only borrow of the sqlite session. Reads take
-  `&Conn` and live in `store.rs`. Writes take `&mut Tx` only and live
-  in `mutable_store.rs`. `Db::conn` and `Tx::conn` produce a Conn.
-  A write that must read first calls store through `tx.conn()` in the
-  same Immediate transaction. It is an error for a mutating query to
-  live in `store.rs` or a read-only query to live in `mutable_store.rs`.
+- **Db**, **Read**, and **Tx** are bottle session types, not rusqlite.
+  **Read** is a deferred transaction. **Tx** is an Immediate write
+  transaction. Both implement **Conn**, the read capability. Reads take
+  `&impl Conn` and live in `store.rs`. Writes take `&mut Tx` only and
+  live in `mutable_store.rs`. A write that must read first passes the
+  Tx to store. A Read cannot be passed to a write. It is an error for
+  a mutating query to live in `store.rs` or a read-only query to live
+  in `mutable_store.rs`.
 
 ## Commits
 

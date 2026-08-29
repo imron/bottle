@@ -19,7 +19,7 @@ use crate::sql::{
 };
 use crate::time::{Instant, Period, ToBound};
 
-pub fn list_schemas(conn: &Conn<'_>) -> Result<Vec<SchemaInfo>, Error> {
+pub fn list_schemas(conn: &impl Conn) -> Result<Vec<SchemaInfo>, Error> {
     let mut stmt = conn
         .sqlite()
         .prepare("SELECT name, retired FROM schemas ORDER BY name")?;
@@ -40,7 +40,7 @@ pub fn list_schemas(conn: &Conn<'_>) -> Result<Vec<SchemaInfo>, Error> {
     Ok(out)
 }
 
-pub fn load_schema(conn: &Conn<'_>, name: &SchemaName) -> Result<Schema, Error> {
+pub fn load_schema(conn: &impl Conn, name: &SchemaName) -> Result<Schema, Error> {
     let retired: Option<i64> = conn
         .sqlite()
         .query_row(
@@ -58,7 +58,7 @@ pub fn load_schema(conn: &Conn<'_>, name: &SchemaName) -> Result<Schema, Error> 
     })
 }
 
-fn load_spec(conn: &Conn<'_>, schema: &SchemaName) -> Result<Spec, Error> {
+fn load_spec(conn: &impl Conn, schema: &SchemaName) -> Result<Spec, Error> {
     let rows = {
         let mut stmt = conn.sqlite().prepare(
             "SELECT name, kind, required FROM schema_fields WHERE schema = ?1 ORDER BY position",
@@ -86,7 +86,7 @@ fn load_spec(conn: &Conn<'_>, schema: &SchemaName) -> Result<Spec, Error> {
 }
 
 fn load_kind(
-    conn: &Conn<'_>,
+    conn: &impl Conn,
     schema: &SchemaName,
     name: &FieldName,
     kind: &str,
@@ -108,7 +108,7 @@ fn load_kind(
 }
 
 fn load_enum_values(
-    conn: &Conn<'_>,
+    conn: &impl Conn,
     schema: &SchemaName,
     field: &FieldName,
 ) -> Result<Vec<EnumValue>, Error> {
@@ -126,7 +126,7 @@ fn load_enum_values(
     Ok(values)
 }
 
-fn require_schema(conn: &Conn<'_>, name: &SchemaName) -> Result<(), Error> {
+fn require_schema(conn: &impl Conn, name: &SchemaName) -> Result<(), Error> {
     let found: Option<i64> = conn
         .sqlite()
         .query_row(
@@ -141,7 +141,7 @@ fn require_schema(conn: &Conn<'_>, name: &SchemaName) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn entry_exists(conn: &Conn<'_>, schema: &SchemaName, id: EntryId) -> Result<bool, Error> {
+pub fn entry_exists(conn: &impl Conn, schema: &SchemaName, id: EntryId) -> Result<bool, Error> {
     require_schema(conn, schema)?;
     let sql = format!(
         "SELECT 1 FROM {} WHERE id = ?1",
@@ -155,7 +155,7 @@ pub fn entry_exists(conn: &Conn<'_>, schema: &SchemaName, id: EntryId) -> Result
 }
 
 pub fn entry_at(
-    conn: &Conn<'_>,
+    conn: &impl Conn,
     schema: &SchemaName,
     id: EntryId,
 ) -> Result<Option<Instant>, Error> {
@@ -174,7 +174,7 @@ pub fn entry_at(
     }
 }
 
-pub fn inbound_link_count(conn: &Conn<'_>, name: &SchemaName) -> Result<i64, Error> {
+pub fn inbound_link_count(conn: &impl Conn, name: &SchemaName) -> Result<i64, Error> {
     let n: i64 = conn.sqlite().query_row(
         "SELECT COUNT(*) FROM links WHERE to_schema = ?1",
         [name.as_str()],
@@ -184,7 +184,7 @@ pub fn inbound_link_count(conn: &Conn<'_>, name: &SchemaName) -> Result<i64, Err
 }
 
 pub fn has_outbound_link_name(
-    conn: &Conn<'_>,
+    conn: &impl Conn,
     schema: &SchemaName,
     name: &LinkName,
 ) -> Result<bool, Error> {
@@ -200,7 +200,7 @@ pub fn has_outbound_link_name(
 }
 
 pub fn get_entry(
-    conn: &Conn<'_>,
+    conn: &impl Conn,
     schema: &SchemaName,
     spec: &Spec,
     id: EntryId,
@@ -222,7 +222,7 @@ pub fn get_entry(
     Ok(Some(entry))
 }
 
-pub fn find(conn: &Conn<'_>, q: Find<'_>) -> Result<Vec<Entry>, Error> {
+pub fn find(conn: &impl Conn, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     let mut sql = format!(
         "SELECT {} FROM {} WHERE 1=1",
         entry_columns(q.spec),
@@ -247,7 +247,7 @@ pub fn find(conn: &Conn<'_>, q: Find<'_>) -> Result<Vec<Entry>, Error> {
 }
 
 pub fn sum(
-    conn: &Conn<'_>,
+    conn: &impl Conn,
     q: Find<'_>,
     field: &FieldName,
     group: Option<Group>,
@@ -259,7 +259,7 @@ pub fn sum(
     }
 }
 
-fn total(conn: &Conn<'_>, q: Find<'_>, field: &FieldName) -> Result<Summed, Error> {
+fn total(conn: &impl Conn, q: Find<'_>, field: &FieldName) -> Result<Summed, Error> {
     let col = quote_ident(field.as_str());
     let mut sql = format!(
         "SELECT bottle_dec_sum({col}) FROM {} WHERE 1=1",
@@ -276,7 +276,7 @@ fn total(conn: &Conn<'_>, q: Find<'_>, field: &FieldName) -> Result<Summed, Erro
 }
 
 fn by_time(
-    conn: &Conn<'_>,
+    conn: &impl Conn,
     q: Find<'_>,
     field: &FieldName,
     unit: TimePeriod,
@@ -311,7 +311,7 @@ fn by_time(
 }
 
 fn by_link(
-    conn: &Conn<'_>,
+    conn: &impl Conn,
     q: Find<'_>,
     field: &FieldName,
     name: LinkName,
@@ -481,7 +481,7 @@ fn apply_find_order_limit(sql: &mut String, q: &Find<'_>) {
     }
 }
 
-fn links_for(conn: &Conn<'_>, schema: &SchemaName, id: EntryId) -> Result<Vec<Link>, Error> {
+fn links_for(conn: &impl Conn, schema: &SchemaName, id: EntryId) -> Result<Vec<Link>, Error> {
     let mut stmt = conn.sqlite().prepare(
         "SELECT from_id, name, to_schema, to_id FROM links
          WHERE from_schema = ?1 AND from_id = ?2
@@ -495,7 +495,7 @@ fn links_for(conn: &Conn<'_>, schema: &SchemaName, id: EntryId) -> Result<Vec<Li
     Ok(links)
 }
 
-fn attach_links(conn: &Conn<'_>, q: &Find<'_>, entries: &mut [Entry]) -> Result<(), Error> {
+fn attach_links(conn: &impl Conn, q: &Find<'_>, entries: &mut [Entry]) -> Result<(), Error> {
     if entries.is_empty() {
         return Ok(());
     }
