@@ -16,7 +16,7 @@ use crate::ledger::Op;
 use crate::{Bottle, Style, execute};
 use rmcp::service::ServerInitializeError;
 
-use super::{AmendInput, Cmd, ScopeInput, SpecSource, cmd, parse};
+use super::{AmendInput, LogInput, ScopeInput, SpecSource, parse};
 use jiff::tz::TimeZone;
 
 fn pairs(map: HashMap<String, String>) -> Vec<(String, String)> {
@@ -312,10 +312,10 @@ impl Server {
 
     #[tool(description = "Write one entry, or many in one transaction")]
     fn log(&self, Parameters(p): Parameters<LogParams>) -> Result<CallToolResult, McpError> {
-        let cmds = p
+        let entries = p
             .entries
             .into_iter()
-            .map(|entry| cmd::Log {
+            .map(|entry| LogInput {
                 schema: p.schema.clone(),
                 at: entry.at,
                 agent: entry.agent,
@@ -323,7 +323,7 @@ impl Server {
                 fields: cells(entry.fields),
             })
             .collect();
-        Ok(self.run(parse::parse(Cmd::Logs(cmds), &self.tz)))
+        Ok(self.run(parse::logs(entries, &self.tz)))
     }
 
     #[tool(description = "List entries of a schema")]

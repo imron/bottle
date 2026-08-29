@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use bottle::{Bottle, Cmd, Error, cmd};
+use bottle::{Bottle, Cmd, Error, LogInput, cmd};
 use tempfile::TempDir;
 
 pub const TZ: &str = "Australia/Melbourne";
@@ -29,7 +29,11 @@ impl Harness {
     }
 
     pub fn log_entries(&mut self, logs: Vec<cmd::Log>) -> Result<String, Error> {
-        self.run(Cmd::Logs(logs))
+        let request = bottle::logs(
+            logs.into_iter().map(LogInput::from).collect(),
+            self.bottle.tz(),
+        )?;
+        bottle::execute(&mut self.bottle, request, bottle::Style::Tsv)
     }
 
     pub fn yaml_file(&self, name: &str, body: &str) -> PathBuf {

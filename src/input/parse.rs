@@ -13,7 +13,7 @@ use crate::spec::{
 };
 use crate::time::{self, Range};
 
-use super::{AmendInput, Cmd, ScopeInput, SpecSource, cmd};
+use super::{AmendInput, Cmd, LogInput, ScopeInput, SpecSource, cmd};
 
 pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
     Ok(match cmd {
@@ -34,21 +34,7 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
         }
         Cmd::Schema(cmd::SchemaCmd::Retire(cmd)) => Op::SchemaRetire(schema_retire(cmd.name)?),
         Cmd::Schema(cmd::SchemaCmd::Drop(cmd)) => Op::SchemaDrop(schema_drop(cmd.name)?),
-        Cmd::Log(cmd) => Op::Log(vec![log(
-            cmd.schema, cmd.at, cmd.agent, cmd.links, cmd.fields, tz,
-        )?]),
-        Cmd::Logs(cmds) => {
-            if cmds.is_empty() {
-                return Err(Error::Usage(Usage::EmptyLog));
-            }
-            let mut ops = Vec::with_capacity(cmds.len());
-            for cmd in cmds {
-                ops.push(log(
-                    cmd.schema, cmd.at, cmd.agent, cmd.links, cmd.fields, tz,
-                )?);
-            }
-            Op::Log(ops)
-        }
+        Cmd::Log(cmd) => logs(vec![cmd.into()], tz)?,
         Cmd::Ls(cmd) => Op::List(ls(
             cmd.filters.into(),
             cmd.from,
@@ -176,23 +162,28 @@ pub fn schema_drop(name: String) -> Result<SchemaDrop, Error> {
     })
 }
 
-fn log(
-    schema: String,
-    at: Option<String>,
-    agent: Option<String>,
-    links: Vec<(String, String)>,
-    fields: Vec<(String, String)>,
-    tz: &TimeZone,
-) -> Result<Log, Error> {
+pub fn logs(entries: Vec<LogInput>, tz: &TimeZone) -> Result<Op, Error> {
+    if entries.is_empty() {
+        return Err(Error::Usage(Usage::EmptyLog));
+    }
+    let mut ops = Vec::with_capacity(entries.len());
+    for entry in entries {
+        ops.push(log(entry, tz)?);
+    }
+    Ok(Op::Log(ops))
+}
+
+fn log(entry: LogInput, tz: &TimeZone) -> Result<Log, Error> {
     Ok(Log {
-        schema: SchemaName::parse(&schema)?,
-        at: at
+        schema: SchemaName::parse(&entry.schema)?,
+        at: entry
+            .at
             .as_deref()
             .map(|s| time::parse_instant(s, tz))
             .transpose()?,
-        agent: parse_agent(agent)?,
-        links: parse_links(links)?,
-        fields: parse_fields(fields)?,
+        agent: parse_agent(entry.agent)?,
+        links: parse_links(entry.links)?,
+        fields: parse_fields(entry.fields)?,
     })
 }
 
