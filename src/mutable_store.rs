@@ -14,16 +14,16 @@ use crate::time::Instant;
 pub fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
     let cols = create_columns(spec);
     let sql = format!("CREATE TABLE {} ({cols})", quote_ident(&table_name(name)));
-    tx.as_ref()
+    tx.sqlite()
         .execute(
             "INSERT INTO schemas (name, retired) VALUES (?1, 0)",
             params![name.as_str()],
         )
         .unique(Fail::SchemaExists(name.clone()))?;
-    for field in &spec.fields {
-        insert_field(tx, name, field)?;
+    for (i, field) in spec.fields.iter().enumerate() {
+        insert_field(tx, name, field, i as i64)?;
     }
-    tx.as_ref().execute_batch(&sql)?;
+    tx.sqlite().execute_batch(&sql)?;
     Ok(())
 }
 
@@ -46,22 +46,22 @@ pub fn add_column(
             quote_ident(field.name.as_str())
         )
     };
-    tx.as_ref().execute_batch(&alter)?;
+    tx.sqlite().execute_batch(&alter)?;
     Ok(())
 }
 
-pub fn insert_field(tx: &mut Tx<'_>, schema: &SchemaName, field: &Field) -> Result<(), Error> {
-    let position: i64 = tx.as_ref().query_row(
-        "SELECT COALESCE(MAX(position), -1) + 1 FROM schema_fields WHERE schema = ?1",
-        [schema.as_str()],
-        |row| row.get(0),
-    )?;
+pub fn insert_field(
+    tx: &mut Tx<'_>,
+    schema: &SchemaName,
+    field: &Field,
+    position: i64,
+) -> Result<(), Error> {
     let kind = match &field.kind {
         FieldKind::Text => "text",
         FieldKind::Number => "number",
         FieldKind::Enum(_) => "enum",
     };
-    tx.as_ref().execute(
+    tx.sqlite().execute(
         "INSERT INTO schema_fields (schema, position, name, kind, required)
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![
@@ -74,7 +74,7 @@ pub fn insert_field(tx: &mut Tx<'_>, schema: &SchemaName, field: &Field) -> Resu
     )?;
     if let FieldKind::Enum(values) = &field.kind {
         for (i, value) in values.iter().enumerate() {
-            tx.as_ref().execute(
+            tx.sqlite().execute(
                 "INSERT INTO schema_enum_values (schema, field, position, value)
                  VALUES (?1, ?2, ?3, ?4)",
                 params![
@@ -94,14 +94,9 @@ pub fn insert_enum_value(
     schema: &SchemaName,
     field: &FieldName,
     value: &EnumValue,
+    position: i64,
 ) -> Result<(), Error> {
-    let position: i64 = tx.as_ref().query_row(
-        "SELECT COALESCE(MAX(position), -1) + 1 FROM schema_enum_values
-         WHERE schema = ?1 AND field = ?2",
-        params![schema.as_str(), field.as_str()],
-        |row| row.get(0),
-    )?;
-    tx.as_ref()
+    tx.sqlite()
         .execute(
             "INSERT INTO schema_enum_values (schema, field, position, value)
              VALUES (?1, ?2, ?3, ?4)",
@@ -112,7 +107,7 @@ pub fn insert_enum_value(
 }
 
 pub fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
-    let n = tx.as_ref().execute(
+    let n = tx.sqlite().execute(
         "UPDATE schemas SET retired = 1 WHERE name = ?1",
         [name.as_str()],
     )?;
@@ -123,23 +118,23 @@ pub fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
 }
 
 pub fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
-    tx.as_ref().execute(
+    tx.sqlite().execute(
         "DELETE FROM schema_enum_values WHERE schema = ?1",
         [name.as_str()],
     )?;
-    tx.as_ref().execute(
+    tx.sqlite().execute(
         "DELETE FROM schema_fields WHERE schema = ?1",
         [name.as_str()],
     )?;
     let n = tx
-        .as_ref()
+        .sqlite()
         .execute("DELETE FROM schemas WHERE name = ?1", [name.as_str()])?;
     if n == 0 {
         return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
     }
-    tx.as_ref()
+    tx.sqlite()
         .execute("DELETE FROM links WHERE from_schema = ?1", [name.as_str()])?;
-    tx.as_ref()
+    tx.sqlite()
         .execute_batch(&format!("DROP TABLE {}", quote_ident(&table_name(name))))?;
     Ok(())
 }
@@ -183,12 +178,12 @@ pub fn insert_entry(
         placeholders.join(", ")
     );
     {
-        let mut stmt = tx.as_ref().prepare(&sql)?;
+        let mut stmt = tx.sqlite().prepare(&sql)?;
         stmt.execute(rusqlite::params_from_iter(
             bind.iter().map(SqlVal::as_param),
         ))?;
     }
-    let id = EntryId::try_from(StoredEntryId(tx.as_ref().last_insert_rowid()))?;
+    let id = EntryId::try_from(StoredEntryId(tx.sqlite().last_insert_rowid()))?;
     insert_links(tx, schema, id, links)?;
     Ok(id)
 }
@@ -229,7 +224,7 @@ pub fn update_entry(
         sets.join(", "),
         bind.len()
     );
-    tx.as_ref().execute(
+    tx.sqlite().execute(
         &sql,
         rusqlite::params_from_iter(bind.iter().map(SqlVal::as_param)),
     )?;
@@ -242,7 +237,7 @@ pub fn delete_link(
     id: EntryId,
     name: &LinkName,
 ) -> Result<(), Error> {
-    tx.as_ref().execute(
+    tx.sqlite().execute(
         "DELETE FROM links WHERE from_schema = ?1 AND from_id = ?2 AND name = ?3",
         params![schema.as_str(), id.as_i64(), name.as_str()],
     )?;
@@ -255,7 +250,7 @@ pub fn upsert_link(
     id: EntryId,
     link: &Link,
 ) -> Result<(), Error> {
-    tx.as_ref().execute(
+    tx.sqlite().execute(
         "INSERT INTO links (from_schema, from_id, name, to_schema, to_id)
          VALUES (?1, ?2, ?3, ?4, ?5)
          ON CONFLICT (from_schema, from_id, name) DO UPDATE SET
@@ -278,7 +273,7 @@ pub fn set_ignored(
     id: EntryId,
     ignored: bool,
 ) -> Result<(), Error> {
-    tx.as_ref().execute(
+    tx.sqlite().execute(
         &format!(
             "UPDATE {} SET ignored = ?1 WHERE id = ?2",
             quote_ident(&table_name(schema))
@@ -295,7 +290,7 @@ fn insert_links(
     links: &[Link],
 ) -> Result<(), Error> {
     for link in links {
-        tx.as_ref().execute(
+        tx.sqlite().execute(
             "INSERT INTO links (from_schema, from_id, name, to_schema, to_id)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![

@@ -77,8 +77,16 @@ impl From<Error> for rusqlite::Error {
     }
 }
 
-/// Readable sqlite session. Implemented by [`Db`] and [`Tx`].
-pub trait Connection: AsRef<Sqlite> {}
+/// Read-only sqlite session. Borrowed from [`Db`] or [`Tx`].
+pub struct Conn<'a> {
+    inner: &'a Sqlite,
+}
+
+impl Conn<'_> {
+    pub(crate) fn sqlite(&self) -> &Sqlite {
+        self.inner
+    }
+}
 
 pub struct Db {
     conn: Sqlite,
@@ -104,6 +112,10 @@ impl Db {
         Ok(Self { conn })
     }
 
+    pub fn conn(&self) -> Conn<'_> {
+        Conn { inner: &self.conn }
+    }
+
     pub fn transaction<T>(
         &mut self,
         f: impl FnOnce(&mut Tx<'_>) -> Result<T, Error>,
@@ -118,25 +130,25 @@ impl Db {
         }
     }
 
-    pub fn read<T>(&mut self, f: impl FnOnce(&Tx<'_>) -> Result<T, Error>) -> Result<T, Error> {
-        let tx = Tx::begin_deferred(&mut self.conn)?;
-        match f(&tx) {
-            Ok(value) => {
-                tx.commit()?;
-                Ok(value)
-            }
-            Err(err) => Err(err),
+    pub fn backup(&self, dest: &Path) -> Result<(), Error> {
+        if dest.exists() {
+            return Err(Error::Fail(Fail::FileExists(dest.display().to_string())));
         }
+        if let Some(parent) = dest.parent()
+            && !parent.as_os_str().is_empty()
+            && !parent.exists()
+        {
+            return Err(Error::Fail(Fail::FileNotFound(
+                parent.display().to_string(),
+            )));
+        }
+        let dest = dest
+            .to_str()
+            .ok_or_else(|| Error::Fail(Fail::Io(format!("invalid path: {}", dest.display()))))?;
+        self.conn.execute("VACUUM INTO ?1", [dest])?;
+        Ok(())
     }
 }
-
-impl AsRef<Sqlite> for Db {
-    fn as_ref(&self) -> &Sqlite {
-        &self.conn
-    }
-}
-
-impl Connection for Db {}
 
 impl<'a> Tx<'a> {
     fn begin(conn: &'a mut Sqlite) -> Result<Self, Error> {
@@ -145,10 +157,12 @@ impl<'a> Tx<'a> {
         })
     }
 
-    fn begin_deferred(conn: &'a mut Sqlite) -> Result<Self, Error> {
-        Ok(Self {
-            inner: conn.transaction_with_behavior(TransactionBehavior::Deferred)?,
-        })
+    pub fn conn(&self) -> Conn<'_> {
+        Conn { inner: &self.inner }
+    }
+
+    pub(crate) fn sqlite(&self) -> &Sqlite {
+        &self.inner
     }
 
     fn commit(self) -> Result<(), Error> {
@@ -156,14 +170,6 @@ impl<'a> Tx<'a> {
         Ok(())
     }
 }
-
-impl AsRef<Sqlite> for Tx<'_> {
-    fn as_ref(&self) -> &Sqlite {
-        &self.inner
-    }
-}
-
-impl Connection for Tx<'_> {}
 
 pub fn default_db_path() -> Result<PathBuf, Error> {
     if let Some(path) = std::env::var_os("BOTTLE_DB") {

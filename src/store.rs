@@ -1,10 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
 
 use rusqlite::OptionalExtension;
 use rust_decimal::Decimal;
 
-use crate::db::Connection;
+use crate::db::Conn;
 use crate::error::{Error, Fail};
 use crate::ledger::{
     Agent, Entry, FieldValue, Filter, Find, NonEmptyFieldValue, Order, Schema, SchemaInfo, Summed,
@@ -20,28 +19,9 @@ use crate::sql::{
 };
 use crate::time::{Instant, Period, ToBound};
 
-pub fn backup(conn: &impl Connection, dest: &Path) -> Result<(), Error> {
-    if dest.exists() {
-        return Err(Error::Fail(Fail::FileExists(dest.display().to_string())));
-    }
-    if let Some(parent) = dest.parent()
-        && !parent.as_os_str().is_empty()
-        && !parent.exists()
-    {
-        return Err(Error::Fail(Fail::FileNotFound(
-            parent.display().to_string(),
-        )));
-    }
-    let dest = dest
-        .to_str()
-        .ok_or_else(|| Error::Fail(Fail::Io(format!("invalid path: {}", dest.display()))))?;
-    conn.as_ref().execute("VACUUM INTO ?1", [dest])?;
-    Ok(())
-}
-
-pub fn list_schemas(conn: &impl Connection) -> Result<Vec<SchemaInfo>, Error> {
+pub fn list_schemas(conn: &Conn<'_>) -> Result<Vec<SchemaInfo>, Error> {
     let mut stmt = conn
-        .as_ref()
+        .sqlite()
         .prepare("SELECT name, retired FROM schemas ORDER BY name")?;
     let rows = stmt.query_map([], |row| {
         let name: String = row.get(0)?;
@@ -60,9 +40,9 @@ pub fn list_schemas(conn: &impl Connection) -> Result<Vec<SchemaInfo>, Error> {
     Ok(out)
 }
 
-pub fn load_schema(conn: &impl Connection, name: &SchemaName) -> Result<Schema, Error> {
+pub fn load_schema(conn: &Conn<'_>, name: &SchemaName) -> Result<Schema, Error> {
     let retired: Option<i64> = conn
-        .as_ref()
+        .sqlite()
         .query_row(
             "SELECT retired FROM schemas WHERE name = ?1",
             [name.as_str()],
@@ -78,9 +58,9 @@ pub fn load_schema(conn: &impl Connection, name: &SchemaName) -> Result<Schema, 
     })
 }
 
-fn load_spec(conn: &impl Connection, schema: &SchemaName) -> Result<Spec, Error> {
+fn load_spec(conn: &Conn<'_>, schema: &SchemaName) -> Result<Spec, Error> {
     let rows = {
-        let mut stmt = conn.as_ref().prepare(
+        let mut stmt = conn.sqlite().prepare(
             "SELECT name, kind, required FROM schema_fields WHERE schema = ?1 ORDER BY position",
         )?;
         let mut raw = stmt.query([schema.as_str()])?;
@@ -106,7 +86,7 @@ fn load_spec(conn: &impl Connection, schema: &SchemaName) -> Result<Spec, Error>
 }
 
 fn load_kind(
-    conn: &impl Connection,
+    conn: &Conn<'_>,
     schema: &SchemaName,
     name: &FieldName,
     kind: &str,
@@ -128,11 +108,11 @@ fn load_kind(
 }
 
 fn load_enum_values(
-    conn: &impl Connection,
+    conn: &Conn<'_>,
     schema: &SchemaName,
     field: &FieldName,
 ) -> Result<Vec<EnumValue>, Error> {
-    let mut stmt = conn.as_ref().prepare(
+    let mut stmt = conn.sqlite().prepare(
         "SELECT value FROM schema_enum_values
          WHERE schema = ?1 AND field = ?2
          ORDER BY position",
@@ -146,9 +126,9 @@ fn load_enum_values(
     Ok(values)
 }
 
-fn require_schema(conn: &impl Connection, name: &SchemaName) -> Result<(), Error> {
+fn require_schema(conn: &Conn<'_>, name: &SchemaName) -> Result<(), Error> {
     let found: Option<i64> = conn
-        .as_ref()
+        .sqlite()
         .query_row(
             "SELECT 1 FROM schemas WHERE name = ?1",
             [name.as_str()],
@@ -161,25 +141,21 @@ fn require_schema(conn: &impl Connection, name: &SchemaName) -> Result<(), Error
     Ok(())
 }
 
-pub fn entry_exists(
-    conn: &impl Connection,
-    schema: &SchemaName,
-    id: EntryId,
-) -> Result<bool, Error> {
+pub fn entry_exists(conn: &Conn<'_>, schema: &SchemaName, id: EntryId) -> Result<bool, Error> {
     require_schema(conn, schema)?;
     let sql = format!(
         "SELECT 1 FROM {} WHERE id = ?1",
         quote_ident(&table_name(schema))
     );
     let found: Option<i64> = conn
-        .as_ref()
+        .sqlite()
         .query_row(&sql, [id.as_i64()], |row| row.get(0))
         .optional()?;
     Ok(found.is_some())
 }
 
 pub fn entry_at(
-    conn: &impl Connection,
+    conn: &Conn<'_>,
     schema: &SchemaName,
     id: EntryId,
 ) -> Result<Option<Instant>, Error> {
@@ -189,7 +165,7 @@ pub fn entry_at(
         quote_ident(&table_name(schema))
     );
     let raw: Option<String> = conn
-        .as_ref()
+        .sqlite()
         .query_row(&sql, [id.as_i64()], |row| row.get(0))
         .optional()?;
     match raw {
@@ -198,8 +174,8 @@ pub fn entry_at(
     }
 }
 
-pub fn inbound_link_count(conn: &impl Connection, name: &SchemaName) -> Result<i64, Error> {
-    let n: i64 = conn.as_ref().query_row(
+pub fn inbound_link_count(conn: &Conn<'_>, name: &SchemaName) -> Result<i64, Error> {
+    let n: i64 = conn.sqlite().query_row(
         "SELECT COUNT(*) FROM links WHERE to_schema = ?1",
         [name.as_str()],
         |row| row.get(0),
@@ -208,12 +184,12 @@ pub fn inbound_link_count(conn: &impl Connection, name: &SchemaName) -> Result<i
 }
 
 pub fn has_outbound_link_name(
-    conn: &impl Connection,
+    conn: &Conn<'_>,
     schema: &SchemaName,
     name: &LinkName,
 ) -> Result<bool, Error> {
     let found: Option<i64> = conn
-        .as_ref()
+        .sqlite()
         .query_row(
             "SELECT 1 FROM links WHERE from_schema = ?1 AND name = ?2 LIMIT 1",
             rusqlite::params![schema.as_str(), name.as_str()],
@@ -224,7 +200,7 @@ pub fn has_outbound_link_name(
 }
 
 pub fn get_entry(
-    conn: &impl Connection,
+    conn: &Conn<'_>,
     schema: &SchemaName,
     spec: &Spec,
     id: EntryId,
@@ -235,7 +211,7 @@ pub fn get_entry(
         quote_ident(&table_name(schema))
     );
     let mut entry = {
-        let mut stmt = conn.as_ref().prepare(&sql)?;
+        let mut stmt = conn.sqlite().prepare(&sql)?;
         let mut raw = stmt.query([id.as_i64()])?;
         match raw.next()? {
             Some(r) => read_entry(spec, r)?,
@@ -246,7 +222,7 @@ pub fn get_entry(
     Ok(Some(entry))
 }
 
-pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
+pub fn find(conn: &Conn<'_>, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     let mut sql = format!(
         "SELECT {} FROM {} WHERE 1=1",
         entry_columns(q.spec),
@@ -256,7 +232,7 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
     apply_find_filters(&mut sql, &mut bind, &q)?;
     apply_find_order_limit(&mut sql, &q);
     let mut entries = {
-        let mut stmt = conn.as_ref().prepare(&sql)?;
+        let mut stmt = conn.sqlite().prepare(&sql)?;
         let mut raw = stmt.query(rusqlite::params_from_iter(
             bind.iter().map(SqlVal::as_param),
         ))?;
@@ -271,7 +247,7 @@ pub fn find(conn: &impl Connection, q: Find<'_>) -> Result<Vec<Entry>, Error> {
 }
 
 pub fn sum(
-    conn: &impl Connection,
+    conn: &Conn<'_>,
     q: Find<'_>,
     field: &FieldName,
     group: Option<Group>,
@@ -283,7 +259,7 @@ pub fn sum(
     }
 }
 
-fn total(conn: &impl Connection, q: Find<'_>, field: &FieldName) -> Result<Summed, Error> {
+fn total(conn: &Conn<'_>, q: Find<'_>, field: &FieldName) -> Result<Summed, Error> {
     let col = quote_ident(field.as_str());
     let mut sql = format!(
         "SELECT bottle_dec_sum({col}) FROM {} WHERE 1=1",
@@ -291,7 +267,7 @@ fn total(conn: &impl Connection, q: Find<'_>, field: &FieldName) -> Result<Summe
     );
     let mut bind = Vec::new();
     apply_find_filters(&mut sql, &mut bind, &q)?;
-    let raw: String = conn.as_ref().query_row(
+    let raw: String = conn.sqlite().query_row(
         &sql,
         rusqlite::params_from_iter(bind.iter().map(SqlVal::as_param)),
         |row| row.get(0),
@@ -300,7 +276,7 @@ fn total(conn: &impl Connection, q: Find<'_>, field: &FieldName) -> Result<Summe
 }
 
 fn by_time(
-    conn: &impl Connection,
+    conn: &Conn<'_>,
     q: Find<'_>,
     field: &FieldName,
     unit: TimePeriod,
@@ -315,7 +291,7 @@ fn by_time(
     sql.push_str(&format!(
         " AND {col} IS NOT NULL AND {col} != '' GROUP BY 1"
     ));
-    let mut stmt = conn.as_ref().prepare(&sql)?;
+    let mut stmt = conn.sqlite().prepare(&sql)?;
     let mut raw = stmt.query(rusqlite::params_from_iter(
         bind.iter().map(SqlVal::as_param),
     ))?;
@@ -335,7 +311,7 @@ fn by_time(
 }
 
 fn by_link(
-    conn: &impl Connection,
+    conn: &Conn<'_>,
     q: Find<'_>,
     field: &FieldName,
     name: LinkName,
@@ -355,7 +331,7 @@ fn by_link(
          GROUP BY l.to_schema, l.to_id",
         a + 1
     );
-    let mut stmt = conn.as_ref().prepare(&sql)?;
+    let mut stmt = conn.sqlite().prepare(&sql)?;
     let mut raw = stmt.query(rusqlite::params_from_iter(
         bind.iter().map(SqlVal::as_param),
     ))?;
@@ -505,8 +481,8 @@ fn apply_find_order_limit(sql: &mut String, q: &Find<'_>) {
     }
 }
 
-fn links_for(conn: &impl Connection, schema: &SchemaName, id: EntryId) -> Result<Vec<Link>, Error> {
-    let mut stmt = conn.as_ref().prepare(
+fn links_for(conn: &Conn<'_>, schema: &SchemaName, id: EntryId) -> Result<Vec<Link>, Error> {
+    let mut stmt = conn.sqlite().prepare(
         "SELECT from_id, name, to_schema, to_id FROM links
          WHERE from_schema = ?1 AND from_id = ?2
          ORDER BY name",
@@ -519,7 +495,7 @@ fn links_for(conn: &impl Connection, schema: &SchemaName, id: EntryId) -> Result
     Ok(links)
 }
 
-fn attach_links(conn: &impl Connection, q: &Find<'_>, entries: &mut [Entry]) -> Result<(), Error> {
+fn attach_links(conn: &Conn<'_>, q: &Find<'_>, entries: &mut [Entry]) -> Result<(), Error> {
     if entries.is_empty() {
         return Ok(());
     }
@@ -540,7 +516,7 @@ fn attach_links(conn: &impl Connection, q: &Find<'_>, entries: &mut [Entry]) -> 
          WHERE l.from_schema = ?{schema_at}
          ORDER BY l.from_id, l.name"
     );
-    let mut stmt = conn.as_ref().prepare(&sql)?;
+    let mut stmt = conn.sqlite().prepare(&sql)?;
     let mut raw = stmt.query(rusqlite::params_from_iter(
         bind.iter().map(SqlVal::as_param),
     ))?;
