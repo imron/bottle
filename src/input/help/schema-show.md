@@ -17,7 +17,7 @@ Prints the field list for one schema: names, types,
 whether each is required, and enum values.
 
 Retired schemas still show. Links are not fields and are
-not in this output.
+not in this output. Pass them with `--link` on `log`.
 
 ## Options
 

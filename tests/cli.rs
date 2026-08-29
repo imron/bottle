@@ -96,6 +96,76 @@ fn missing_command_is_usage() {
     }
 }
 
+fn clap_line_has_help(line: &str) -> bool {
+    let rest = line.trim_start();
+    match rest.rfind("  ") {
+        Some(i) => rest[i..].trim().chars().any(|c| c.is_ascii_alphabetic()),
+        None => false,
+    }
+}
+
+fn assert_help_describes_args(args: &[&str]) {
+    let (code, stdout, stderr) = run(args);
+    assert_eq!(code, 0, "{args:?}: {stderr}");
+    let text = if stdout.contains("Usage:") {
+        stdout
+    } else {
+        stderr
+    };
+    let mut block = false;
+    for line in text.lines() {
+        if line == "Arguments:" || line == "Options:" {
+            block = true;
+            continue;
+        }
+        if block && (line.is_empty() || !line.starts_with(' ')) {
+            block = false;
+            continue;
+        }
+        if block {
+            assert!(
+                clap_line_has_help(line),
+                "{args:?}: missing help on {line:?}\n{text}"
+            );
+        }
+    }
+}
+
+#[test]
+fn every_help_page_describes_args() {
+    assert_help_describes_args(&["--help"]);
+    assert_help_describes_args(&["help", "--help"]);
+    assert_help_describes_args(&["mcp", "--help"]);
+    assert_help_describes_args(&["schema", "--help"]);
+    for sub in [
+        "list",
+        "show",
+        "add",
+        "add-field",
+        "add-value",
+        "rename-field",
+        "retire",
+        "drop",
+    ] {
+        assert_help_describes_args(&["schema", sub, "--help"]);
+    }
+    for cmd in [
+        "log", "ls", "get", "sum", "last", "today", "amend", "ignore", "unignore", "backup",
+    ] {
+        assert_help_describes_args(&[cmd, "--help"]);
+    }
+}
+
+#[test]
+fn list_is_an_alias_of_ls() {
+    let (code, stdout, _) = run(&["list", "--help"]);
+    assert_eq!(code, 0);
+    assert!(stdout.contains("List entries of a schema"), "{stdout}");
+    let (code, stdout, _) = run(&["schema", "ls", "--help"]);
+    assert_eq!(code, 0);
+    assert!(stdout.contains("List registered schemas"), "{stdout}");
+}
+
 #[test]
 fn schema_log_ls_through_argv() {
     let dir = TempDir::new().unwrap();

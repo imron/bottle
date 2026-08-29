@@ -18,62 +18,80 @@ fn parse_entry_id(s: &str) -> Result<EntryId, String> {
 
 #[derive(Debug, Clone, Args)]
 pub struct SchemaShow {
+    /// Schema name
     pub name: String,
+    /// Print the YAML field list
     #[arg(long)]
     pub yaml: bool,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct SchemaAdd {
+    /// Schema name
     pub name: String,
-    #[arg(long, required = true)]
+    /// Path to the YAML spec
+    #[arg(long, required = true, value_name = "PATH")]
     pub file: PathBuf,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct SchemaAddField {
+    /// Schema name
     pub schema: String,
+    /// Field name
     #[arg(long)]
     pub name: String,
+    /// Field type
     #[arg(long = "type")]
     pub type_: FieldType,
-    #[arg(long, value_delimiter = ',')]
+    /// Enum values, comma-separated
+    #[arg(long, value_delimiter = ',', value_name = "a,b")]
     pub values: Option<Vec<String>>,
-    #[arg(long)]
+    /// Backfill existing entries and make the field required
+    #[arg(long, value_name = "VALUE")]
     pub default: Option<String>,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct SchemaAddValue {
+    /// Schema name
     pub schema: String,
+    /// Enum field name
     #[arg(long)]
     pub field: String,
+    /// Value to append
     #[arg(long)]
     pub value: String,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct SchemaRenameField {
+    /// Schema name
     pub schema: String,
+    /// Current field name
     #[arg(long = "from")]
     pub from: String,
+    /// New field name
     #[arg(long = "to")]
     pub to: String,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct SchemaRetire {
+    /// Schema name
     pub name: String,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct SchemaDrop {
+    /// Schema name
     pub name: String,
 }
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum SchemaCmd {
     /// List registered schemas
+    #[command(visible_alias = "ls")]
     List,
     /// Print the field list of a schema
     Show(SchemaShow),
@@ -96,24 +114,33 @@ pub enum SchemaCmd {
 
 #[derive(Debug, Clone, Args)]
 pub struct Log {
+    /// Schema name
     pub schema: String,
-    #[arg(long)]
+    /// Time of the event; omit to use now
+    #[arg(long, value_name = "TIME")]
     pub at: Option<String>,
-    #[arg(long)]
+    /// Who wrote the entry
+    #[arg(long, value_name = "NAME")]
     pub agent: Option<String>,
+    /// Named pointer to another entry
     #[arg(long = "link", value_name = "name=SCHEMA/ID", value_parser = parse_kv)]
     pub links: Vec<(String, String)>,
-    #[arg(trailing_var_arg = true, value_parser = parse_kv)]
+    /// Declared fields as name=value
+    #[arg(trailing_var_arg = true, value_name = "name=value", value_parser = parse_kv)]
     pub fields: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct Filters {
+    /// Schema name
     pub schema: String,
-    #[arg(long)]
+    /// Only entries written by that agent
+    #[arg(long, value_name = "NAME")]
     pub agent: Option<String>,
+    /// Filter a declared field; repeat, all AND
     #[arg(long = "where", value_name = "field=value", value_parser = parse_kv)]
     pub wheres: Vec<(String, String)>,
+    /// Filter a named pointer; repeat, all AND
     #[arg(long = "link", value_name = "name=SCHEMA/ID", value_parser = parse_kv)]
     pub links: Vec<(String, String)>,
 }
@@ -122,17 +149,22 @@ pub struct Filters {
 pub struct Ls {
     #[command(flatten)]
     pub filters: Filters,
-    #[arg(long)]
+    /// Lower bound on at
+    #[arg(long, value_name = "DATE|TIME")]
     pub from: Option<String>,
-    #[arg(long)]
+    /// Upper bound on at
+    #[arg(long, value_name = "DATE|TIME")]
     pub to: Option<String>,
+    /// Include ignored entries and print the ignored column
     #[arg(long)]
     pub include_ignored: bool,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct Get {
+    /// Schema name
     pub schema: String,
+    /// Entry id
     #[arg(value_parser = parse_entry_id)]
     pub id: EntryId,
 }
@@ -141,48 +173,64 @@ pub struct Get {
 pub struct Sum {
     #[command(flatten)]
     pub filters: Filters,
+    /// Number field to total
     pub field: String,
-    #[arg(long)]
+    /// Lower bound on at
+    #[arg(long, value_name = "DATE|TIME")]
     pub from: Option<String>,
-    #[arg(long)]
+    /// Upper bound on at
+    #[arg(long, value_name = "DATE|TIME")]
     pub to: Option<String>,
-    #[arg(long)]
+    /// Bucket by day, week, month, year, or a link name
+    #[arg(long, value_name = "day|week|month|year|LINK")]
     pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct Amend {
+    /// Schema name
     pub schema: String,
+    /// Entry id
     #[arg(value_parser = parse_entry_id)]
     pub id: EntryId,
-    #[arg(long)]
+    /// Time of the event
+    #[arg(long, value_name = "TIME")]
     pub at: Option<String>,
-    #[arg(long)]
+    /// Set who wrote the entry
+    #[arg(long, value_name = "NAME")]
     pub agent: Option<String>,
+    /// Set or replace a named pointer
     #[arg(long = "link", value_name = "name=SCHEMA/ID", value_parser = parse_kv)]
     pub links: Vec<(String, String)>,
-    #[arg(long = "unlink")]
+    /// Remove a named pointer
+    #[arg(long = "unlink", value_name = "NAME")]
     pub unlinks: Vec<String>,
-    #[arg(trailing_var_arg = true, value_parser = parse_kv)]
+    /// Fields to change as name=value
+    #[arg(trailing_var_arg = true, value_name = "name=value", value_parser = parse_kv)]
     pub fields: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct Ignore {
+    /// Schema name
     pub schema: String,
+    /// Entry id
     #[arg(value_parser = parse_entry_id)]
     pub id: EntryId,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct Unignore {
+    /// Schema name
     pub schema: String,
+    /// Entry id
     #[arg(value_parser = parse_entry_id)]
     pub id: EntryId,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct Backup {
+    /// Destination sqlite file
     pub path: PathBuf,
 }
 
@@ -194,6 +242,7 @@ pub enum Cmd {
     /// Write one entry of a registered schema
     Log(Log),
     /// List entries of a schema
+    #[command(visible_alias = "list")]
     Ls(Ls),
     /// Print one entry by schema and id
     Get(Get),

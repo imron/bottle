@@ -48,8 +48,8 @@ Overview if no command. Schema verbs are
 bottle schema list
 ```
 
-TSV: `name`, `retired`. Alpha order. `retired` is `true`
-or `false`.
+`schema ls` is the same command. TSV: `name`, `retired`.
+Alpha order. `retired` is `true` or `false`.
 
 ## schema show
 
@@ -168,6 +168,8 @@ bottle ls <schema> [--from DATE|TIME] [--to DATE|TIME] \
   [--agent NAME] [--where field=value]... \
   [--link name=SCHEMA/ID]... [--include-ignored]
 ```
+
+`list` is the same command.
 
 Columns: `id`, `at`, `links`, schema fields in spec
 order, `agent`. `ignored` only with `--include-ignored`.

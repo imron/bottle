@@ -69,7 +69,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Print the long explanation of a command
-    Help { topic: Vec<String> },
+    Help {
+        /// Topic, for example log or schema add
+        topic: Vec<String>,
+    },
     /// Run bottle as an MCP server on stdio
     Mcp,
     #[command(flatten)]

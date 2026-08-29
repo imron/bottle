@@ -16,7 +16,7 @@ bottle ls <schema> [--from DATE|TIME] [--to DATE|TIME] \
 
 Lists entries of one schema, oldest first. You can filter
 by a time window, who wrote the entry, field equality, and
-link equality.
+link equality. `list` is the same command.
 
 Ignored entries are omitted unless `--include-ignored`.
 `get` can still fetch an ignored id.
