@@ -1,6 +1,6 @@
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, FieldValue, NonEmptyFieldValue};
-use crate::spec::{EntryId, EnumValue, LinkName, SchemaName, parse_number};
+use crate::spec::{EntryId, EnumValue, FieldName, LinkName, SchemaName, parse_number};
 use crate::time::Instant;
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
@@ -63,6 +63,7 @@ pub struct StoredEnum(pub String);
 pub struct StoredAgent(pub String);
 pub struct StoredText(pub String);
 pub struct StoredEntryId(pub i64);
+pub struct StoredFieldName(pub String);
 
 macro_rules! try_from_stored_name {
     ($stored:ident, $ty:ty, $fail:ident) => {
@@ -97,6 +98,7 @@ impl TryFrom<StoredTime> for Instant {
 try_from_stored_name!(StoredSchemaName, SchemaName, CorruptSchemaName);
 try_from_stored_name!(StoredLinkName, LinkName, CorruptLinkName);
 try_from_stored_name!(StoredLinkSchema, SchemaName, CorruptLinkSchema);
+try_from_stored_name!(StoredFieldName, FieldName, CorruptStoredFieldName);
 try_from_stored_name!(StoredEnum, EnumValue, CorruptStoredEnum);
 try_from_stored_name!(StoredAgent, Agent, CorruptStoredAgent);
 
@@ -206,6 +208,12 @@ mod tests {
         assert_eq!(
             EntryId::try_from(StoredEntryId(0)).unwrap_err().to_string(),
             "corrupt stored id: 0"
+        );
+        assert_eq!(
+            FieldName::try_from(StoredFieldName("Nope".into()))
+                .unwrap_err()
+                .to_string(),
+            "corrupt stored field name: Nope"
         );
     }
 

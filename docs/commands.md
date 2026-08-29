@@ -62,7 +62,7 @@ Default TSV, one line per field, spec order: `name`,
 `false`. `values` is comma-separated for `enum`, empty
 otherwise.
 Links are not fields; they are omitted. `--yaml` prints
-the stored spec, the same YAML `schema add --file`
+the field list as YAML, the same form `schema add --file`
 accepts. Exit 1 if missing. Retired schemas still show.
 
 ## schema add

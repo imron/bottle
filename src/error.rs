@@ -77,6 +77,8 @@ pub enum Fail {
     CorruptStoredAgent(String),
     CorruptStoredText(String),
     CorruptStoredId(i64),
+    CorruptStoredFieldName(String),
+    CorruptStoredFieldKind(String),
     UnsupportedStoreVersion(i32),
     HomeNotSet,
     FileNotFound(String),
@@ -174,6 +176,8 @@ fn fail_message(err: &Fail) -> String {
         Fail::CorruptStoredAgent(raw) => format!("corrupt stored agent: {raw}"),
         Fail::CorruptStoredText(raw) => format!("corrupt stored text: {raw}"),
         Fail::CorruptStoredId(id) => format!("corrupt stored id: {id}"),
+        Fail::CorruptStoredFieldName(name) => format!("corrupt stored field name: {name}"),
+        Fail::CorruptStoredFieldKind(kind) => format!("corrupt stored field kind: {kind}"),
         Fail::UnsupportedStoreVersion(v) => format!("unsupported store version: {v}"),
         Fail::HomeNotSet => "HOME is not set".into(),
     }

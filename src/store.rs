@@ -14,8 +14,9 @@ use crate::spec::{
     Spec, TimePeriod,
 };
 use crate::sql::{
-    SqlVal, StoredAgent, StoredEntryId, StoredEnum, StoredLinkName, StoredLinkSchema, StoredNumber,
-    StoredSchemaName, StoredText, StoredTime, instant_to_sql, quote_ident, table_name,
+    SqlVal, StoredAgent, StoredEntryId, StoredEnum, StoredFieldName, StoredLinkName,
+    StoredLinkSchema, StoredNumber, StoredSchemaName, StoredText, StoredTime, instant_to_sql,
+    quote_ident, table_name,
 };
 use crate::time::{Instant, Period, ToBound};
 
@@ -60,25 +61,89 @@ pub fn list_schemas(conn: &impl Connection) -> Result<Vec<SchemaInfo>, Error> {
 }
 
 pub fn load_schema(conn: &impl Connection, name: &SchemaName) -> Result<Schema, Error> {
-    let row = conn
+    let retired: Option<i64> = conn
         .as_ref()
         .query_row(
-            "SELECT spec, retired FROM schemas WHERE name = ?1",
+            "SELECT retired FROM schemas WHERE name = ?1",
             [name.as_str()],
-            |row| {
-                let spec: String = row.get(0)?;
-                let retired: i64 = row.get(1)?;
-                Ok((spec, retired))
-            },
+            |row| row.get(0),
         )
         .optional()?;
-    let Some((spec, retired)) = row else {
+    let Some(retired) = retired else {
         return Err(Error::Fail(Fail::UnknownSchema(name.clone())));
     };
     Ok(Schema {
-        spec: Spec::parse_yaml(&spec)?,
+        spec: load_spec(conn, name)?,
         retired: retired != 0,
     })
+}
+
+fn load_spec(conn: &impl Connection, schema: &SchemaName) -> Result<Spec, Error> {
+    let rows = {
+        let mut stmt = conn.as_ref().prepare(
+            "SELECT name, kind, required FROM schema_fields WHERE schema = ?1 ORDER BY position",
+        )?;
+        let mut raw = stmt.query([schema.as_str()])?;
+        let mut rows = Vec::new();
+        while let Some(r) = raw.next()? {
+            let name: String = r.get(0)?;
+            let kind: String = r.get(1)?;
+            let required: i64 = r.get(2)?;
+            rows.push((name, kind, required));
+        }
+        rows
+    };
+    let mut fields = Vec::new();
+    for (name, kind, required) in rows {
+        let name = FieldName::try_from(StoredFieldName(name))?;
+        fields.push(Field {
+            kind: load_kind(conn, schema, &name, &kind)?,
+            name,
+            required: required != 0,
+        });
+    }
+    Ok(Spec { fields })
+}
+
+fn load_kind(
+    conn: &impl Connection,
+    schema: &SchemaName,
+    name: &FieldName,
+    kind: &str,
+) -> Result<FieldKind, Error> {
+    match kind {
+        "text" => Ok(FieldKind::Text),
+        "number" => Ok(FieldKind::Number),
+        "enum" => {
+            let values = load_enum_values(conn, schema, name)?;
+            if values.is_empty() {
+                return Err(Error::Fail(Fail::CorruptStoredFieldKind(
+                    name.as_str().to_string(),
+                )));
+            }
+            Ok(FieldKind::Enum(values))
+        }
+        other => Err(Error::Fail(Fail::CorruptStoredFieldKind(other.to_string()))),
+    }
+}
+
+fn load_enum_values(
+    conn: &impl Connection,
+    schema: &SchemaName,
+    field: &FieldName,
+) -> Result<Vec<EnumValue>, Error> {
+    let mut stmt = conn.as_ref().prepare(
+        "SELECT value FROM schema_enum_values
+         WHERE schema = ?1 AND field = ?2
+         ORDER BY position",
+    )?;
+    let mut raw = stmt.query(rusqlite::params![schema.as_str(), field.as_str()])?;
+    let mut values = Vec::new();
+    while let Some(r) = raw.next()? {
+        let value: String = r.get(0)?;
+        values.push(EnumValue::try_from(StoredEnum(value))?);
+    }
+    Ok(values)
 }
 
 fn require_schema(conn: &impl Connection, name: &SchemaName) -> Result<(), Error> {

@@ -5,20 +5,24 @@ use rusqlite::params;
 use crate::db::{Tx, UniqueConstraint};
 use crate::error::{Error, Fail};
 use crate::ledger::{Agent, FieldValue, NonEmptyFieldValue};
-use crate::spec::{EntryId, Field, FieldName, Link, LinkName, SchemaName, Spec};
+use crate::spec::{
+    EntryId, EnumValue, Field, FieldKind, FieldName, Link, LinkName, SchemaName, Spec,
+};
 use crate::sql::{SqlVal, StoredEntryId, instant_to_sql, quote_ident, sql_default, table_name};
 use crate::time::Instant;
 
 pub fn insert_schema(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
-    let yaml = spec.to_yaml()?;
     let cols = create_columns(spec);
     let sql = format!("CREATE TABLE {} ({cols})", quote_ident(&table_name(name)));
     tx.as_ref()
         .execute(
-            "INSERT INTO schemas (name, spec, retired) VALUES (?1, ?2, 0)",
-            params![name.as_str(), yaml],
+            "INSERT INTO schemas (name, retired) VALUES (?1, 0)",
+            params![name.as_str()],
         )
         .unique(Fail::SchemaExists(name.clone()))?;
+    for field in &spec.fields {
+        insert_field(tx, name, field)?;
+    }
     tx.as_ref().execute_batch(&sql)?;
     Ok(())
 }
@@ -46,12 +50,64 @@ pub fn add_column(
     Ok(())
 }
 
-pub fn save_spec(tx: &mut Tx<'_>, name: &SchemaName, spec: &Spec) -> Result<(), Error> {
-    let yaml = spec.to_yaml()?;
-    tx.as_ref().execute(
-        "UPDATE schemas SET spec = ?1 WHERE name = ?2",
-        params![yaml, name.as_str()],
+pub fn insert_field(tx: &mut Tx<'_>, schema: &SchemaName, field: &Field) -> Result<(), Error> {
+    let position: i64 = tx.as_ref().query_row(
+        "SELECT COALESCE(MAX(position), -1) + 1 FROM schema_fields WHERE schema = ?1",
+        [schema.as_str()],
+        |row| row.get(0),
     )?;
+    let kind = match &field.kind {
+        FieldKind::Text => "text",
+        FieldKind::Number => "number",
+        FieldKind::Enum(_) => "enum",
+    };
+    tx.as_ref().execute(
+        "INSERT INTO schema_fields (schema, position, name, kind, required)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![
+            schema.as_str(),
+            position,
+            field.name.as_str(),
+            kind,
+            field.required as i64
+        ],
+    )?;
+    if let FieldKind::Enum(values) = &field.kind {
+        for (i, value) in values.iter().enumerate() {
+            tx.as_ref().execute(
+                "INSERT INTO schema_enum_values (schema, field, position, value)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    schema.as_str(),
+                    field.name.as_str(),
+                    i as i64,
+                    value.as_str()
+                ],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+pub fn insert_enum_value(
+    tx: &mut Tx<'_>,
+    schema: &SchemaName,
+    field: &FieldName,
+    value: &EnumValue,
+) -> Result<(), Error> {
+    let position: i64 = tx.as_ref().query_row(
+        "SELECT COALESCE(MAX(position), -1) + 1 FROM schema_enum_values
+         WHERE schema = ?1 AND field = ?2",
+        params![schema.as_str(), field.as_str()],
+        |row| row.get(0),
+    )?;
+    tx.as_ref()
+        .execute(
+            "INSERT INTO schema_enum_values (schema, field, position, value)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![schema.as_str(), field.as_str(), position, value.as_str()],
+        )
+        .unique(Fail::EnumValueExists(value.clone()))?;
     Ok(())
 }
 
@@ -67,6 +123,14 @@ pub fn retire(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
 }
 
 pub fn drop_schema(tx: &mut Tx<'_>, name: &SchemaName) -> Result<(), Error> {
+    tx.as_ref().execute(
+        "DELETE FROM schema_enum_values WHERE schema = ?1",
+        [name.as_str()],
+    )?;
+    tx.as_ref().execute(
+        "DELETE FROM schema_fields WHERE schema = ?1",
+        [name.as_str()],
+    )?;
     let n = tx
         .as_ref()
         .execute("DELETE FROM schemas WHERE name = ?1", [name.as_str()])?;

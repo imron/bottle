@@ -1,8 +1,9 @@
 # Schema
 
-bottle ships with no schemas. `schema add` writes a YAML spec
-into a registry table and creates a sqlite table for that
-type.
+bottle ships with no schemas. `schema add` reads a YAML spec
+and stores each field as a catalog row, then creates a
+sqlite table for that type. YAML is an input format. It is
+not stored.
 
 ## One table per schema
 
@@ -14,19 +15,38 @@ uses dots. The table name is `entry_` plus underscores.
 ```sql
 CREATE TABLE schemas (
   name     TEXT PRIMARY KEY,
-  spec     TEXT NOT NULL,
   retired  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE schema_fields (
+  schema   TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  name     TEXT NOT NULL,
+  kind     TEXT NOT NULL,
+  required INTEGER NOT NULL,
+  PRIMARY KEY (schema, name),
+  UNIQUE (schema, position)
+);
+
+CREATE TABLE schema_enum_values (
+  schema   TEXT NOT NULL,
+  field    TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  value    TEXT NOT NULL,
+  PRIMARY KEY (schema, field, value),
+  UNIQUE (schema, field, position)
 );
 ```
 
-`spec` is the YAML from `schema add`, updated by
-`schema add-field` and `schema add-value`. `retired`
+`kind` is `text`, `number`, or `enum`. `schema add-field`
+and `schema add-value` insert catalog rows. `retired`
 blocks new `log`s. Existing entries stay readable. sqlite
 stores `retired` and `ignored` as `0`/`1`. TSV prints
 `true`/`false`.
 
 `schema show` prints the current fields as TSV.
-`--yaml` prints `spec` as stored.
+`--yaml` prints the field list as YAML, the same form
+`schema add --file` accepts.
 
 The file is opened with WAL and a 5000 ms busy timeout.
 See [tech-stack.md](tech-stack.md).

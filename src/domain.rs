@@ -63,7 +63,7 @@ fn add_schema(db: &mut Db, op: SchemaAdd) -> Result<(), Error> {
 
 fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
     db.transaction(|tx| {
-        let mut loaded = store::load_schema(tx, &op.schema)?;
+        let loaded = store::load_schema(tx, &op.schema)?;
         if loaded.retired {
             return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
         }
@@ -81,28 +81,26 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
             return Err(Error::Fail(Fail::LinkNameCollidesWithField(link_name)));
         }
         mutable_store::add_column(tx, &op.schema, &field, op.default.as_ref())?;
-        loaded.spec.fields.push(field);
-        mutable_store::save_spec(tx, &op.schema, &loaded.spec)
+        mutable_store::insert_field(tx, &op.schema, &field)
     })
 }
 
 fn add_value(db: &mut Db, op: SchemaAddValue) -> Result<(), Error> {
     db.transaction(|tx| {
-        let mut loaded = store::load_schema(tx, &op.schema)?;
+        let loaded = store::load_schema(tx, &op.schema)?;
         if loaded.retired {
             return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
         }
-        let Some(f) = loaded.spec.fields.iter_mut().find(|f| f.name == op.field) else {
+        let Some(f) = loaded.spec.fields.iter().find(|f| f.name == op.field) else {
             return Err(Error::Fail(Fail::UnknownField(op.field.clone())));
         };
-        let FieldKind::Enum(values) = &mut f.kind else {
+        let FieldKind::Enum(values) = &f.kind else {
             return Err(Error::Fail(Fail::FieldNotEnum(op.field.clone())));
         };
         if values.iter().any(|v| v == &op.value) {
             return Err(Error::Fail(Fail::EnumValueExists(op.value)));
         }
-        values.push(op.value);
-        mutable_store::save_spec(tx, &op.schema, &loaded.spec)
+        mutable_store::insert_enum_value(tx, &op.schema, &op.field, &op.value)
     })
 }
 
