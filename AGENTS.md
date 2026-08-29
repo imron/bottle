@@ -41,6 +41,8 @@ input → domain → store
 
 ## Commits
 
+Commit changes as you go
+
 One commit is one complete, revertible unit of work. Do not mix unrelated
 changes. If a commit cannot be described in one subject line, split it.
 See https://www.aleksandrhovhannisyan.com/blog/atomic-git-commits/
