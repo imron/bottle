@@ -87,6 +87,13 @@ fn missing_command_is_usage() {
         "{stdout}{stderr}"
     );
     assert!(!stderr.is_empty(), "{stderr}");
+    for needle in [
+        "Write one entry of a registered schema",
+        "List entries of a schema",
+        "Declare and change types of entry",
+    ] {
+        assert!(stderr.contains(needle), "missing {needle:?} in {stderr}");
+    }
 }
 
 #[test]

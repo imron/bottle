@@ -64,14 +64,21 @@ pub struct SchemaDrop {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum SchemaCmd {
+    /// List registered schemas
     List,
+    /// Print the field list of a schema
     Show(SchemaShow),
+    /// Register a type from a YAML file
     Add(SchemaAdd),
+    /// Add one field to an existing schema
     #[command(name = "add-field")]
     AddField(SchemaAddField),
+    /// Append one value to an enum field
     #[command(name = "add-value")]
     AddValue(SchemaAddValue),
+    /// Block new logs on a schema
     Retire(SchemaRetire),
+    /// Delete a schema and its entries
     Drop(SchemaDrop),
 }
 
@@ -169,16 +176,27 @@ pub struct Backup {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Cmd {
+    /// Declare and change types of entry
     #[command(subcommand)]
     Schema(SchemaCmd),
+    /// Write one entry of a registered schema
     Log(Log),
+    /// List entries of a schema
     Ls(Ls),
+    /// Print one entry by schema and id
     Get(Get),
+    /// Total a number field
     Sum(Sum),
+    /// Print the most recent entry of a schema
     Last(Filters),
+    /// List entries for the current civil day
     Today(Filters),
+    /// Change an existing entry in place
     Amend(Amend),
+    /// Hide an entry from lists and totals
     Ignore(Ignore),
+    /// Show an ignored entry in lists and totals again
     Unignore(Unignore),
+    /// Copy the ledger to a sqlite file
     Backup(Backup),
 }

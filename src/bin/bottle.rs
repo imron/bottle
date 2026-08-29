@@ -59,6 +59,7 @@ fn run_cli(cli: Cli) -> Result<String, Error> {
     disable_help_subcommand = true
 )]
 struct Cli {
+    /// Path to the database file
     #[arg(long, global = true)]
     db: Option<PathBuf>,
     #[command(subcommand)]
