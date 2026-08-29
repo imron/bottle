@@ -42,8 +42,8 @@ field required.
 
 ## Exit status
 
-`0` ok. `1` field exists, schema retired, or reserved
-name.
+`0` ok. `1` field exists, schema retired, reserved name,
+or the name is already used as a link.
 
 ## See also
 

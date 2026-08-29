@@ -176,7 +176,8 @@ TODO: `restore` is specified, not implemented.
 `schema add-field` adds one field (`ALTER TABLE ADD COLUMN`).
 Without `--default` the field is optional and old entries
 are empty there. With `--default` the field becomes
-required and old entries are backfilled.
+required and old entries are backfilled. It fails if a
+link on that schema already uses the new field name.
 
 `schema add-value` appends one enum value. You may not
 remove one.

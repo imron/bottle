@@ -9,7 +9,7 @@ use crate::ledger::{
     Sum, Summed, Today, Total,
 };
 use crate::mutable_store;
-use crate::spec::{Field, FieldKind, FieldName, Group, Link, Spec};
+use crate::spec::{Field, FieldKind, FieldName, Group, Link, LinkName, Spec};
 use crate::store;
 use crate::time::{Instant, Range};
 use jiff::tz::TimeZone;
@@ -72,6 +72,11 @@ fn add_field(db: &mut Db, op: SchemaAddField) -> Result<(), Error> {
         };
         if loaded.spec.field(&field.name).is_some() {
             return Err(Error::Fail(Fail::FieldExists(field.name.clone())));
+        }
+        if let Ok(link_name) = LinkName::parse(field.name.as_str())
+            && store::has_outbound_link_name(tx, &op.schema, &link_name)?
+        {
+            return Err(Error::Fail(Fail::LinkNameCollidesWithField(link_name)));
         }
         mutable_store::add_column(tx, &op.schema, &field, op.default.as_ref())?;
         loaded.spec.fields.push(field);

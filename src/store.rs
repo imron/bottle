@@ -122,6 +122,22 @@ pub fn inbound_link_count(conn: &impl Connection, name: &SchemaName) -> Result<i
     Ok(n)
 }
 
+pub fn has_outbound_link_name(
+    conn: &impl Connection,
+    schema: &SchemaName,
+    name: &LinkName,
+) -> Result<bool, Error> {
+    let found: Option<i64> = conn
+        .as_ref()
+        .query_row(
+            "SELECT 1 FROM links WHERE from_schema = ?1 AND name = ?2 LIMIT 1",
+            rusqlite::params![schema.as_str(), name.as_str()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(found.is_some())
+}
+
 pub fn get_entry(
     conn: &impl Connection,
     schema: &SchemaName,

@@ -672,6 +672,35 @@ fn add_field_invalid_name() {
 }
 
 #[test]
+fn add_field_rejects_existing_link_name() {
+    let mut h = harness();
+    h.add_schema("fitness.session", SESSION);
+    h.add_schema("fitness.set", SET);
+    h.log(
+        "fitness.session",
+        &[("title", "upper")],
+        &[],
+        Some("2026-08-22T08:00:00Z"),
+    );
+    h.log(
+        "fitness.set",
+        &[("movement", "squat"), ("reps", "8")],
+        &[("session", "fitness.session/1")],
+        Some("2026-08-22T08:01:00Z"),
+    );
+    let err = h
+        .run(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
+            schema: "fitness.set".into(),
+            name: "session".into(),
+            type_: FieldType::Text,
+            values: None,
+            default: None,
+        })))
+        .unwrap_err();
+    assert_fail(err, "collides with field");
+}
+
+#[test]
 fn yaml_missing_and_invalid() {
     let mut h = harness();
     let err = h
