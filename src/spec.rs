@@ -324,6 +324,16 @@ impl TimePeriod {
             Self::Year => "year",
         }
     }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "day" => Some(Self::Day),
+            "week" => Some(Self::Week),
+            "month" => Some(Self::Month),
+            "year" => Some(Self::Year),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -334,12 +344,10 @@ pub enum Group {
 
 impl Group {
     pub fn parse(s: &str) -> Result<Self, Error> {
-        match s {
-            "day" => Ok(Self::Time(TimePeriod::Day)),
-            "week" => Ok(Self::Time(TimePeriod::Week)),
-            "month" => Ok(Self::Time(TimePeriod::Month)),
-            "year" => Ok(Self::Time(TimePeriod::Year)),
-            other => Ok(Self::Link(LinkName::parse(other)?)),
+        if let Some(unit) = TimePeriod::parse(s) {
+            Ok(Self::Time(unit))
+        } else {
+            Ok(Self::Link(LinkName::parse(s)?))
         }
     }
 }

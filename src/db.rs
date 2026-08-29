@@ -7,7 +7,10 @@ use rusqlite::functions::{Aggregate, FunctionFlags};
 use rust_decimal::Decimal;
 
 use crate::error::{Error, Fail};
-use crate::sql::StoredNumber;
+use crate::spec::TimePeriod;
+use crate::sql::{StoredNumber, StoredTime};
+use crate::time::{self, Instant};
+use jiff::tz::TimeZone;
 
 pub trait UniqueConstraint<T> {
     fn unique(self, err: Fail) -> Result<T, Error>;
@@ -52,7 +55,7 @@ pub struct Tx<'a> {
 }
 
 impl Db {
-    pub fn open(path: &Path) -> Result<Self, Error> {
+    pub fn open(path: &Path, tz: TimeZone) -> Result<Self, Error> {
         if let Some(parent) = path.parent()
             && !parent.as_os_str().is_empty()
         {
@@ -76,7 +79,7 @@ impl Db {
                 PRIMARY KEY (from_schema, from_id, name)
              );",
         )?;
-        register_functions(&conn)?;
+        register_functions(&conn, tz)?;
         Ok(Self { conn })
     }
 
@@ -159,7 +162,7 @@ pub fn default_db_path() -> Result<PathBuf, Error> {
     Ok(home.join(".local/share/bottle/bottle.db"))
 }
 
-fn register_functions(conn: &Sqlite) -> Result<(), Error> {
+fn register_functions(conn: &Sqlite, tz: TimeZone) -> Result<(), Error> {
     conn.create_scalar_function(
         "bottle_dec_eq",
         2,
@@ -176,7 +179,25 @@ fn register_functions(conn: &Sqlite) -> Result<(), Error> {
         FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
         DecSum,
     )?;
+    conn.create_scalar_function(
+        "bottle_period",
+        2,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        move |ctx| {
+            let at: String = ctx.get(0)?;
+            let unit: String = ctx.get(1)?;
+            Ok(period_bucket(&at, &unit, &tz)?)
+        },
+    )?;
     Ok(())
+}
+
+fn period_bucket(at: &str, unit: &str, tz: &TimeZone) -> Result<String, Error> {
+    let at = Instant::try_from(StoredTime(at.to_string()))?;
+    let Some(unit) = TimePeriod::parse(unit) else {
+        return Err(Error::Fail(Fail::Store(format!("unknown period: {unit}"))));
+    };
+    Ok(time::period(unit, at, tz).to_string())
 }
 
 struct DecSum;

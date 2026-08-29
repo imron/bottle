@@ -16,8 +16,7 @@ use crate::sql::{
     SqlVal, StoredAgent, StoredEntryId, StoredEnum, StoredLinkName, StoredLinkSchema, StoredNumber,
     StoredSchemaName, StoredText, StoredTime, instant_to_sql, quote_ident, table_name,
 };
-use crate::time::{Instant, Period, ToBound, period};
-use jiff::tz::TimeZone;
+use crate::time::{Instant, Period, ToBound};
 
 pub fn list_schemas(conn: &impl Connection) -> Result<Vec<SchemaInfo>, Error> {
     let mut stmt = conn
@@ -175,11 +174,10 @@ pub fn sum(
     q: Find<'_>,
     field: &FieldName,
     group: Option<Group>,
-    tz: &TimeZone,
 ) -> Result<Summed, Error> {
     match group {
         None => total(conn, q, field),
-        Some(Group::Time(unit)) => by_time(conn, q, field, unit, tz),
+        Some(Group::Time(unit)) => by_time(conn, q, field, unit),
         Some(Group::Link(name)) => by_link(conn, q, field, name),
     }
 }
@@ -205,30 +203,29 @@ fn by_time(
     q: Find<'_>,
     field: &FieldName,
     unit: TimePeriod,
-    tz: &TimeZone,
 ) -> Result<Summed, Error> {
     let col = quote_ident(field.as_str());
     let mut sql = format!(
-        "SELECT at, {col} FROM {} WHERE 1=1",
+        "SELECT bottle_period(at, ?1), bottle_dec_sum({col}) FROM {} WHERE 1=1",
         quote_ident(&table_name(q.schema))
     );
-    let mut bind = Vec::new();
+    let mut bind = vec![SqlVal::Text(unit.as_str().to_string())];
     apply_find_filters(&mut sql, &mut bind, &q)?;
-    sql.push_str(&format!(" AND {col} IS NOT NULL AND {col} != ''"));
+    sql.push_str(&format!(
+        " AND {col} IS NOT NULL AND {col} != '' GROUP BY 1"
+    ));
     let mut stmt = conn.as_ref().prepare(&sql)?;
     let mut raw = stmt.query(rusqlite::params_from_iter(
         bind.iter().map(SqlVal::as_param),
     ))?;
     let mut buckets: BTreeMap<Period, Decimal> = BTreeMap::new();
     while let Some(r) = raw.next()? {
-        let at_raw: String = r.get(0)?;
-        let n_raw: String = r.get(1)?;
-        let n = Decimal::try_from(StoredNumber(n_raw))?;
-        let k = period(unit, Instant::try_from(StoredTime(at_raw))?, tz);
-        let slot = buckets.entry(k).or_insert(Decimal::ZERO);
-        *slot = slot
-            .checked_add(n)
-            .ok_or(Error::Fail(Fail::NumberOverflow))?;
+        let key: String = r.get(0)?;
+        let total: String = r.get(1)?;
+        buckets.insert(
+            Period::parse(unit, &key)?,
+            Decimal::try_from(StoredNumber(total))?,
+        );
     }
     Ok(Summed::Time {
         unit,

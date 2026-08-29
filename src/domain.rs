@@ -43,7 +43,7 @@ pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outc
         Op::Log(op) => log(db, agent, op),
         Op::List(op) => list(db, op),
         Op::Get(op) => get(db, op),
-        Op::Sum(op) => sum(db, op, tz),
+        Op::Sum(op) => sum(db, op),
         Op::Last(op) => last(db, op),
         Op::Today(op) => today(db, op, tz),
         Op::Amend(op) => amend(db, op),
@@ -294,7 +294,7 @@ fn find_entries(db: &mut Db, q: Query<'_>) -> Result<Outcome, Error> {
     })
 }
 
-fn sum(db: &mut Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
+fn sum(db: &mut Db, op: Sum) -> Result<Outcome, Error> {
     db.read(|tx| {
         let spec = store::load_schema(tx, &op.scope.schema)?.spec;
         let Some(f) = spec.field(&op.field) else {
@@ -317,7 +317,7 @@ fn sum(db: &mut Db, op: Sum, tz: &TimeZone) -> Result<Outcome, Error> {
         if let Some(Group::Link(name)) = &op.group {
             spec.ensure_link_name(name)?;
         }
-        Ok(match store::sum(tx, q, &op.field, op.group, tz)? {
+        Ok(match store::sum(tx, q, &op.field, op.group)? {
             Summed::Total(value) => Outcome::Total(Total {
                 field: op.field,
                 value,

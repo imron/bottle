@@ -30,13 +30,14 @@ pub struct Bottle {
 
 impl Bottle {
     pub fn open(path: &Path, agent: Option<String>, tz: Option<&str>) -> Result<Self, Error> {
+        let tz = time::zone(tz)?;
         Ok(Self {
-            db: db::Db::open(path)?,
+            db: db::Db::open(path, tz.clone())?,
             agent: resolve_agent(
                 agent.as_deref(),
                 std::env::var("BOTTLE_AGENT").ok().as_deref(),
             )?,
-            tz: time::zone(tz)?,
+            tz,
         })
     }
 

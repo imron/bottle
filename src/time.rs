@@ -1,9 +1,11 @@
+use std::fmt;
+
 use jiff::Timestamp;
 use jiff::civil::{Date, DateTime};
 use jiff::fmt::strtime;
 use jiff::tz::TimeZone;
 
-use crate::error::{Error, Usage};
+use crate::error::{Error, Fail, Usage};
 use crate::spec::TimePeriod;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -103,6 +105,44 @@ pub enum Period {
     Week { year: i16, week: i8 },
     Month { year: i16, month: i8 },
     Year(i16),
+}
+
+impl fmt::Display for Period {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Day(date) => write!(f, "{date}"),
+            Self::Week { year, week } => write!(f, "{year}-W{week:02}"),
+            Self::Month { year, month } => write!(f, "{year:04}-{month:02}"),
+            Self::Year(year) => write!(f, "{year:04}"),
+        }
+    }
+}
+
+impl Period {
+    pub fn parse(unit: TimePeriod, raw: &str) -> Result<Self, Error> {
+        let bad = || Error::Fail(Fail::Store(format!("corrupt period: {raw}")));
+        match unit {
+            TimePeriod::Day => {
+                let date: Date = raw.parse().map_err(|_| bad())?;
+                Ok(Self::Day(date))
+            }
+            TimePeriod::Week => {
+                let (year, week) = raw.rsplit_once("-W").ok_or_else(bad)?;
+                Ok(Self::Week {
+                    year: year.parse().map_err(|_| bad())?,
+                    week: week.parse().map_err(|_| bad())?,
+                })
+            }
+            TimePeriod::Month => {
+                let (year, month) = raw.rsplit_once('-').ok_or_else(bad)?;
+                Ok(Self::Month {
+                    year: year.parse().map_err(|_| bad())?,
+                    month: month.parse().map_err(|_| bad())?,
+                })
+            }
+            TimePeriod::Year => Ok(Self::Year(raw.parse().map_err(|_| bad())?)),
+        }
+    }
 }
 
 pub fn period(unit: TimePeriod, at: Instant, tz: &TimeZone) -> Period {
@@ -220,6 +260,24 @@ mod tests {
                 "{input}: {err}"
             );
         }
+    }
+
+    #[test]
+    fn period_display_round_trips() {
+        let tz = melbourne();
+        let at = parse_instant("2026-08-22T08:14:00+10:00", &tz).unwrap();
+        for unit in [
+            TimePeriod::Day,
+            TimePeriod::Week,
+            TimePeriod::Month,
+            TimePeriod::Year,
+        ] {
+            let p = period(unit, at, &tz);
+            assert_eq!(Period::parse(unit, &p.to_string()).unwrap(), p, "{unit:?}");
+        }
+        assert_eq!(period(TimePeriod::Day, at, &tz).to_string(), "2026-08-22");
+        assert_eq!(period(TimePeriod::Month, at, &tz).to_string(), "2026-08");
+        assert_eq!(period(TimePeriod::Year, at, &tz).to_string(), "2026");
     }
 
     #[test]

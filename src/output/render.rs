@@ -6,7 +6,7 @@ use crate::ledger::{
     Total,
 };
 use crate::spec::{EnumValue, FieldKind, Link, Spec};
-use crate::time::{self, Period};
+use crate::time;
 
 use super::Style;
 use super::tsv;
@@ -52,7 +52,7 @@ pub fn render(outcome: &Outcome, tz: &TimeZone, style: Style) -> Result<String, 
         Outcome::GroupedTime(GroupedTime { unit, buckets }) => {
             let rows: Vec<Vec<String>> = buckets
                 .iter()
-                .map(|(k, v)| vec![render_period(*k), tsv::number(*v)])
+                .map(|(k, v)| vec![k.to_string(), tsv::number(*v)])
                 .collect();
             Ok(tsv::table(&[unit.as_str(), "value"], &rows))
         }
@@ -68,15 +68,6 @@ pub fn render(outcome: &Outcome, tz: &TimeZone, style: Style) -> Result<String, 
                 .collect();
             Ok(tsv::table(&[name.as_str(), "value"], &rows))
         }
-    }
-}
-
-fn render_period(period: Period) -> String {
-    match period {
-        Period::Day(date) => date.to_string(),
-        Period::Week { year, week } => format!("{year}-W{week:02}"),
-        Period::Month { year, month } => format!("{year:04}-{month:02}"),
-        Period::Year(year) => format!("{year:04}"),
     }
 }
 
