@@ -236,6 +236,10 @@ impl Identifier {
             Err(Error::Fail(Fail::InvalidIdentifier(s.to_string())))
         }
     }
+
+    pub(crate) fn from_reserved(s: &str) -> Option<Self> {
+        is_reserved(s).then(|| Self(s.to_string()))
+    }
 }
 
 string_newtype!(Identifier, from_str);
@@ -481,6 +485,17 @@ mod tests {
             EnumValue::parse("   ").unwrap_err(),
             Error::Fail(Fail::EmptyEnumValue)
         ));
+    }
+
+    #[test]
+    fn identifier_is_lowercase() {
+        assert_eq!(Identifier::parse("agent").unwrap().as_str(), "agent");
+        assert!(matches!(
+            Identifier::parse("Agent").unwrap_err(),
+            Error::Fail(Fail::InvalidIdentifier(ref s)) if s == "Agent"
+        ));
+        assert!(Identifier::from_reserved("agent").is_some());
+        assert!(Identifier::from_reserved("kcal").is_none());
     }
 
     #[test]

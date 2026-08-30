@@ -206,6 +206,28 @@ fn sum_unknown_field() {
 }
 
 #[test]
+fn sum_rejects_invalid_field_name() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let err = h
+        .run(Cmd::Sum(cmd::Sum {
+            filters: cmd::Filters {
+                schema: "nutrition.meal".into(),
+                agent: None,
+                wheres: vec![],
+                links: vec![],
+                excludes: vec![],
+            },
+            field: "Protein".into(),
+            from: None,
+            to: None,
+            group: None,
+        }))
+        .unwrap_err();
+    assert_fail(err, "invalid field name");
+}
+
+#[test]
 fn sum_group_collides_with_field() {
     let mut h = harness();
     seed_meals(&mut h);

@@ -11,7 +11,7 @@ use crate::ledger::{
 };
 use crate::spec::{
     EntryId, EnumValue, Field, FieldKind, FieldName, FieldType, FromTypeErr, Group, Identifier,
-    Link, LinkName, SchemaName, Spec, is_reserved,
+    Link, LinkName, SchemaName, Spec,
 };
 use crate::time::{self, Range};
 
@@ -125,20 +125,21 @@ pub fn schema_add_field(
 }
 
 fn field_kind(type_: FieldType, values: Option<Vec<String>>) -> Result<FieldKind, Error> {
-    let values = match (type_, values) {
-        (FieldType::Enum, Some(raw)) => Some(
+    if type_ != FieldType::Enum && values.is_some() {
+        return Err(Error::Usage(Usage::EnumValuesNotAllowed));
+    }
+    let values = values
+        .map(|raw| {
             raw.into_iter()
                 .map(|s| EnumValue::parse(&s))
-                .collect::<Result<Vec<_>, _>>()?,
-        ),
-        (FieldType::Enum, None) => None,
-        (_, None) => None,
-        (_, Some(_)) => return Err(Error::Usage(Usage::EnumValuesNotAllowed)),
-    };
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?;
     FieldKind::from_type(type_, values).map_err(|e| match e {
-        FromTypeErr::ValuesRequired => Error::Usage(Usage::EnumValuesRequired),
-        FromTypeErr::ValuesNotAllowed => Error::Usage(Usage::EnumValuesNotAllowed),
         FromTypeErr::Duplicate(v) => Error::Fail(Fail::DuplicateEnumValue(v)),
+        FromTypeErr::ValuesRequired | FromTypeErr::ValuesNotAllowed => {
+            Error::Usage(Usage::EnumValuesRequired)
+        }
     })
 }
 
@@ -441,10 +442,8 @@ fn named_fields(
     let mut seen = HashSet::new();
     let mut out = Vec::new();
     for (name, value) in pairs {
-        if reject_reserved && is_reserved(&name) {
-            return Err(Error::Usage(Usage::ReservedWhere(Identifier::parse(
-                &name,
-            )?)));
+        if reject_reserved && let Some(name) = Identifier::from_reserved(&name) {
+            return Err(Error::Usage(Usage::ReservedWhere(name)));
         }
         let name = FieldName::parse(&name)?;
         if unique && !seen.insert(name.clone()) {
