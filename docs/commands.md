@@ -1,13 +1,14 @@
 # Commands
 
 ```
-bottle [--db PATH] <command>
+bottle [--db PATH] [--no-header] <command>
 ```
 
 Output is TSV: one table, header always, even for one line.
-`help` is prose, not TSV. `schema show --yaml` is the spec
-YAML. Errors go to stderr and never share stdout with a
-TSV body.
+`--no-header` omits the header. Empty `ls` then prints
+nothing. `help` is prose, not TSV. `schema show --yaml` is
+the spec YAML. Errors go to stderr and never share stdout
+with a TSV body.
 
 Exit codes: `0` ok, `2` usage, `1` anything else (unknown
 schema, bad field, not found).
@@ -40,7 +41,8 @@ bottle help <command>
 Prints the matching page from [src/input/help/](../src/input/help/).
 Overview if no command. Schema verbs are
 `bottle help schema add`.
-`--db` is accepted and ignored. Unknown topic: exit 2.
+`--db` and `--no-header` are accepted and ignored.
+Unknown topic: exit 2.
 
 ## schema list
 

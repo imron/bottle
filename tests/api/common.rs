@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use bottle::{Bottle, Cmd, EntryId, Error, LogInput, cmd};
+use bottle::{Bottle, Cmd, EntryId, Error, LogInput, Style, cmd};
 
 pub fn eid(n: i64) -> EntryId {
     EntryId::parse(n).unwrap()
@@ -23,13 +23,18 @@ pub fn harness() -> Harness {
 
 impl Harness {
     pub fn run(&mut self, cmd: Cmd) -> Result<String, Error> {
-        let style = bottle::style(&cmd);
+        let style = bottle::style(&cmd, false);
         let request = bottle::parse(cmd, self.bottle.tz())?;
         bottle::execute(&mut self.bottle, request, style)
     }
 
     pub fn run_ok(&mut self, cmd: Cmd) -> String {
         self.run(cmd).unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    pub fn run_style(&mut self, cmd: Cmd, style: Style) -> Result<String, Error> {
+        let request = bottle::parse(cmd, self.bottle.tz())?;
+        bottle::execute(&mut self.bottle, request, style)
     }
 
     pub fn log_entries(&mut self, logs: Vec<cmd::Log>) -> Result<String, Error> {

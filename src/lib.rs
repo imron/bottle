@@ -64,9 +64,10 @@ pub async fn mcp(path: &Path, agent: Option<String>, tz: Option<&str>) -> Result
     input::mcp::serve(path, agent, tz).await
 }
 
-pub fn style(cmd: &Cmd) -> Style {
+pub fn style(cmd: &Cmd, no_header: bool) -> Style {
     match cmd {
         Cmd::Schema(cmd::SchemaCmd::Show(show)) if show.yaml => Style::Yaml,
+        _ if no_header => Style::TsvNoHeader,
         _ => Style::Tsv,
     }
 }

@@ -68,6 +68,8 @@ with `--include-ignored`.
 
 The `links` cell is space-separated `name=schema/id`
 pairs, sorted by name. Empty means no links.
+`--no-header` omits the header, so an empty list prints
+nothing.
 
 ## Examples
 

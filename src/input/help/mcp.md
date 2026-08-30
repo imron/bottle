@@ -19,10 +19,9 @@ to bottle without a shell.
 The schema name is an argument on tools that need one.
 `schema_add` takes the YAML as `spec`, not a file path.
 
-Each tool result is the same bytes the CLI would print:
-TSV for entry commands, prose for `help`, YAML for
-`schema_show` with `yaml`. A failed call is a tool error,
-not a TSV body.
+Each tool result is TSV with a header for entry commands,
+prose for `help`, YAML for `schema_show` with `yaml`. A
+failed call is a tool error, not a TSV body.
 
 ## Tools
 

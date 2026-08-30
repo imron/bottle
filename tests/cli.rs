@@ -207,6 +207,65 @@ fn schema_log_ls_through_argv() {
 }
 
 #[test]
+fn no_header_omits_tsv_header() {
+    let dir = TempDir::new().unwrap();
+    let spec = dir.path().join("meal.yaml");
+    std::fs::write(&spec, MEAL).unwrap();
+    let (code, _, stderr) = run_db(
+        &dir,
+        &[
+            "schema",
+            "add",
+            "nutrition.meal",
+            "--file",
+            spec.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(code, 0, "{stderr}");
+    let (code, stdout, stderr) = run_db(&dir, &["--no-header", "ls", "nutrition.meal"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.is_empty(), "{stdout}");
+    let (code, stdout, stderr) = run_db(&dir, &["ls", "nutrition.meal"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.starts_with("id\t"), "{stdout}");
+    let (code, stdout, stderr) = run_db(
+        &dir,
+        &[
+            "--no-header",
+            "log",
+            "nutrition.meal",
+            "--at",
+            "2026-08-22T08:14:00+10:00",
+            "when=breakfast",
+            "kcal=568",
+        ],
+    );
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.starts_with("1\t"), "{stdout}");
+    assert!(!stdout.contains("id\tat\tlinks"), "{stdout}");
+    let (code, stdout, stderr) = run_db(&dir, &["--no-header", "ls", "nutrition.meal"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(!stdout.starts_with("id\t"), "{stdout}");
+    assert!(stdout.contains("breakfast"), "{stdout}");
+    let (code, stdout, stderr) = run_db(&dir, &["--no-header", "schema", "list"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert_eq!(stdout, "nutrition.meal\tfalse\n");
+    let (code, stdout, stderr) = run_db(&dir, &["--no-header", "schema", "show", "nutrition.meal"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(!stdout.starts_with("name\t"), "{stdout}");
+    assert!(stdout.contains("when\tenum"), "{stdout}");
+    let (code, stdout, stderr) = run_db(
+        &dir,
+        &["--no-header", "schema", "show", "nutrition.meal", "--yaml"],
+    );
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.contains("fields:"), "{stdout}");
+    let (code, stdout, stderr) = run(&["--no-header", "help"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.starts_with("# overview\n"), "{stdout}");
+}
+
+#[test]
 fn schema_add_file_dash_is_stdin() {
     use std::io::Write;
     use std::process::Stdio;

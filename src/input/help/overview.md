@@ -7,7 +7,7 @@ bottle — a store for events
 ## Synopsis
 
 ```
-bottle [--db PATH] <command>
+bottle [--db PATH] [--no-header] <command>
 ```
 
 ## Description
@@ -55,11 +55,12 @@ logging.
 ## Output
 
 Most commands print a TSV table: a header line, then data
-lines, even when there is only one result. Booleans print
-`true` or `false`. Empty optional fields are empty cells.
-Numbers print as logged (`86.50` stays `86.50`). Errors go
-to stderr and never share stdout with a table. `help` is
-prose. `schema show --yaml` is YAML.
+lines, even when there is only one result. `--no-header`
+omits the header. Empty `ls` then prints nothing.
+Booleans print `true` or `false`. Empty optional fields
+are empty cells. Numbers print as logged (`86.50` stays
+`86.50`). Errors go to stderr and never share stdout with
+a table. `help` is prose. `schema show --yaml` is YAML.
 
 ## Exit status
 

@@ -1,4 +1,4 @@
-use bottle::{Cmd, cmd};
+use bottle::{Cmd, cmd, style};
 
 use crate::common::{MEAL, SESSION, SET, assert_fail, assert_usage, eid, harness, tsv_lines};
 
@@ -7,6 +7,13 @@ fn list_empty() {
     let mut h = harness();
     let out = h.run_ok(Cmd::Schema(cmd::SchemaCmd::List));
     assert_eq!(tsv_lines(&out), vec![vec!["name", "retired"]]);
+    let body = h
+        .run_style(
+            Cmd::Schema(cmd::SchemaCmd::List),
+            bottle::Style::TsvNoHeader,
+        )
+        .unwrap();
+    assert!(body.is_empty(), "{body}");
 }
 
 #[test]
@@ -41,6 +48,21 @@ fn show_yaml_round_trip() {
     })));
     assert!(yaml.contains("name: when"));
     assert!(yaml.contains("type: enum"));
+}
+
+#[test]
+fn yaml_show_ignores_no_header() {
+    let cmd = Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow {
+        name: "nutrition.meal".into(),
+        yaml: true,
+    }));
+    assert_eq!(style(&cmd, true), bottle::Style::Yaml);
+    assert_eq!(style(&cmd, false), bottle::Style::Yaml);
+    let tsv = Cmd::Schema(cmd::SchemaCmd::Show(cmd::SchemaShow {
+        name: "nutrition.meal".into(),
+        yaml: false,
+    }));
+    assert_eq!(style(&tsv, true), bottle::Style::TsvNoHeader);
 }
 
 #[test]

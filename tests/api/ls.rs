@@ -456,6 +456,42 @@ fn where_unknown_field() {
     assert_fail(err, "unknown field");
 }
 
+#[test]
+fn empty_ls_no_header_prints_nothing() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let empty = h
+        .run_style(
+            ls_filters("nutrition.meal", vec![], vec![]),
+            bottle::Style::TsvNoHeader,
+        )
+        .unwrap();
+    assert!(empty.is_empty(), "{empty}");
+}
+
+#[test]
+fn no_header_omits_ls_header() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let headed = h.run_ok(ls_filters("nutrition.meal", vec![], vec![]));
+    assert!(headed.starts_with("id\t"), "{headed}");
+    let body = h
+        .run_style(
+            ls_filters("nutrition.meal", vec![], vec![]),
+            bottle::Style::TsvNoHeader,
+        )
+        .unwrap();
+    assert!(!body.starts_with("id\t"), "{body}");
+    assert!(body.contains("breakfast"), "{body}");
+    assert_eq!(
+        body,
+        headed
+            .split_once('\n')
+            .map(|(_, rest)| rest.to_string())
+            .unwrap()
+    );
+}
+
 fn ls_filters(schema: &str, wheres: Vec<(String, String)>, excludes: Vec<(String, String)>) -> Cmd {
     Cmd::Ls(cmd::Ls {
         filters: cmd::Filters {

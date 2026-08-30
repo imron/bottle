@@ -23,8 +23,8 @@ With no topic, you get the overview. Schema verbs use the
 two-word name: `bottle help schema add`, not
 `bottle help add`.
 
-The page is prose, not a TSV table. `--db` is accepted and
-ignored.
+The page is prose, not a TSV table. `--db` and
+`--no-header` are accepted and ignored.
 
 ## Exit status
 

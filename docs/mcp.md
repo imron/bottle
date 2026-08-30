@@ -42,9 +42,9 @@ entry.
 
 ## Output
 
-The tool result is the same bytes the CLI would print: TSV
-for entry commands, prose for `help`, YAML for
-`schema_show` with `yaml`. Not a JSON array of objects.
+The tool result is TSV with a header for entry commands,
+prose for `help`, YAML for `schema_show` with `yaml`. Not
+a JSON array of objects.
 
 Errors are tool errors. A failed call does not return a TSV
 body.

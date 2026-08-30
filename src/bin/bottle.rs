@@ -44,7 +44,7 @@ fn run_cli(cli: Cli) -> Result<String, Error> {
                 None => bottle::default_db_path()?,
             };
             let tz = zone(None)?;
-            let style = bottle::style(&command);
+            let style = bottle::style(&command, cli.no_header);
             let request = parse(command, &tz)?;
             let mut bottle = Bottle::open(&db, None, None)?;
             execute(&mut bottle, request, style)
@@ -62,6 +62,9 @@ struct Cli {
     /// Path to the database file
     #[arg(long, global = true)]
     db: Option<PathBuf>,
+    /// Hide the TSV header
+    #[arg(long, global = true)]
+    no_header: bool,
     #[command(subcommand)]
     command: Command,
 }

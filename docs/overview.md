@@ -63,8 +63,9 @@ happened. They speak bottle.
   See [schema.md](schema.md).
 - Instants stored as UTC, shown in the host timezone. See
   [time.md](time.md).
-- TSV on stdout. Errors on stderr. CLI and MCP return the
-  same bytes. `help` is prose. `schema show --yaml` is YAML.
+- TSV on stdout. Errors on stderr. `--no-header` omits the
+  CLI header; MCP includes it. `help` is prose.
+  `schema show --yaml` is YAML.
   See [commands.md](commands.md), [help.md](help.md), and
   [mcp.md](mcp.md).
 - One static musl binary next to the db.
