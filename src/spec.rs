@@ -237,7 +237,7 @@ impl Identifier {
         }
     }
 
-    pub(crate) fn from_reserved(s: &str) -> Option<Self> {
+    pub fn from_reserved(s: &str) -> Option<Self> {
         is_reserved(s).then(|| Self(s.to_string()))
     }
 }
