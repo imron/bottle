@@ -2,12 +2,13 @@
 
 ## Name
 
-schema add — register a type from a YAML file
+schema add — register a type from YAML
 
 ## Synopsis
 
 ```
 bottle schema add <name> --file spec.yaml
+bottle schema add <name> --file -
 ```
 
 ## Description
@@ -64,8 +65,7 @@ On success the command prints nothing.
 
 ## Options
 
-`--file spec.yaml` — path to the YAML field list
-(required).
+`--file PATH` — YAML field list (required). `-` is stdin.
 
 ## Exit status
 

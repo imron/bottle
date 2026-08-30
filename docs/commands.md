@@ -69,11 +69,13 @@ accepts. Exit 1 if missing. Retired schemas still show.
 
 ```
 bottle schema add <name> --file spec.yaml
+bottle schema add <name> --file -
 ```
 
 Fails if `name` exists or is not one or more ident
 segments joined by dots (no empty segments). Writes the
-spec into the registry and creates the table.
+spec into the registry and creates the table. `--file -`
+is stdin.
 
 ## schema add-field
 

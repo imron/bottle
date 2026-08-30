@@ -29,7 +29,7 @@ pub struct SchemaShow {
 pub struct SchemaAdd {
     /// Schema name
     pub name: String,
-    /// Path to the YAML spec
+    /// YAML field list; - is stdin
     #[arg(long, required = true, value_name = "PATH")]
     pub file: PathBuf,
 }

@@ -10,6 +10,7 @@ schema — declare and change types of entry
 bottle schema list
 bottle schema show <name> [--yaml]
 bottle schema add <name> --file spec.yaml
+bottle schema add <name> --file -
 bottle schema add-field <name> --name <field> --type ...
 bottle schema add-value <schema> --field <name> --value <v>
 bottle schema rename <old> <new>

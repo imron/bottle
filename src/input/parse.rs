@@ -87,13 +87,7 @@ pub fn schema_show(name: String) -> Result<SchemaShow, Error> {
 
 pub fn schema_add(name: String, source: SpecSource) -> Result<SchemaAdd, Error> {
     let raw = match source {
-        SpecSource::File(path) => match std::fs::read_to_string(&path) {
-            Ok(raw) => raw,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                return Err(Error::Fail(Fail::FileNotFound(path.display().to_string())));
-            }
-            Err(err) => return Err(err.into()),
-        },
+        SpecSource::File(path) => read_text(&path)?,
         SpecSource::Yaml(raw) => raw,
     };
     Ok(SchemaAdd {

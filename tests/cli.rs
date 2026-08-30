@@ -207,6 +207,45 @@ fn schema_log_ls_through_argv() {
 }
 
 #[test]
+fn schema_add_file_dash_is_stdin() {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let dir = TempDir::new().unwrap();
+    let db = dir.path().join("bottle.db");
+    let mut child = bottle()
+        .arg("--db")
+        .arg(&db)
+        .args(["schema", "add", "nutrition.meal", "--file", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn schema add --file -");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(MEAL.as_bytes())
+        .expect("write yaml");
+    let out = child.wait_with_output().expect("wait");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stdout.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let (code, stdout, stderr) = run_db(&dir, &["schema", "list"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(stdout.contains("nutrition.meal"), "{stdout}");
+}
+
+#[test]
 fn log_file_dash_is_stdin() {
     use std::io::Write;
     use std::process::Stdio;
