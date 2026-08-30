@@ -217,6 +217,7 @@ pub struct Log {
     pub agent: Option<Agent>,
     pub links: Vec<Link>,
     pub fields: Vec<FieldInput>,
+    pub file_line: Option<usize>,
 }
 
 #[derive(Debug, Clone)]

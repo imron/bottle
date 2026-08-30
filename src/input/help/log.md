@@ -91,7 +91,10 @@ schema, and must not be reserved (`id`, `at`, `agent`,
 
 `--file PATH` — TSV of entries. `-` is stdin. Header
 required. All rows succeed or none do. Other log flags
-are defaults for blank cells.
+are defaults for blank cells. Errors name the file line
+(header is line 1). Trailing empty cells are not extra
+columns. A row with fewer cells than the header is an
+error; extra cells with values are an error.
 
 ## Output
 

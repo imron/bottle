@@ -265,6 +265,11 @@ pub fn logs(entries: Vec<LogInput>, tz: &TimeZone) -> Result<Op, Error> {
 }
 
 fn log(entry: LogInput, tz: &TimeZone) -> Result<Log, Error> {
+    let line = entry.file_line;
+    parse_log(entry, tz).map_err(|e| e.at_file_line(line))
+}
+
+fn parse_log(entry: LogInput, tz: &TimeZone) -> Result<Log, Error> {
     Ok(Log {
         schema: SchemaName::parse(&entry.schema)?,
         at: entry
@@ -275,6 +280,7 @@ fn log(entry: LogInput, tz: &TimeZone) -> Result<Log, Error> {
         agent: parse_agent(entry.agent)?,
         links: parse_links(entry.links)?,
         fields: parse_fields(entry.fields)?,
+        file_line: entry.file_line,
     })
 }
 

@@ -163,7 +163,12 @@ fn log(db: &mut Db, agent: &Agent, ops: Vec<Log>) -> Result<Outcome, Error> {
     .map(Outcome::Posted)
 }
 
-fn insert_log(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Error> {
+fn insert_log(tx: &mut Tx<'_>, agent: &Agent, op: Log) -> Result<Posted, Error> {
+    let line = op.file_line;
+    insert_one(tx, agent, op).map_err(|e| e.at_file_line(line))
+}
+
+fn insert_one(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Error> {
     let agent = op.agent.as_ref().unwrap_or(agent);
     let at = match op.at {
         Some(at) => at,

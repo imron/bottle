@@ -180,7 +180,14 @@ required. Schema is on the command. `--at`, `--agent`,
 `--link`, and `field=value` default every row; a TSV cell
 wins. Missing `at` is now. Missing `agent` is
 `BOTTLE_AGENT`. All succeed or none do. Same as MCP `log`
-`entries`. See [mcp.md](mcp.md).
+`entries`. See [mcp.md](mcp.md). Errors name the file
+line (header is line 1). Trailing empty cells are not
+extra columns. Too few cells, or extra cells with
+values, is an error:
+
+```
+log --file line 12: 6 columns, header has 5
+```
 
 ## ls
 

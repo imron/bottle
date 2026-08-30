@@ -8,6 +8,7 @@ use crate::spec::{
 pub enum Error {
     Usage(Usage),
     Fail(Fail),
+    FileLine { line: usize, err: Box<Error> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,7 +33,7 @@ pub enum Usage {
     RenameSameField(FieldName),
     RenameSameSchema(SchemaName),
     LogFileNeedsHeader,
-    TsvRowWidth,
+    TsvRowWidth { columns: usize, header: usize },
     DuplicateHeader(String),
 }
 
@@ -99,6 +100,17 @@ impl Error {
         match self {
             Self::Usage(_) => 2,
             Self::Fail(_) => 1,
+            Self::FileLine { err, .. } => err.exit_code(),
+        }
+    }
+
+    pub(crate) fn at_file_line(self, line: Option<usize>) -> Self {
+        match line {
+            Some(line) if !matches!(self, Self::FileLine { .. }) => Self::FileLine {
+                line,
+                err: Box::new(self),
+            },
+            _ => self,
         }
     }
 }
@@ -127,7 +139,9 @@ fn usage_message(err: &Usage) -> String {
         Usage::RenameSameField(name) => format!("from and to are the same field: {name}"),
         Usage::RenameSameSchema(name) => format!("from and to are the same schema: {name}"),
         Usage::LogFileNeedsHeader => "log --file requires a header row".into(),
-        Usage::TsvRowWidth => "log --file row has the wrong number of columns".into(),
+        Usage::TsvRowWidth { columns, header } => {
+            format!("{columns} columns, header has {header}")
+        }
         Usage::DuplicateHeader(name) => format!("duplicate column: {name}"),
     }
 }
@@ -202,6 +216,7 @@ impl fmt::Display for Error {
         match self {
             Self::Usage(err) => f.write_str(&usage_message(err)),
             Self::Fail(err) => f.write_str(&fail_message(err)),
+            Self::FileLine { line, err } => write!(f, "log --file line {line}: {err}"),
         }
     }
 }

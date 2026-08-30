@@ -818,7 +818,7 @@ fn log_file_rolls_back_on_error() {
             fields: vec![],
         }))
         .unwrap_err();
-    assert_fail(err, "missing required");
+    assert_fail(err, "log --file line 3: missing required");
     let ls = h.run_ok(Cmd::Ls(cmd::Ls {
         filters: cmd::Filters {
             schema: "nutrition.meal".into(),
@@ -968,7 +968,7 @@ fn log_file_wrong_width_and_duplicate_header() {
             fields: vec![],
         }))
         .unwrap_err();
-    assert_usage(err, "wrong number of columns");
+    assert_usage(err, "log --file line 2: 3 columns, header has 2");
     let dup = h.dir.path().join("dup.tsv");
     std::fs::write(&dup, "when\twhen\nbreakfast\tlunch\n").unwrap();
     let err = h
@@ -994,7 +994,7 @@ fn log_file_wrong_width_and_duplicate_header() {
             fields: vec![],
         }))
         .unwrap_err();
-    assert_usage(err, "wrong number of columns");
+    assert_usage(err, "log --file line 2: 1 columns, header has 2");
 }
 
 #[test]
@@ -1128,7 +1128,7 @@ fn log_file_reserved_header_and_directory() {
             fields: vec![],
         }))
         .unwrap_err();
-    assert_fail(err, "reserved field name");
+    assert_fail(err, "log --file line 2: reserved field name");
     let err = h
         .run(Cmd::Log(cmd::Log {
             schema: "nutrition.meal".into(),
@@ -1140,4 +1140,44 @@ fn log_file_reserved_header_and_directory() {
         }))
         .unwrap_err();
     assert_fail(err, "io error");
+}
+
+#[test]
+fn log_file_trailing_empty_cells_and_row_errors() {
+    let mut h = harness();
+    h.add_schema("nutrition.meal", MEAL);
+    let trailing = h.dir.path().join("trailing.tsv");
+    std::fs::write(
+        &trailing,
+        "when\twhat\tkcal\tprotein\tcarbs\n\
+         breakfast\teggs\t1\t1\t0\t\t\n",
+    )
+    .unwrap();
+    h.run_ok(Cmd::Log(cmd::Log {
+        schema: "nutrition.meal".into(),
+        at: Some("2026-08-22T08:14:00Z".into()),
+        agent: None,
+        links: vec![],
+        file: Some(trailing),
+        fields: vec![],
+    }));
+    let bad_number = h.dir.path().join("number.tsv");
+    std::fs::write(
+        &bad_number,
+        "when\twhat\tkcal\tprotein\tcarbs\n\
+         breakfast\teggs\t1\t1\t0\n\
+         lunch\trice\t01\t2\t1\n",
+    )
+    .unwrap();
+    let err = h
+        .run(Cmd::Log(cmd::Log {
+            schema: "nutrition.meal".into(),
+            at: Some("2026-08-22T08:14:00Z".into()),
+            agent: None,
+            links: vec![],
+            file: Some(bad_number),
+            fields: vec![],
+        }))
+        .unwrap_err();
+    assert_fail(err, "log --file line 3: invalid number: 01");
 }

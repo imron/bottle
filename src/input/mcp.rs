@@ -371,6 +371,7 @@ impl Server {
                 agent: entry.agent,
                 links: pairs(entry.links),
                 fields: cells(entry.fields),
+                file_line: None,
             })
             .collect();
         Ok(self.run(parse::logs(entries, &self.tz)))

@@ -52,6 +52,7 @@ pub struct LogInput {
     pub agent: Option<String>,
     pub links: Vec<(String, String)>,
     pub fields: Vec<(String, String)>,
+    pub file_line: Option<usize>,
 }
 
 impl From<cmd::Log> for LogInput {
@@ -62,6 +63,7 @@ impl From<cmd::Log> for LogInput {
             agent: cmd.agent,
             links: cmd.links,
             fields: cmd.fields,
+            file_line: None,
         }
     }
 }

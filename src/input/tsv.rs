@@ -32,17 +32,32 @@ pub fn log_rows(schema: &str, raw: &str) -> Result<Vec<LogInput>, Error> {
         return Err(Error::Usage(Usage::EmptyLog));
     }
     let mut out = Vec::with_capacity(rows.len());
-    for row in rows {
-        let cells: Vec<&str> = row.split('\t').collect();
-        if cells.len() != cols.len() {
-            return Err(Error::Usage(Usage::TsvRowWidth));
-        }
-        out.push(row_entry(schema, &cols, &cells)?);
+    for (i, row) in rows.iter().enumerate() {
+        let line = i + 2;
+        let cells = cells_for_header(row, cols.len(), line)?;
+        out.push(row_entry(schema, &cols, &cells, line).map_err(|e| e.at_file_line(Some(line)))?);
     }
     Ok(out)
 }
 
-fn row_entry(schema: &str, cols: &[&str], cells: &[&str]) -> Result<LogInput, Error> {
+fn cells_for_header(row: &str, header: usize, line: usize) -> Result<Vec<&str>, Error> {
+    let cells: Vec<&str> = row.split('\t').collect();
+    if cells.len() < header
+        || (cells.len() > header && cells[header..].iter().any(|c| !c.is_empty()))
+    {
+        return Err(Error::Usage(Usage::TsvRowWidth {
+            columns: cells.len(),
+            header,
+        })
+        .at_file_line(Some(line)));
+    }
+    if cells.len() > header {
+        return Ok(cells[..header].to_vec());
+    }
+    Ok(cells)
+}
+
+fn row_entry(schema: &str, cols: &[&str], cells: &[&str], line: usize) -> Result<LogInput, Error> {
     let mut at = None;
     let mut agent = None;
     let mut links = Vec::new();
@@ -69,6 +84,7 @@ fn row_entry(schema: &str, cols: &[&str], cells: &[&str]) -> Result<LogInput, Er
         agent,
         links,
         fields,
+        file_line: Some(line),
     })
 }
 
@@ -138,7 +154,27 @@ mod tests {
     #[test]
     fn short_row_is_wrong_width() {
         let err = log_rows("meal", "when\twhat\nbreakfast\n").unwrap_err();
-        assert!(matches!(err, Error::Usage(Usage::TsvRowWidth)));
+        assert_eq!(
+            err.to_string(),
+            "log --file line 2: 1 columns, header has 2"
+        );
+    }
+
+    #[test]
+    fn trailing_empty_cells_are_not_extra_columns() {
+        let rows = log_rows("meal", "when\twhat\nbreakfast\teggs\t\t\n").unwrap();
+        assert_eq!(
+            rows[0].fields,
+            vec![
+                ("when".into(), "breakfast".into()),
+                ("what".into(), "eggs".into())
+            ]
+        );
+        let err = log_rows("meal", "when\twhat\nbreakfast\teggs\t\tnope\n").unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "log --file line 2: 4 columns, header has 2"
+        );
     }
 
     #[test]
@@ -163,7 +199,10 @@ mod tests {
             ]
         );
         let err = log_rows("set", "links\nsession\n").unwrap_err();
-        assert!(matches!(err, Error::Usage(Usage::InvalidLinkTarget(_))));
+        assert_eq!(
+            err.to_string(),
+            "log --file line 2: invalid link target: session"
+        );
     }
 
     #[test]
