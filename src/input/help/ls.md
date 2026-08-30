@@ -47,8 +47,7 @@ The name must be a declared field (`enum` values folded
 lowercase, `text` exact and case-sensitive). The value
 may not be empty. `--where` on `id`, `at`, `agent`,
 `ignored`, `links`, or `grain` is an error; use `--agent`,
-`get`, or `--from` / `--to`. There is no `!=`; use
-`--exclude`.
+`get`, or `--from` / `--to`.
 
 `--exclude field=value` — may repeat; a row drops if it
 matches any exclude. Same field rules as `--where`. Still

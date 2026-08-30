@@ -199,8 +199,8 @@ on reserved names (`id`, `at`, `agent`, `ignored`, `grain`,
 `links`) is an error; use `--agent`, `get`, or
 `--from` / `--to`. `--exclude field=value` may repeat; a
 row drops if it matches any exclude. Same field rules as
-`--where`. Still must match every `--where`. No `!=` in
-`--where`. Order: oldest `at`, then `id`.
+`--where`. Still must match every `--where`. Order: oldest
+`at`, then `id`.
 
 ## get
 
