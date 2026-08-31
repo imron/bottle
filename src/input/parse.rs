@@ -194,9 +194,6 @@ pub fn schema_drop(name: String) -> Result<SchemaDrop, Error> {
 }
 
 fn log_op(cmd: cmd::Log, tz: &TimeZone) -> Result<Op, Error> {
-    if cmd.check && cmd.file.is_none() {
-        return Err(Error::Usage(Usage::CheckNeedsFile));
-    }
     let check = cmd.check;
     let entries = log_cmd(cmd)?;
     if check {

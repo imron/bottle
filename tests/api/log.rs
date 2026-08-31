@@ -1304,25 +1304,36 @@ fn log_file_check_fails_like_log() {
 }
 
 #[test]
-fn check_without_file_is_usage() {
+fn check_without_file_validates_one_entry() {
     let mut h = harness();
     h.add_schema("nutrition.meal", MEAL);
-    let err = h
-        .run(Cmd::Log(cmd::Log {
+    let out = h.run_ok(Cmd::Log(cmd::Log {
+        schema: "nutrition.meal".into(),
+        at: Some("2026-08-22T08:14:00Z".into()),
+        agent: None,
+        links: vec![],
+        file: None,
+        check: true,
+        fields: vec![
+            ("when".into(), "breakfast".into()),
+            ("what".into(), "eggs".into()),
+            ("kcal".into(), "1".into()),
+            ("protein".into(), "1".into()),
+            ("carbs".into(), "0".into()),
+        ],
+    }));
+    assert_eq!(tsv_lines(&out), vec![vec!["rows"], vec!["1"]]);
+    let ls = h.run_ok(Cmd::Ls(cmd::Ls {
+        filters: cmd::Filters {
             schema: "nutrition.meal".into(),
-            at: Some("2026-08-22T08:14:00Z".into()),
             agent: None,
+            wheres: vec![],
             links: vec![],
-            file: None,
-            check: true,
-            fields: vec![
-                ("when".into(), "breakfast".into()),
-                ("what".into(), "eggs".into()),
-                ("kcal".into(), "1".into()),
-                ("protein".into(), "1".into()),
-                ("carbs".into(), "0".into()),
-            ],
-        }))
-        .unwrap_err();
-    assert_usage(err, "--check requires --file");
+            excludes: vec![],
+        },
+        from: None,
+        to: None,
+        include_ignored: false,
+    }));
+    assert_eq!(tsv_lines(&ls).len(), 1);
 }
