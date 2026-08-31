@@ -104,7 +104,7 @@ impl Error {
         }
     }
 
-    pub(crate) fn at_file_line(self, line: Option<usize>) -> Self {
+    pub fn at_file_line(self, line: Option<usize>) -> Self {
         match line {
             Some(line) if !matches!(self, Self::FileLine { .. }) => Self::FileLine {
                 line,

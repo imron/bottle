@@ -369,7 +369,7 @@ impl EntryId {
         self.0
     }
 
-    pub(crate) fn from_raw(n: i64) -> Option<Self> {
+    pub fn from_raw(n: i64) -> Option<Self> {
         (n >= 1).then_some(Self(n))
     }
 }
@@ -456,7 +456,7 @@ pub fn parse_number(raw: &str) -> Result<Decimal, Error> {
     }
 }
 
-pub(crate) fn number_reject_rule(raw: &str) -> &'static str {
+pub fn number_reject_rule(raw: &str) -> &'static str {
     if raw.contains(['e', 'E']) {
         "plain number, no exponent"
     } else if raw.starts_with('+') {
