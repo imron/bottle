@@ -187,6 +187,8 @@ struct LogEntry {
 struct LogParams {
     schema: String,
     entries: Vec<LogEntry>,
+    #[serde(default)]
+    check: bool,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -362,6 +364,7 @@ impl Server {
 
     #[tool(description = "Write one entry, or many in one transaction")]
     fn log(&self, Parameters(p): Parameters<LogParams>) -> Result<CallToolResult, McpError> {
+        let check = p.check;
         let entries = p
             .entries
             .into_iter()
@@ -374,7 +377,12 @@ impl Server {
                 file_line: None,
             })
             .collect();
-        Ok(self.run(parse::logs(entries, &self.tz)))
+        let op = if check {
+            parse::log_check(entries, &self.tz)
+        } else {
+            parse::logs(entries, &self.tz)
+        };
+        Ok(self.run(op))
     }
 
     #[tool(description = "List entries of a schema")]

@@ -249,6 +249,34 @@ async fn empty_log_is_tool_error() {
 }
 
 #[tokio::test]
+async fn check_does_not_write() {
+    let dir = TempDir::new().unwrap();
+    let client = connect(&dir).await;
+    ok(
+        &client,
+        "schema_add",
+        rmcp::object!({ "name": "nutrition.meal", "spec": MEAL }),
+    )
+    .await;
+    let out = ok(
+        &client,
+        "log",
+        rmcp::object!({
+            "schema": "nutrition.meal",
+            "check": true,
+            "entries": [{
+                "at": "2026-08-22T08:14:00Z",
+                "fields": { "when": "breakfast", "what": "eggs", "kcal": 1 }
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(out, "rows\n1\n");
+    let ls = ok(&client, "ls", rmcp::object!({ "schema": "nutrition.meal" })).await;
+    assert_eq!(ls, "id\tat\tlinks\twhen\twhat\tkcal\tfat\tagent\n");
+}
+
+#[tokio::test]
 async fn rejects_bad_value_shape() {
     let dir = TempDir::new().unwrap();
     let client = connect(&dir).await;

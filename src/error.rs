@@ -32,6 +32,7 @@ pub enum Usage {
     EmptyBackupPath,
     RenameSameField(FieldName),
     RenameSameSchema(SchemaName),
+    CheckNeedsFile,
     LogFileNeedsHeader,
     TsvRowWidth { columns: usize, header: usize },
     DuplicateHeader(String),
@@ -138,6 +139,7 @@ fn usage_message(err: &Usage) -> String {
         Usage::EmptyBackupPath => "backup requires a path".into(),
         Usage::RenameSameField(name) => format!("from and to are the same field: {name}"),
         Usage::RenameSameSchema(name) => format!("from and to are the same schema: {name}"),
+        Usage::CheckNeedsFile => "--check requires --file".into(),
         Usage::LogFileNeedsHeader => "log --file requires a header row".into(),
         Usage::TsvRowWidth { columns, header } => {
             format!("{columns} columns, header has {header}")

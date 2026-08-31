@@ -42,7 +42,7 @@ pub fn parse(cmd: Cmd, tz: &TimeZone) -> Result<Op, Error> {
         }
         Cmd::Schema(cmd::SchemaCmd::Retire(cmd)) => Op::SchemaRetire(schema_retire(cmd.name)?),
         Cmd::Schema(cmd::SchemaCmd::Drop(cmd)) => Op::SchemaDrop(schema_drop(cmd.name)?),
-        Cmd::Log(cmd) => logs(log_cmd(cmd)?, tz)?,
+        Cmd::Log(cmd) => log_op(cmd, tz)?,
         Cmd::Ls(cmd) => Op::List(ls(
             cmd.filters.into(),
             cmd.from,
@@ -193,6 +193,19 @@ pub fn schema_drop(name: String) -> Result<SchemaDrop, Error> {
     })
 }
 
+fn log_op(cmd: cmd::Log, tz: &TimeZone) -> Result<Op, Error> {
+    if cmd.check && cmd.file.is_none() {
+        return Err(Error::Usage(Usage::CheckNeedsFile));
+    }
+    let check = cmd.check;
+    let entries = log_cmd(cmd)?;
+    if check {
+        log_check(entries, tz)
+    } else {
+        logs(entries, tz)
+    }
+}
+
 fn log_cmd(cmd: cmd::Log) -> Result<Vec<LogInput>, Error> {
     match cmd.file {
         None => Ok(vec![cmd.into()]),
@@ -254,6 +267,14 @@ fn read_text(path: &Path) -> Result<String, Error> {
 }
 
 pub fn logs(entries: Vec<LogInput>, tz: &TimeZone) -> Result<Op, Error> {
+    Ok(Op::Log(parse_logs(entries, tz)?))
+}
+
+pub fn log_check(entries: Vec<LogInput>, tz: &TimeZone) -> Result<Op, Error> {
+    Ok(Op::LogCheck(parse_logs(entries, tz)?))
+}
+
+fn parse_logs(entries: Vec<LogInput>, tz: &TimeZone) -> Result<Vec<Log>, Error> {
     if entries.is_empty() {
         return Err(Error::Usage(Usage::EmptyLog));
     }
@@ -261,7 +282,7 @@ pub fn logs(entries: Vec<LogInput>, tz: &TimeZone) -> Result<Op, Error> {
     for entry in entries {
         ops.push(log(entry, tz)?);
     }
-    Ok(Op::Log(ops))
+    Ok(ops)
 }
 
 fn log(entry: LogInput, tz: &TimeZone) -> Result<Log, Error> {

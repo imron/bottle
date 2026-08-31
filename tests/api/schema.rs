@@ -184,6 +184,7 @@ fn retire_blocks_log_not_show() {
             agent: None,
             links: vec![],
             file: None,
+            check: false,
             fields: vec![
                 ("when".into(), "breakfast".into()),
                 ("what".into(), "eggs".into()),

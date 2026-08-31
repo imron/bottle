@@ -40,7 +40,9 @@ On `ls` / `sum` / `last` / `today`, `exclude` is a list of
 one-element list. All entries share one schema and run in
 one transaction: all succeed or none do. Put `at`,
 `agent`, and `links` on the entry they belong to.
-Declared cells go in `fields`, same as `amend`.
+Declared cells go in `fields`, same as `amend`. `check`
+true validates every entry and returns `rows` and the
+count. It does not write.
 
 `links` is an object of name to `schema/id`. `unlink` is a
 list of names.

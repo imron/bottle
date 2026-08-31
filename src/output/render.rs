@@ -74,6 +74,7 @@ pub fn render(outcome: &Outcome, tz: &TimeZone, style: Style) -> Result<String, 
                 .collect();
             Ok(tsv::table(&[name.as_str(), "value"], &rows, header))
         }
+        Outcome::RowCount(n) => Ok(tsv::table(&["rows"], &[vec![n.to_string()]], header)),
     }
 }
 

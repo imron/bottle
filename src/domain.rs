@@ -4,7 +4,7 @@ use crate::db::{Conn, Db, Tx};
 use crate::error::{Error, Fail};
 use crate::ledger::{
     Agent, Amend, Backup, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink,
-    GroupedTime, Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome, Posted,
+    GroupedTime, Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome, Posted, Schema,
     SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRename, SchemaRenameField,
     SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed, Today, Total, Unignore,
 };
@@ -51,6 +51,7 @@ pub fn execute(db: &mut Db, agent: &Agent, tz: &TimeZone, op: Op) -> Result<Outc
             Ok(Outcome::Empty)
         }
         Op::Log(op) => log(db, agent, op),
+        Op::LogCheck(op) => check_log(db, op),
         Op::List(op) => list(db, op),
         Op::Get(op) => get(db, op),
         Op::Sum(op) => sum(db, op),
@@ -163,9 +164,33 @@ fn log(db: &mut Db, agent: &Agent, ops: Vec<Log>) -> Result<Outcome, Error> {
     .map(Outcome::Posted)
 }
 
+fn check_log(db: &mut Db, ops: Vec<Log>) -> Result<Outcome, Error> {
+    db.read(|conn| {
+        for op in &ops {
+            let line = op.file_line;
+            prepare_log(conn, op).map_err(|e| e.at_file_line(line))?;
+        }
+        Ok(Outcome::RowCount(ops.len()))
+    })
+}
+
 fn insert_log(tx: &mut Tx<'_>, agent: &Agent, op: Log) -> Result<Posted, Error> {
     let line = op.file_line;
     insert_one(tx, agent, op).map_err(|e| e.at_file_line(line))
+}
+
+fn prepare_log(
+    conn: &impl Conn,
+    op: &Log,
+) -> Result<(Schema, HashMap<FieldName, FieldValue>), Error> {
+    let loaded = store::load_schema(conn, &op.schema)?;
+    if loaded.retired {
+        return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
+    }
+    let values = given_fields(&loaded.spec, &op.fields)?;
+    ensure_required(&loaded.spec, &values)?;
+    ensure_links(conn, &loaded.spec, &op.links)?;
+    Ok((loaded, values))
 }
 
 fn insert_one(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Error> {
@@ -174,13 +199,7 @@ fn insert_one(tx: &mut Tx<'_>, agent: &Agent, mut op: Log) -> Result<Posted, Err
         Some(at) => at,
         None => At::now(),
     };
-    let loaded = store::load_schema(tx, &op.schema)?;
-    if loaded.retired {
-        return Err(Error::Fail(Fail::SchemaRetired(op.schema.clone())));
-    }
-    let values = given_fields(&loaded.spec, &op.fields)?;
-    ensure_required(&loaded.spec, &values)?;
-    ensure_links(tx, &loaded.spec, &op.links)?;
+    let (loaded, values) = prepare_log(tx, &op)?;
     op.links.sort_by(|a, b| a.name.cmp(&b.name));
     let id = mutable_store::insert_entry(
         tx,

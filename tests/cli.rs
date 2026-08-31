@@ -418,6 +418,48 @@ fn date_only_at_prints_the_day() {
 }
 
 #[test]
+fn log_check_requires_file_and_prints_count() {
+    let dir = TempDir::new().unwrap();
+    let spec = dir.path().join("meal.yaml");
+    std::fs::write(&spec, MEAL).unwrap();
+    let (code, _, stderr) = run_db(
+        &dir,
+        &[
+            "schema",
+            "add",
+            "nutrition.meal",
+            "--file",
+            spec.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(code, 0, "{stderr}");
+    let (code, stdout, stderr) = run_db(&dir, &["log", "nutrition.meal", "--check"]);
+    assert_eq!(code, 2, "{stderr}");
+    assert!(stdout.is_empty(), "{stdout}");
+    assert!(
+        stderr.contains("--file") || stderr.contains("check"),
+        "{stderr}"
+    );
+    let rows = dir.path().join("meals.tsv");
+    std::fs::write(&rows, "when\tkcal\nbreakfast\t1\nlunch\t2\n").unwrap();
+    let (code, stdout, stderr) = run_db(
+        &dir,
+        &[
+            "log",
+            "nutrition.meal",
+            "--file",
+            rows.to_str().unwrap(),
+            "--check",
+        ],
+    );
+    assert_eq!(code, 0, "{stderr}");
+    assert_eq!(stdout, "rows\n2\n");
+    let (code, stdout, stderr) = run_db(&dir, &["ls", "nutrition.meal"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert_eq!(stdout, "id\tat\tlinks\twhen\tkcal\tagent\n");
+}
+
+#[test]
 fn zero_id_is_usage_on_stderr() {
     let dir = TempDir::new().unwrap();
     let (code, stdout, stderr) = run_db(&dir, &["get", "meal", "0"]);

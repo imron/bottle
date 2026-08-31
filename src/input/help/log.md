@@ -11,6 +11,7 @@ bottle log <schema> [--at DATE|TIME] [--agent NAME] \
   [--link name=SCHEMA/ID]... [field=value ...]
 bottle log <schema> --file rows.tsv
 bottle log <schema> --file -
+bottle log <schema> --file rows.tsv --check
 ```
 
 ## Description
@@ -96,9 +97,14 @@ are defaults for blank cells. Errors name the file line
 columns. A row with fewer cells than the header is an
 error; extra cells with values are an error.
 
+`--check` — only with `--file`. Validate every row and
+print a count. Does not write and does not invent ids.
+A bad file uses the same stderr as a real log.
+
 ## Output
 
-TSV of `id`, `at`, `links`.
+TSV of `id`, `at`, `links`. `--check` prints `rows` and
+the count. `--no-header` then prints the count alone.
 
 ## Exit status
 
@@ -129,6 +135,7 @@ id	at	links
 
 ```
 bottle log nutrition.meal --file meals.tsv
+bottle log nutrition.meal --file meals.tsv --check
 ```
 
 ## See also

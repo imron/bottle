@@ -38,7 +38,10 @@ expand it before calling. bottle stores entries, not that
 string.
 
 The result is one TSV line of `id`, `at`, `links` per
-entry.
+entry. `check` true validates every entry and returns
+`rows` and the count. It does not write and does not
+invent ids. A bad batch is the same tool error as a real
+log.
 
 ## Output
 

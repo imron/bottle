@@ -198,6 +198,7 @@ fn year_week_and_quarter_are_not_grains() {
                 agent: None,
                 links: vec![],
                 file: None,
+                check: false,
                 fields: vec![
                     ("when".into(), "breakfast".into()),
                     ("what".into(), "x".into()),

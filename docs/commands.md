@@ -189,6 +189,20 @@ values, is an error:
 log --file line 12: 6 columns, header has 5
 ```
 
+`--check` is only valid with `--file`. It validates every
+row and prints a count. It does not write and does not
+invent ids. `--no-header` prints the count alone. A bad
+file uses the same stderr as a real log.
+
+```
+bottle log money.txn --file cba.tsv --check
+```
+
+```
+rows
+165
+```
+
 ## ls
 
 ```

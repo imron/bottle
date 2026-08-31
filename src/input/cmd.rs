@@ -138,6 +138,9 @@ pub struct Log {
     /// TSV file of entries; - is stdin
     #[arg(long, value_name = "PATH")]
     pub file: Option<PathBuf>,
+    /// Validate --file without writing
+    #[arg(long, requires = "file")]
+    pub check: bool,
     /// Declared fields as name=value
     #[arg(trailing_var_arg = true, value_name = "name=value", value_parser = parse_kv)]
     pub fields: Vec<(String, String)>,

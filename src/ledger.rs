@@ -300,6 +300,7 @@ pub enum Op {
     SchemaRetire(SchemaRetire),
     SchemaDrop(SchemaDrop),
     Log(Vec<Log>),
+    LogCheck(Vec<Log>),
     List(List),
     Get(Get),
     Sum(Sum),
@@ -365,4 +366,5 @@ pub enum Outcome {
     Total(Total),
     GroupedTime(GroupedTime),
     GroupedLink(GroupedLink),
+    RowCount(usize),
 }
