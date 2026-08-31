@@ -12,12 +12,11 @@ bottle ignore <schema> <id>
 
 ## Description
 
-Hides an entry from `ls`, `sum`, `last`, and `today`.
-`get` still returns it. `unignore` clears `ignored` so
-those queries see the entry again.
+Hides an entry from `ls`, `sum`, `last`, and `today`. `get` still returns it.
+`unignore` clears `ignored` so those queries see the entry again.
 
-Ignore does not clear links. Other entries that point here
-still do, and those links still block `schema drop`.
+Ignore does not clear links. Other entries that point here still do, and those
+links still block `schema drop`.
 
 Running ignore on an already-ignored id succeeds.
 

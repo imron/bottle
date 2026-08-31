@@ -14,29 +14,29 @@ bottle last <schema> [--agent NAME] \
 
 ## Description
 
-Prints the most recent entry of a schema, optionally
-filtered. One result, not a list.
+Prints the most recent entry of a schema, optionally filtered. One result, not a
+list.
 
-Most recent `at` wins. If two entries share an instant,
-the highest `id` wins. Ignored entries are omitted.
+Most recent `at` wins. If two entries share an instant, the highest `id` wins.
+Ignored entries are omitted.
 
 ## Options
 
 `--agent NAME` — only entries written by that agent.
 
-`--where field=value` — may repeat; all clauses are AND.
-The name must be a declared field.
+`--where field=value` — may repeat; all clauses are AND. The name must be a
+declared field.
 
-`--exclude field=value` — may repeat; a row drops if it
-matches any exclude. Same field rules as `--where`.
+`--exclude field=value` — may repeat; a row drops if it matches any exclude.
+Same field rules as `--where`.
 
-`--link name=SCHEMA/ID` — may repeat; all clauses are AND.
-Entries that have that named pointer.
+`--link name=SCHEMA/ID` — may repeat; all clauses are AND. Entries that have
+that named pointer.
 
 ## Output
 
-Columns: `id`, `at`, `links`, the schema's fields in
-declaration order, then `agent`.
+Columns: `id`, `at`, `links`, the schema's fields in declaration order, then
+`agent`.
 
 ## Exit status
 

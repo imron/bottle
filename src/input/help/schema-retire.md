@@ -12,16 +12,13 @@ bottle schema retire <name>
 
 ## Description
 
-Stops new `log`s on a schema. Existing entries stay. You
-can still `ls`, `get`, `sum`, `amend`, `ignore`, and
-`unignore`.
+Stops new `log`s on a schema. Existing entries stay. You can still `ls`, `get`,
+`sum`, `amend`, `ignore`, and `unignore`.
 
-Use this when you have replaced a type and want the old
-name kept as history. Running it again on an already
-retired schema succeeds.
+Use this when you have replaced a type and want the old name kept as history.
+Running it again on an already retired schema succeeds.
 
-`schema add-field` and `schema add-value` also fail on a
-retired schema.
+`schema add-field` and `schema add-value` also fail on a retired schema.
 
 ## Exit status
 

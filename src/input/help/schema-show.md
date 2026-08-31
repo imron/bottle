@@ -13,16 +13,16 @@ bottle schema show <name> --yaml
 
 ## Description
 
-Prints the field list for one schema: names, types,
-whether each is required, and enum values.
+Prints the field list for one schema: names, types, whether each is required,
+and enum values.
 
-Retired schemas still show. Links are not fields and are
-not in this output. Pass them with `--link` on `log`.
+Retired schemas still show. Links are not fields and are not in this output.
+Pass them with `--link` on `log`.
 
 ## Options
 
-`--yaml` — print the YAML field list, the same form that
-`schema add --file` accepts.
+`--yaml` — print the YAML field list, the same form that `schema add --file`
+accepts.
 
 ## Output
 
@@ -35,9 +35,8 @@ what	text	true
 kcal	number	true	
 ```
 
-`required` is `true` or `false`. `values` is
-comma-separated for an enum, and empty for `text` and
-`number`.
+`required` is `true` or `false`. `values` is comma-separated for an enum, and
+empty for `text` and `number`.
 
 ## Exit status
 
