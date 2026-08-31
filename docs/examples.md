@@ -70,9 +70,9 @@ does not print a total.
 
 ## Sets
 
-One entry is one set. `reps`, `load`, and `unit` stay queryable. Volume is
-`reps * load` when load is present, so `sum volume` is tonnage. How many sets is
-an entry count.
+One entry is one set. `reps`, `load`, and `unit` stay queryable. `volume` is a
+declared number, not computed: store `reps * load` when load is present so
+`sum volume` is tonnage. How many sets is an entry count.
 
 `4x8x24kg` is four entries of `reps=8 load=24 unit=kg`, not one entry with a
 sets count. If the last set is 6, the four entries differ.
@@ -120,9 +120,9 @@ bottle schema add fitness.session \
 bottle schema add fitness.set --file fitness.set.yaml
 bottle log fitness.session title="upper"
 bottle log fitness.set --link session=fitness.session/1 \
-  movement=squat reps=8 load=24 unit=kg
+  movement=squat reps=8 load=24 unit=kg volume=192
 bottle log fitness.set --link session=fitness.session/1 \
-  movement=squat reps=8 load=24 unit=kg
+  movement=squat reps=8 load=24 unit=kg volume=192
 bottle ls fitness.set --link session=fitness.session/1
 bottle sum fitness.set volume --from 2026-08-16 \
   --to 2026-08-22 --where unit=kg

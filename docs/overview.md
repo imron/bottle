@@ -68,8 +68,9 @@ APIs to ask what happened. They speak bottle.
 - Not a hosted service. The file lives on disk.
 - Not a tag system. A link is a named pointer to an existing entry, not a free
   string.
-- Not a general migrator. You can add an optional field, add an enum value, or
-  retire the schema. See [schema.md](schema.md).
+- Not a general migrator. You can add an optional field, add an enum value,
+  rename a schema or field, or retire the schema. See
+  [schema.md](schema.md).
 
 ## Who uses it
 
