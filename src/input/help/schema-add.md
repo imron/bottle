@@ -13,15 +13,12 @@ bottle schema add <name> --file -
 
 ## Description
 
-Registers a new type. After this succeeds you can `log`
-entries of that type.
+Registers a new type. After this succeeds you can `log` entries of that type.
 
-`<name>` is one or more lowercase segments separated by
-dots, for example `meal`, `nutrition.meal`, or
-`fitness.strength.set`. Each segment is
-`^[a-z][a-z0-9]*$`. `_` is `.` (`nutrition_meal` is
-`nutrition.meal`). Empty segments are not allowed
-(`meal.`, `.meal`, `foo..bar`). It must not already
+`<name>` is one or more lowercase segments separated by dots, for example
+`meal`, `nutrition.meal`, or `fitness.strength.set`. Each segment is
+`^[a-z][a-z0-9]*$`. `_` is `.` (`nutrition_meal` is `nutrition.meal`). Empty
+segments are not allowed (`meal.`, `.meal`, `foo..bar`). It must not already
 exist.
 
 The YAML is a field list:
@@ -42,24 +39,22 @@ fields:
 
 Types:
 
-- `text` — a string. Comparison is case-sensitive. Tabs
-  and newlines are rejected.
-- `number` — a decimal in stored form (`1`, `1.10`), not
-  `1e3`, `01`, or `+1`. Only number fields can be summed.
-- `enum` — one of the listed values. Values are stored
-  lowercase (`Water` becomes `water`). Duplicates after
-  that fold are rejected. Tab, newline, and comma are
+- `text` — a string. Comparison is case-sensitive. Tabs and newlines are
   rejected.
+- `number` — a decimal in stored form (`1`, `1.10`), not `1e3`, `01`, or `+1`.
+  Only number fields can be summed.
+- `enum` — one of the listed values. Values are stored lowercase (`Water`
+  becomes `water`). Duplicates after that fold are rejected. Tab, newline, and
+  comma are rejected.
 
-Field names: `^[a-z][a-z0-9_]*$`. Reserved (you may not
-use them as fields): `id`, `at`, `agent`, `ignored`,
-`links`, `grain`. There is no date field type; the time of the
-event is `at` on every entry. Keys other than `name`,
-`type`, `required`, and `values` are rejected. `default`
-is `schema add-field --default`, not a YAML key.
+Field names: `^[a-z][a-z0-9_]*$`. Reserved (you may not use them as fields):
+`id`, `at`, `agent`, `ignored`, `links`, `grain`. There is no date field type;
+the time of the event is `at` on every entry. Keys other than `name`, `type`,
+`required`, and `values` are rejected. `default` is
+`schema add-field --default`, not a YAML key.
 
-Links are not declared in the YAML. You set them on `log`
-with `--link name=schema/id`.
+Links are not declared in the YAML. You set them on `log` with
+`--link name=schema/id`.
 
 On success the command prints nothing.
 

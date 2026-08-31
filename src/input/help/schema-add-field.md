@@ -13,39 +13,34 @@ bottle schema add-field <name> --name <field> \
 
 ## Description
 
-Adds one field to an existing schema. Use
-`schema rename-field` to rename a field. You cannot drop
-a field or change its type. For those, add a new schema,
-copy the entries you still want, and `schema retire` the
-old name.
+Adds one field to an existing schema. Use `schema rename-field` to rename a
+field. You cannot drop a field or change its type. For those, add a new schema,
+copy the entries you still want, and `schema retire` the old name.
 
-Without `--default` the new field is optional. Existing
-entries have an empty cell there.
+Without `--default` the new field is optional. Existing entries have an empty
+cell there.
 
-With `--default` the field is required and every existing
-entry is filled with that value.
+With `--default` the field is required and every existing entry is filled with
+that value.
 
 ## Options
 
-`--name <field>` — field name (`^[a-z][a-z0-9_]*$`).
-Cannot be reserved: `id`, `at`, `agent`, `ignored`,
-`links`, `grain`.
+`--name <field>` — field name (`^[a-z][a-z0-9_]*$`). Cannot be reserved: `id`,
+`at`, `agent`, `ignored`, `links`, `grain`.
 
 `--type text|number|enum` — the field type.
 
-`--values a,b` — required for `enum`, invalid for `text`
-and `number`. Leading and trailing spaces are stripped.
-Values are stored lowercase. Two values that fold to the
-same lowercase string are rejected. Tab, newline, and
-comma are rejected.
+`--values a,b` — required for `enum`, invalid for `text` and `number`. Leading
+and trailing spaces are stripped. Values are stored lowercase. Two values that
+fold to the same lowercase string are rejected. Tab, newline, and comma are
+rejected.
 
-`--default N` — backfill existing entries and make the
-field required.
+`--default N` — backfill existing entries and make the field required.
 
 ## Exit status
 
-`0` ok. `1` field exists, schema retired, reserved name,
-or the name is already used as a link.
+`0` ok. `1` field exists, schema retired, reserved name, or the name is already
+used as a link.
 
 ## See also
 

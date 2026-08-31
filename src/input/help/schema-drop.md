@@ -12,13 +12,11 @@ bottle schema drop <name>
 
 ## Description
 
-Deletes a schema, all of its entries, and every outbound
-link from those entries. `schema retire` keeps the entries
-readable; `drop` does not.
+Deletes a schema, all of its entries, and every outbound link from those
+entries. `schema retire` keeps the entries readable; `drop` does not.
 
-It refuses if any entry, in any schema, still links at
-this type — ignored or not. `ignore` does not clear links.
-Unlink them first.
+It refuses if any entry, in any schema, still links at this type — ignored or
+not. `ignore` does not clear links. Unlink them first.
 
 ## Exit status
 

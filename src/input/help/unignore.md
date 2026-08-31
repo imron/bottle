@@ -12,9 +12,8 @@ bottle unignore <schema> <id>
 
 ## Description
 
-Clears `ignored` on an entry. The entry is again visible
-to `ls`, `sum`, `last`, and `today`. Does not change
-fields, `at`, `agent`, or links.
+Clears `ignored` on an entry. The entry is again visible to `ls`, `sum`, `last`,
+and `today`. Does not change fields, `at`, `agent`, or links.
 
 Running unignore on an id that is not ignored succeeds.
 

@@ -1,21 +1,17 @@
 # Examples
 
-None of these schemas ship with bottle. They show how to
-declare a type and use the verbs. Copy the YAML, change the
-fields.
+None of these schemas ship with bottle. They show how to declare a type and use
+the verbs. Copy the YAML, change the fields.
 
-Set `BOTTLE_AGENT`. Sample timestamps are local to the
-host. A link target is `schema/id`. Link names are chosen
-at write time; they are not in the YAML.
+Set `BOTTLE_AGENT`. Sample timestamps are local to the host. A link target is
+`schema/id`. Link names are chosen at write time; they are not in the YAML.
 
-A caller may turn a shorthand like `4x8x24` into several
-`log`s (or one MCP `entries` call). bottle only sees fields
-and links.
+A caller may turn a shorthand like `4x8x24` into several `log`s (or one MCP
+`entries` call). bottle only sees fields and links.
 
 ## Meals
 
-Meals and drinks are different types so `sum ml` and
-`sum protein` stay obvious.
+Meals and drinks are different types so `sum ml` and `sum protein` stay obvious.
 
 `nutrition.meal.yaml`
 
@@ -69,23 +65,21 @@ bottle amend nutrition.fluid 1 ml=375
 bottle ignore nutrition.fluid 1
 ```
 
-`get`, `amend`, and `ignore` take a schema because ids are
-per table. `today` does not print a total.
+`get`, `amend`, and `ignore` take a schema because ids are per table. `today`
+does not print a total.
 
 ## Sets
 
-One entry is one set. `reps`, `load`, and `unit` stay
-queryable. Volume is `reps * load` when load is present, so
-`sum volume` is tonnage. How many sets is an entry count.
+One entry is one set. `reps`, `load`, and `unit` stay queryable. Volume is
+`reps * load` when load is present, so `sum volume` is tonnage. How many sets is
+an entry count.
 
-`4x8x24kg` is four entries of `reps=8 load=24 unit=kg`, not
-one entry with a sets count. If the last set is 6, the four
-entries differ.
+`4x8x24kg` is four entries of `reps=8 load=24 unit=kg`, not one entry with a
+sets count. If the last set is 6, the four entries differ.
 
-`load` is a number. `unit` is `kg` or `lb`. If `load` is
-set, `unit` is required. Bodyweight sets omit both. bottle
-does not convert units. `sum volume` should use
-`--where unit=kg` (or `lb`).
+`load` is a number. `unit` is `kg` or `lb`. If `load` is set, `unit` is
+required. Bodyweight sets omit both. bottle does not convert units. `sum volume`
+should use `--where unit=kg` (or `lb`).
 
 A workout is its own entry. Sets link to it as `session`.
 
@@ -138,8 +132,7 @@ A single set with no workout omits `--link`.
 
 ## Cardio
 
-A cardio bout is one entry (duration and kind), not a list
-of intervals.
+A cardio bout is one entry (duration and kind), not a list of intervals.
 
 `fitness.cardio.yaml`
 
@@ -171,8 +164,8 @@ bottle last fitness.cardio --where protocol=intervals
 
 ## Expenses
 
-`kind` is `in` or `out`. Sum spend with
-`--where kind=out`. Do not store a negative amount.
+`kind` is `in` or `out`. Sum spend with `--where kind=out`. Do not store a
+negative amount.
 
 `money.txn.yaml`
 
@@ -209,8 +202,7 @@ bottle last money.txn --where account=operating
 
 ## Hours
 
-A project is its own table. Hour entries link to it as
-`project`.
+A project is its own table. Hour entries link to it as `project`.
 
 `work.project.yaml`
 
