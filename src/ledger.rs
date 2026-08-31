@@ -159,6 +159,10 @@ pub enum Summed {
         name: LinkName,
         buckets: Vec<(Option<EntryRef>, Decimal)>,
     },
+    Field {
+        name: FieldName,
+        buckets: Vec<(Option<String>, Decimal)>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -356,6 +360,12 @@ pub struct GroupedLink {
 }
 
 #[derive(Debug, Clone)]
+pub struct GroupedField {
+    pub name: FieldName,
+    pub buckets: Vec<(Option<String>, Decimal)>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Outcome {
     Empty,
     Schemas(Schemas),
@@ -366,5 +376,6 @@ pub enum Outcome {
     Total(Total),
     GroupedTime(GroupedTime),
     GroupedLink(GroupedLink),
+    GroupedField(GroupedField),
     RowCount(usize),
 }

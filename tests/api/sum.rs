@@ -1,4 +1,4 @@
-use bottle::{Cmd, cmd};
+use bottle::{Cmd, FieldType, cmd};
 
 use crate::common::{SESSION, SET, assert_fail, harness, seed_meals, tsv_lines};
 
@@ -228,7 +228,55 @@ fn sum_rejects_invalid_field_name() {
 }
 
 #[test]
-fn sum_group_collides_with_field() {
+fn sum_group_enum_and_text_fields() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    let by_when = h.run_ok(Cmd::Sum(cmd::Sum {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+            excludes: vec![],
+        },
+        field: "protein".into(),
+        from: None,
+        to: None,
+        group: Some("when".into()),
+    }));
+    assert_eq!(
+        tsv_lines(&by_when),
+        vec![
+            vec!["when", "value"],
+            vec!["breakfast", "49"],
+            vec!["lunch", "10"],
+        ]
+    );
+    let by_what = h.run_ok(Cmd::Sum(cmd::Sum {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+            excludes: vec![],
+        },
+        field: "protein".into(),
+        from: None,
+        to: None,
+        group: Some("what".into()),
+    }));
+    assert_eq!(
+        tsv_lines(&by_what),
+        vec![
+            vec!["what", "value"],
+            vec!["eggs", "49"],
+            vec!["rice", "10"],
+        ]
+    );
+}
+
+#[test]
+fn sum_group_rejects_number_field() {
     let mut h = harness();
     seed_meals(&mut h);
     let err = h
@@ -246,7 +294,50 @@ fn sum_group_collides_with_field() {
             group: Some("kcal".into()),
         }))
         .unwrap_err();
-    assert_fail(err, "collides with field");
+    assert_fail(err, "cannot group by number field: kcal");
+}
+
+#[test]
+fn sum_group_empty_optional_field() {
+    let mut h = harness();
+    seed_meals(&mut h);
+    h.run_ok(Cmd::Schema(cmd::SchemaCmd::AddField(cmd::SchemaAddField {
+        schema: "nutrition.meal".into(),
+        name: "tag".into(),
+        type_: FieldType::Text,
+        values: None,
+        default: None,
+    })));
+    h.log(
+        "nutrition.meal",
+        &[
+            ("when", "snack"),
+            ("what", "nuts"),
+            ("kcal", "1"),
+            ("protein", "5"),
+            ("carbs", "1"),
+            ("tag", "work"),
+        ],
+        &[],
+        Some("2026-08-24T08:00:00Z"),
+    );
+    let grouped = h.run_ok(Cmd::Sum(cmd::Sum {
+        filters: cmd::Filters {
+            schema: "nutrition.meal".into(),
+            agent: None,
+            wheres: vec![],
+            links: vec![],
+            excludes: vec![],
+        },
+        field: "protein".into(),
+        from: None,
+        to: None,
+        group: Some("tag".into()),
+    }));
+    assert_eq!(
+        tsv_lines(&grouped),
+        vec![vec!["tag", "value"], vec!["", "59"], vec!["work", "5"],]
+    );
 }
 
 #[test]

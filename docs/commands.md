@@ -245,7 +245,7 @@ bottle sum <schema> <field> [--from DATE|TIME] \
   [--where field=value]... \
   [--exclude field=value]... \
   [--link name=SCHEMA/ID]... \
-  [--group day|week|month|year|<link>]
+  [--group day|week|month|year|<field>|<link>]
 ```
 
 `<field>` must be a declared number. With no `--group`:
@@ -258,9 +258,12 @@ event on one day):
 - `month` -- `YYYY-MM`
 - `year` -- `YYYY`
 
-Any other `--group` name is a link name. The group column
-is that name; the cell is `schema/id`. Entries with no
-such link are one group with an empty cell.
+A declared enum or text field is next. Number fields are
+rejected. Time grains stay grains even if a field uses
+that name. Any other name is a link. The group column is
+that name. For a field the cell is the stored value; for
+a link it is `schema/id`. An empty optional field is one
+group with an empty cell, same as a missing link.
 
 An empty set prints `value` `0` (one line, or no group
 lines).

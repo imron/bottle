@@ -203,6 +203,7 @@ bottle sum money.txn amount --from 2026-08-01 \
   --to 2026-08-31 --where kind=out
 bottle sum money.txn amount --from 2025-01-01 \
   --to 2026-12-31 --where kind=out --group month
+bottle sum money.txn amount --group kind
 bottle last money.txn --where account=operating
 ```
 

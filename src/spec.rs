@@ -344,6 +344,7 @@ impl TimePeriod {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Group {
     Time(TimePeriod),
+    Field(FieldName),
     Link(LinkName),
 }
 

@@ -12,7 +12,7 @@ bottle sum <schema> <field> [--from DATE|TIME] \
   [--where field=value]... \
   [--exclude field=value]... \
   [--link name=SCHEMA/ID]... \
-  [--group day|week|month|year|<link>]
+  [--group day|week|month|year|<field>|<link>]
 ```
 
 ## Description
@@ -53,10 +53,13 @@ day):
 - `month` — `YYYY-MM`
 - `year` — `YYYY`
 
-`--group <link>` — any other name is a link name. The
-group column is that name; the cell is `schema/id`.
-Entries with no such link are one group with an empty
-cell.
+`--group <field>|<link>` — a declared enum or text field,
+else a link name. Time grains stay grains even if a field
+uses that name. Number fields are rejected. The group
+column is that name. For a field the cell is the stored
+value; for a link it is `schema/id`. An empty optional
+field is one group with an empty cell, same as a missing
+link.
 
 ## Output
 
@@ -75,6 +78,7 @@ bottle sum nutrition.meal protein --from 2026-08-16 \
   --to 2026-08-22 --group day
 bottle sum work.hours hours --link project=work.project/1
 bottle sum work.hours hours --group project
+bottle sum nutrition.fluid ml --from 2026-08 --group kind
 ```
 
 ## See also

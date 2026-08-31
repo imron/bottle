@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use crate::db::{Conn, Db, Tx};
 use crate::error::{Error, Fail};
 use crate::ledger::{
-    Agent, Amend, Backup, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedLink,
-    GroupedTime, Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome, Posted, Schema,
-    SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRename, SchemaRenameField,
-    SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed, Today, Total, Unignore,
+    Agent, Amend, Backup, Entries, FieldInput, FieldValue, Filter, Find, Get, GroupedField,
+    GroupedLink, GroupedTime, Ignore, Last, List, Log, NonEmptyFieldValue, Op, Order, Outcome,
+    Posted, Schema, SchemaAdd, SchemaAddField, SchemaAddValue, SchemaDrop, SchemaRename,
+    SchemaRenameField, SchemaRetire, SchemaShow, Schemas, Scope, Stamp, Sum, Summed, Today, Total,
+    Unignore,
 };
 use crate::mutable_store;
 use crate::spec::{EntryId, Field, FieldKind, FieldName, Group, Link, LinkName, SchemaName, Spec};
@@ -410,18 +411,47 @@ fn sum(db: &mut Db, op: Sum) -> Result<Outcome, Error> {
                 _ => None,
             },
         };
-        if let Some(Group::Link(name)) = &op.group {
-            spec.ensure_link_name(name)?;
-        }
-        Ok(match store::sum(conn, q, &op.field, op.group)? {
+        let group = match op.group {
+            None => None,
+            Some(Group::Time(unit)) => Some(Group::Time(unit)),
+            Some(Group::Field(name)) => Some(resolve_field_group(&spec, name)?),
+            Some(Group::Link(name)) => Some(resolve_group_name(&spec, name)?),
+        };
+        Ok(match store::sum(conn, q, &op.field, group)? {
             Summed::Total(value) => Outcome::Total(Total {
                 field: op.field,
                 value,
             }),
             Summed::Time { unit, buckets } => Outcome::GroupedTime(GroupedTime { unit, buckets }),
             Summed::Link { name, buckets } => Outcome::GroupedLink(GroupedLink { name, buckets }),
+            Summed::Field { name, buckets } => {
+                Outcome::GroupedField(GroupedField { name, buckets })
+            }
         })
     })
+}
+
+fn resolve_field_group(spec: &Spec, name: FieldName) -> Result<Group, Error> {
+    let Some(f) = spec.field(&name) else {
+        return Err(Error::Fail(Fail::UnknownField(name)));
+    };
+    match f.kind {
+        FieldKind::Number => Err(Error::Fail(Fail::CannotGroupByNumber(name))),
+        FieldKind::Text | FieldKind::Enum(_) => Ok(Group::Field(name)),
+    }
+}
+
+fn resolve_group_name(spec: &Spec, name: LinkName) -> Result<Group, Error> {
+    if let Ok(field) = FieldName::parse(name.as_str())
+        && let Some(f) = spec.field(&field)
+    {
+        return match f.kind {
+            FieldKind::Number => Err(Error::Fail(Fail::CannotGroupByNumber(field))),
+            FieldKind::Text | FieldKind::Enum(_) => Ok(Group::Field(field)),
+        };
+    }
+    spec.ensure_link_name(&name)?;
+    Ok(Group::Link(name))
 }
 
 fn resolve_filters(

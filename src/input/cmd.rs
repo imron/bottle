@@ -200,8 +200,8 @@ pub struct Sum {
     /// Upper bound on at
     #[arg(long, value_name = "DATE|TIME")]
     pub to: Option<String>,
-    /// Bucket by day, week, month, year, or a link name
-    #[arg(long, value_name = "day|week|month|year|LINK")]
+    /// Bucket by day, week, month, year, a field, or a link name
+    #[arg(long, value_name = "day|week|month|year|NAME")]
     pub group: Option<String>,
 }
 

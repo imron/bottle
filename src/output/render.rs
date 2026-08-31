@@ -2,8 +2,8 @@ use jiff::tz::TimeZone;
 
 use crate::error::Error;
 use crate::ledger::{
-    Agent, Entries, Entry, FieldValue, GroupedLink, GroupedTime, Outcome, Posted, Schemas, Stamp,
-    Total,
+    Agent, Entries, Entry, FieldValue, GroupedField, GroupedLink, GroupedTime, Outcome, Posted,
+    Schemas, Stamp, Total,
 };
 use crate::spec::{EnumValue, FieldKind, Link, Spec};
 use crate::time;
@@ -71,6 +71,13 @@ pub fn render(outcome: &Outcome, tz: &TimeZone, style: Style) -> Result<String, 
                         tsv::number(*v),
                     ]
                 })
+                .collect();
+            Ok(tsv::table(&[name.as_str(), "value"], &rows, header))
+        }
+        Outcome::GroupedField(GroupedField { name, buckets }) => {
+            let rows: Vec<Vec<String>> = buckets
+                .iter()
+                .map(|(k, v)| vec![k.clone().unwrap_or_default(), tsv::number(*v)])
                 .collect();
             Ok(tsv::table(&[name.as_str(), "value"], &rows, header))
         }

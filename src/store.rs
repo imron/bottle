@@ -255,6 +255,7 @@ pub fn sum(
         None => total(conn, q, field),
         Some(Group::Time(unit)) => by_time(conn, q, field, unit),
         Some(Group::Link(name)) => by_link(conn, q, field, name),
+        Some(Group::Field(name)) => by_field(conn, q, field, name),
     }
 }
 
@@ -355,6 +356,61 @@ fn by_link(
         name,
         buckets: buckets.into_iter().collect(),
     })
+}
+
+fn by_field(
+    conn: &impl Conn,
+    q: Find<'_>,
+    field: &FieldName,
+    group: FieldName,
+) -> Result<Summed, Error> {
+    let spec_field = q
+        .spec
+        .field(&group)
+        .ok_or_else(|| Error::Fail(Fail::UnknownField(group.clone())))?;
+    let col = quote_ident(field.as_str());
+    let group_col = quote_ident(group.as_str());
+    let mut sql = format!(
+        "SELECT CASE WHEN {group_col} IS NULL OR {group_col} = '' THEN NULL ELSE {group_col} END, bottle_dec_sum({col}) FROM {} WHERE 1=1",
+        quote_ident(&table_name(q.schema))
+    );
+    let mut bind = Vec::new();
+    apply_find_filters(&mut sql, &mut bind, &q)?;
+    sql.push_str(&format!(
+        " AND {col} IS NOT NULL AND {col} != '' GROUP BY 1"
+    ));
+    let mut stmt = conn.sqlite().prepare(&sql)?;
+    let mut raw = stmt.query(rusqlite::params_from_iter(
+        bind.iter().map(SqlVal::as_param),
+    ))?;
+    let mut buckets: BTreeMap<Option<String>, Decimal> = BTreeMap::new();
+    while let Some(r) = raw.next()? {
+        let raw_key: Option<String> = r.get(0)?;
+        let total: String = r.get(1)?;
+        buckets.insert(
+            stored_group_key(&group, &spec_field.kind, raw_key)?,
+            Decimal::try_from(StoredNumber(total))?,
+        );
+    }
+    Ok(Summed::Field {
+        name: group,
+        buckets: buckets.into_iter().collect(),
+    })
+}
+
+fn stored_group_key(
+    name: &FieldName,
+    kind: &FieldKind,
+    raw: Option<String>,
+) -> Result<Option<String>, Error> {
+    match raw {
+        Some(s) if !s.is_empty() => match kind {
+            FieldKind::Text => Ok(Some(String::try_from(StoredText(s))?)),
+            FieldKind::Enum(_) => Ok(Some(EnumValue::try_from(StoredEnum(s))?.to_string())),
+            FieldKind::Number => Err(Error::Fail(Fail::CannotGroupByNumber(name.clone()))),
+        },
+        _ => Ok(None),
+    }
 }
 
 fn apply_find_filters(sql: &mut String, bind: &mut Vec<SqlVal>, q: &Find<'_>) -> Result<(), Error> {
